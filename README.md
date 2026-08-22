@@ -16,6 +16,7 @@ msm8953-mainline 内核（Linux 6.19，github.com/msm8953-mainline/linux）编�
 | 5 | drm/panel: FT8716 | FocalTech FT8716 TDDI 1080p 视频模式面板 + Sharp 模组变体 |
 | 6 | drm/panel: NT36672 | Novatek NT36672 1080p 视频模式面板 |
 | 7 | arm64: dts: qcom | `msm8953-smartisan-odin.dts` 设备树 |
+| 3' | msm8953: oem_panel | ODIN 面板 GPIO 检测（TLMM91/92 复刻原厂）+ `fastboot oem panel` 实时切换（见 reports/009） |
 
 所有初始化序列逐字节取自原厂 DTB（用 msm8953-mainline 官方工具
 linux-mdss-dsi-panel-driver-generator 从 boot.img 的 DTB 自动生成后合并）。
@@ -45,9 +46,11 @@ lk2nd 启动 → 用原厂 LK 同款面板表初始化显示并得到 panel_node
 - `bin/lk2nd.img` / `bin/emmc_appsboot.mbn`：已构建好的 lk2nd 固件
   （29 个 msm8953 设备 DTB，含 odin）
 
-默认面板 = 原厂首选 R69006 cmd（与原厂 LK 行为一致）；其他批次可经
-lk2nd 菜单或 `fastboot oem panel <name>` 切换（如
-`fastboot oem panel ft8716_1080p_video`）。
+默认面板 = 复刻原厂 LK 的 GPIO 电平检测（TLMM 91/92 输入 strap）：
+91=1&92=1→NT36672、91=1&92=0→FT8716、91=0→Sharp FT8716（兜底，与出厂行为逐位一致，
+见 reports/009 反汇编证据）。r69006 两变体不参与自动检测（原厂亦然），经
+lk2nd 菜单或 `fastboot oem panel <name>` 显式指定（命令会立即用所选面板重初始化
+显示，黑屏状态下也可经 USB 操作；选择不跨重启持久化）。
 
 ## 三、USB 外接存储链路
 
@@ -89,7 +92,9 @@ exFAT/vfat/ext4 原有。用户态建议安装 udisks2 实现自动挂载
   FTS 驱动，属独立移植任务。
 - QMP SuperSpeed PHY 主线无 msm8953 支持，先以 USB2 HighSpeed 工作
   （480Mbps 对 U 盘足够）。
-- lk2nd 的面板选择沿用原厂 LK 逻辑：默认 R69006 cmd，不做 DSI ID
-  自动探测（原厂 LK 同样不探测）；非默认批次用菜单/fastboot 切换。
+- 面板识别：原厂机制为 GPIO91/92 电平 strap 三分（反汇编实锤，reports/009），
+  本移植已复刻；DSI read-id 签名探测原厂从未使用（signature 全 0xFFFF）。
+- `fastboot oem panel` 的选择不跨重启持久化（r69006 批次如需每次生效，
+  目前需改默认值重编 lk2nd）。
 - 面板 AVDD 取 pm8953_l17@2.85V、IO 取 l6@1.8V，系按原厂电压与同类
   机型推断；如首屏异常优先核对这两路。
