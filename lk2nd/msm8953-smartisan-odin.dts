@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: BSD-3-Clause
+
+/dts-v1/;
+
+#include <skeleton64.dtsi>
+#include <lk2nd.dtsi>
+
+/ {
+	qcom,msm-id = <QCOM_ID_MSM8953 0>;
+	qcom,board-id = <0x0b 0x01>;
+};
+
+&lk2nd {
+	model = "Smartisan U2 Pro (ODIN)";
+	compatible = "smartisan,odin";
+
+	lk2nd,dtb-files = "msm8953-smartisan-odin";
+
+	panel {
+		compatible = "smartisan,odin-panel", "lk2nd,panel";
+
+		qcom,mdss_dsi_r69006_1080p_cmd {
+			compatible = "smartisan,odin-r69006-cmd";
+		};
+		qcom,mdss_dsi_r69006_1080p_video {
+			compatible = "smartisan,odin-r69006-video";
+		};
+		qcom,mdss_dsi_ft8716_1080p_video {
+			compatible = "smartisan,odin-ft8716";
+		};
+		qcom,mdss_dsi_nt36672_1080p_video {
+			compatible = "smartisan,odin-nt36672";
+		};
+		qcom,mdss_dsi_sharp_ft8716_1080p_video {
+			compatible = "smartisan,odin-sharp-ft8716";
+		};
+	};
+};

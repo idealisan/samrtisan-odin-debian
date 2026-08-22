@@ -1,0 +1,29 @@
+From b87d4c1e03db23cb002984c69887d2a4d7297542 Mon Sep 17 00:00:00 2001
+From: odin-port <odin@port.local>
+Date: Sat, 22 Aug 2026 00:07:35 +0800
+Subject: [PATCH 1/7] dt-bindings: vendor-prefixes: add Smartisan
+
+Add the smartisan vendor prefix for Smartisan Digital Co., Ltd.,
+needed for the MSM8953-based Smartisan ODIN (U2 Pro) device.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.yaml | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.yaml b/Documentation/devicetree/bindings/vendor-prefixes.yaml
+index c7591b2ae..618003a5f 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.yaml
++++ b/Documentation/devicetree/bindings/vendor-prefixes.yaml
+@@ -1527,6 +1527,8 @@ patternProperties:
+     description: Sony Corporation
+   "^sophgo,.*":
+     description: Sophgo Technology Inc.
++  "^smartisan,.*":
++    description: Smartisan Digital Co., Ltd.
+   "^sourceparts,.*":
+     description: Source Parts Inc.
+   "^spacemit,.*":
+-- 
+2.48.1
+

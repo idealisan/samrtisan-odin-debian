@@ -1,0 +1,492 @@
+From 897db3345f0edbf2a51c9bbd47fb1611c2e5ae60 Mon Sep 17 00:00:00 2001
+From: odin-port <odin@port.local>
+Date: Sat, 22 Aug 2026 00:08:02 +0800
+Subject: [PATCH 2/7] usb: typec: add Fairchild FUSB301 Type-C port controller
+ driver
+
+The Smartisan ODIN (MSM8953) uses a FUSB301 Type-C CC controller on
+I2C (0x25) for connector attach/detach and orientation detection.
+The chip autonomously performs CC detection and reports the result
+over I2C; translate those events into Type-C class and USB role
+switch updates so the DWC3 controller can switch between host and
+peripheral roles.
+
+Based on the register map of the vendor driver; supports DRP mode
+with manual data role override via the Type-C class sysfs interface.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+---
+ drivers/usb/typec/Kconfig   |  12 +
+ drivers/usb/typec/Makefile  |   1 +
+ drivers/usb/typec/fusb301.c | 421 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 434 insertions(+)
+ create mode 100644 drivers/usb/typec/fusb301.c
+
+diff --git a/drivers/usb/typec/Kconfig b/drivers/usb/typec/Kconfig
+index 2f80c2792..007dd85cd 100644
+--- a/drivers/usb/typec/Kconfig
++++ b/drivers/usb/typec/Kconfig
+@@ -110,6 +110,18 @@ config TYPEC_WUSB3801
+ 	  If you choose to build this driver as a dynamically linked module, the
+ 	  module will be called wusb3801.ko.
+ 
++config TYPEC_FUSB301
++	tristate "Fairchild FUSB301 Type-C port controller driver"
++	depends on I2C
++	depends on USB_ROLE_SWITCH
++	help
++	  Say Y or M here if your system has a Fairchild/ON Semiconductor
++	  FUSB301 Type-C port controller, e.g. in the Smartisan ODIN
++	  (Qualcomm MSM8953) smartphone.
++
++	  If you choose to build this driver as a dynamically linked module,
++	  the module will be called fusb301.ko.
++
+ source "drivers/usb/typec/mux/Kconfig"
+ 
+ source "drivers/usb/typec/altmodes/Kconfig"
+diff --git a/drivers/usb/typec/Makefile b/drivers/usb/typec/Makefile
+index 7a368fea6..fe48c99b0 100644
+--- a/drivers/usb/typec/Makefile
++++ b/drivers/usb/typec/Makefile
+@@ -11,4 +11,5 @@ obj-$(CONFIG_TYPEC_HD3SS3220)	+= hd3ss3220.o
+ obj-$(CONFIG_TYPEC_STUSB160X) 	+= stusb160x.o
+ obj-$(CONFIG_TYPEC_RT1719)	+= rt1719.o
+ obj-$(CONFIG_TYPEC_WUSB3801)	+= wusb3801.o
++obj-$(CONFIG_TYPEC_FUSB301)	+= fusb301.o
+ obj-$(CONFIG_TYPEC)		+= mux/
+diff --git a/drivers/usb/typec/fusb301.c b/drivers/usb/typec/fusb301.c
+new file mode 100644
+index 000000000..6f075051b
+--- /dev/null
++++ b/drivers/usb/typec/fusb301.c
+@@ -0,0 +1,421 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Fairchild/ON Semiconductor FUSB301 Type-C port controller driver
++ *
++ * Ported from the vendor driver found in Smartisan ODIN (MSM8953) and
++ * LG/NVIDIA downstream kernels. The FUSB301 autonomously performs CC
++ * attach/detach detection and reports the result over I2C; this driver
++ * translates those events into Type-C class and USB role switch updates.
++ */
++
++#include <linux/delay.h>
++#include <linux/i2c.h>
++#include <linux/interrupt.h>
++#include <linux/mod_devicetable.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/regulator/consumer.h>
++#include <linux/usb/typec.h>
++#include <linux/usb/role.h>
++
++#define FUSB301_REG_DEVICEID		0x01
++#define FUSB301_REG_MODES		0x02
++#define FUSB301_REG_CONTROL		0x03
++#define FUSB301_REG_MANUAL		0x04
++#define FUSB301_REG_RESET		0x05
++#define FUSB301_REG_MASK		0x10
++#define FUSB301_REG_STATUS		0x11
++#define FUSB301_REG_TYPE		0x12
++#define FUSB301_REG_INT			0x13
++
++/* MODES register */
++#define FUSB301_MODE_DRP_ACC		BIT(5)
++#define FUSB301_MODE_DRP		BIT(4)
++#define FUSB301_MODE_SNK_ACC		BIT(3)
++#define FUSB301_MODE_SNK		BIT(2)
++#define FUSB301_MODE_SRC_ACC		BIT(1)
++#define FUSB301_MODE_SRC		BIT(0)
++#define FUSB301_MODE_MASK		0x3f
++
++/* CONTROL register */
++#define FUSB301_TGL_MASK		0x30
++#define FUSB301_HOST_CUR_MASK		0x06
++
++#define FUSB301_HOST_CUR_DEFAULT	0x01
++#define FUSB301_HOST_CUR_1_5A		0x02
++#define FUSB301_HOST_CUR_3_0A		0x03
++
++/* RESET register */
++#define FUSB301_SW_RESET		BIT(0)
++
++/* MASK register */
++#define FUSB301_INT_DISABLE		BIT(0)
++
++/* STATUS register */
++#define FUSB301_FAULT_CC		0x30
++#define FUSB301_CC2			0x20
++#define FUSB301_CC1			0x10
++#define FUSB301_VBUS_OK			0x08
++#define FUSB301_BC_LVL_MASK		0x06
++#define FUSB301_ATTACH			0x01
++
++/* TYPE register */
++#define FUSB301_TYPE_SNK		BIT(4)
++#define FUSB301_TYPE_SRC		BIT(3)
++#define FUSB301_TYPE_PWR_ACC		BIT(2)
++#define FUSB301_TYPE_DBG_ACC		BIT(1)
++#define FUSB301_TYPE_AUD_ACC		BIT(0)
++#define FUSB301_TYPE_MASK		0x1f
++
++/* INT register */
++#define FUSB301_INT_ACC_CH		BIT(3)
++#define FUSB301_INT_BCLVL		BIT(2)
++#define FUSB301_INT_DETACH		BIT(1)
++#define FUSB301_INT_ATTACH		BIT(0)
++
++struct fusb301 {
++	struct i2c_client *client;
++	struct typec_capability cap;
++	struct typec_port *port;
++	struct typec_partner *partner;
++	struct usb_role_switch *role_sw;
++	struct regulator *vbus;
++	struct mutex lock;
++
++	u8 mode;
++	enum typec_port_type port_type;
++};
++
++static int fusb301_dr_set(struct typec_port *port, enum typec_data_role role);
++
++static const struct typec_operations fusb301_typec_ops = {
++	.dr_set = fusb301_dr_set,
++};
++
++static int fusb301_read(struct fusb301 *chip, u8 reg)
++{
++	int ret;
++
++	ret = i2c_smbus_read_byte_data(chip->client, reg);
++	if (ret < 0)
++		dev_err(&chip->client->dev, "failed to read 0x%02x: %d\n",
++			reg, ret);
++
++	return ret;
++}
++
++static int fusb301_write(struct fusb301 *chip, u8 reg, u8 val)
++{
++	int ret;
++
++	ret = i2c_smbus_write_byte_data(chip->client, reg, val);
++	if (ret < 0)
++		dev_err(&chip->client->dev,
++			"failed to write 0x%02x = 0x%02x: %d\n", reg, val, ret);
++
++	return ret;
++}
++
++static int fusb301_set_mode(struct fusb301 *chip, u8 mode)
++{
++	int ret;
++
++	ret = fusb301_write(chip, FUSB301_REG_MODES, mode & FUSB301_MODE_MASK);
++	if (!ret)
++		chip->mode = mode & FUSB301_MODE_MASK;
++
++	return ret;
++}
++
++static int fusb301_reset_device(struct fusb301 *chip)
++{
++	int ret;
++
++	ret = fusb301_write(chip, FUSB301_REG_RESET, FUSB301_SW_RESET);
++	if (ret)
++		return ret;
++
++	usleep_range(1000, 2000);
++
++	return fusb301_set_mode(chip, chip->mode);
++}
++
++static void fusb301_set_role(struct fusb301 *chip, enum usb_role role)
++{
++	int ret = 0;
++
++	if (chip->role_sw) {
++		ret = usb_role_switch_set_role(chip->role_sw, role);
++		if (ret)
++			dev_err(&chip->client->dev,
++				"failed to set role %d: %d\n", role, ret);
++	}
++
++	if (chip->vbus) {
++		if (role == USB_ROLE_HOST)
++			ret = regulator_enable(chip->vbus);
++		else
++			ret = regulator_disable(chip->vbus);
++		if (ret)
++			dev_err(&chip->client->dev,
++				"failed to %s vbus: %d\n",
++				role == USB_ROLE_HOST ? "enable" : "disable",
++				ret);
++	}
++}
++
++static void fusb301_attach(struct fusb301 *chip, u8 status, u8 type)
++{
++	struct device *dev = &chip->client->dev;
++	struct typec_partner_desc desc = { };
++	enum typec_pwr_opmode opmode = TYPEC_PWR_MODE_USB;
++	bool source = !!(type & FUSB301_TYPE_SNK);
++	int ret;
++
++	mutex_lock(&chip->lock);
++
++	if (chip->partner) {
++		mutex_unlock(&chip->lock);
++		return;
++	}
++
++	switch (status & (FUSB301_CC1 | FUSB301_CC2)) {
++	case FUSB301_CC1:
++		typec_set_orientation(chip->port, TYPEC_ORIENTATION_NORMAL);
++		break;
++	case FUSB301_CC2:
++		typec_set_orientation(chip->port, TYPEC_ORIENTATION_REVERSE);
++		break;
++	default:
++		break;
++	}
++
++	if (source) {
++		/* A sink is attached: we are the power/data source */
++		typec_set_pwr_role(chip->port, TYPEC_SOURCE);
++		typec_set_data_role(chip->port, TYPEC_HOST);
++		fusb301_set_role(chip, USB_ROLE_HOST);
++
++		switch (status & FUSB301_BC_LVL_MASK) {
++		case 0x04:
++			opmode = TYPEC_PWR_MODE_1_5A;
++			break;
++		case 0x06:
++			opmode = TYPEC_PWR_MODE_3_0A;
++			break;
++		}
++	} else {
++		/* A source is attached: we are the sink */
++		typec_set_pwr_role(chip->port, TYPEC_SINK);
++		typec_set_data_role(chip->port, TYPEC_DEVICE);
++		fusb301_set_role(chip, USB_ROLE_DEVICE);
++
++		if (type & FUSB301_TYPE_PWR_ACC)
++			opmode = TYPEC_PWR_MODE_PD;
++	}
++
++	typec_set_pwr_opmode(chip->port, opmode);
++
++	desc.accessory = TYPEC_ACCESSORY_NONE;
++	chip->partner = typec_register_partner(chip->port, &desc);
++	if (IS_ERR_OR_NULL(chip->partner)) {
++		dev_err(dev, "failed to register partner\n");
++		chip->partner = NULL;
++	}
++
++	ret = fusb301_read(chip, FUSB301_REG_TYPE);
++	dev_dbg(dev, "attached: status=0x%02x type=0x%02x (%s)\n",
++		status, ret < 0 ? type : (u8)ret, source ? "source" : "sink");
++
++	mutex_unlock(&chip->lock);
++}
++
++static void fusb301_detach(struct fusb301 *chip)
++{
++	mutex_lock(&chip->lock);
++
++	if (chip->partner) {
++		typec_unregister_partner(chip->partner);
++		chip->partner = NULL;
++	}
++
++	typec_set_data_role(chip->port, TYPEC_DEVICE);
++	typec_set_pwr_role(chip->port, TYPEC_SINK);
++	fusb301_set_role(chip, USB_ROLE_NONE);
++
++	mutex_unlock(&chip->lock);
++}
++
++static irqreturn_t fusb301_irq_thread(int irq, void *data)
++{
++	struct fusb301 *chip = data;
++	int ret, status;
++
++	ret = fusb301_read(chip, FUSB301_REG_INT);
++	if (ret < 0)
++		return IRQ_HANDLED;
++
++	if (!(ret & (FUSB301_INT_ATTACH | FUSB301_INT_DETACH)))
++		return IRQ_HANDLED;
++
++	status = fusb301_read(chip, FUSB301_REG_STATUS);
++	if (status < 0)
++		return IRQ_HANDLED;
++
++	if (status & FUSB301_ATTACH) {
++		int type = fusb301_read(chip, FUSB301_REG_TYPE);
++
++		if (type >= 0)
++			fusb301_attach(chip, status, type & FUSB301_TYPE_MASK);
++	} else {
++		fusb301_detach(chip);
++	}
++
++	return IRQ_HANDLED;
++}
++
++static int fusb301_dr_set(struct typec_port *port, enum typec_data_role role)
++{
++	struct fusb301 *chip = typec_get_drvdata(port);
++	u8 mode;
++	int ret;
++
++	if (role == TYPEC_HOST)
++		mode = FUSB301_MODE_SRC;
++	else if (role == TYPEC_DEVICE)
++		mode = FUSB301_MODE_SNK;
++	else
++		return -EINVAL;
++
++	mutex_lock(&chip->lock);
++	ret = fusb301_set_mode(chip, mode);
++	mutex_unlock(&chip->lock);
++
++	return ret;
++}
++
++static int fusb301_probe(struct i2c_client *client)
++{
++	struct fwnode_handle *connector;
++	struct device *dev = &client->dev;
++	struct fusb301 *chip;
++	u32 val;
++	int ret;
++
++	chip = devm_kzalloc(dev, sizeof(*chip), GFP_KERNEL);
++	if (!chip)
++		return -ENOMEM;
++
++	chip->client = client;
++	mutex_init(&chip->lock);
++
++	ret = fusb301_read(chip, FUSB301_REG_DEVICEID);
++	if (ret < 0)
++		return dev_err_probe(dev, ret, "failed to read device ID\n");
++
++	dev_dbg(dev, "FUSB301 device ID: 0x%02x\n", ret);
++
++	/* Default to DRP with audio accessory detection, like the vendor DT */
++	chip->mode = FUSB301_MODE_DRP_ACC;
++	if (!device_property_read_u32(dev, "fcs,init-mode", &val))
++		chip->mode = val & FUSB301_MODE_MASK;
++
++	ret = fusb301_reset_device(chip);
++	if (ret)
++		return dev_err_probe(dev, ret, "failed to reset device\n");
++
++	/* Host current advertisement: default USB default current */
++	val = FUSB301_HOST_CUR_DEFAULT;
++	device_property_read_u32(dev, "fcs,host-current", &val);
++	ret = fusb301_read(chip, FUSB301_REG_CONTROL);
++	if (ret >= 0)
++		fusb301_write(chip, FUSB301_REG_CONTROL,
++			      (ret & ~FUSB301_HOST_CUR_MASK) |
++			      ((val << 1) & FUSB301_HOST_CUR_MASK));
++
++	/* Unmask all interrupts */
++	fusb301_write(chip, FUSB301_REG_MASK, 0);
++
++	connector = device_get_named_child_node(dev, "connector");
++	if (connector)
++		chip->role_sw = fwnode_usb_role_switch_get(connector);
++	if (IS_ERR_OR_NULL(chip->role_sw)) {
++		ret = PTR_ERR(chip->role_sw);
++		fwnode_handle_put(connector);
++		if (ret == -EPROBE_DEFER)
++			return dev_err_probe(dev, ret,
++					     "usb role switch not ready\n");
++		dev_warn(dev, "no USB role switch available yet\n");
++		chip->role_sw = NULL;
++	}
++	fwnode_handle_put(connector);
++
++	chip->vbus = devm_regulator_get_optional(dev, "vbus");
++	if (IS_ERR(chip->vbus)) {
++		ret = PTR_ERR(chip->vbus);
++		if (ret != -ENODEV)
++			return dev_err_probe(dev, ret, "failed to get vbus\n");
++		chip->vbus = NULL;
++	}
++
++	chip->cap.type = TYPEC_PORT_DRP;
++	chip->cap.data = TYPEC_PORT_DRD;
++	chip->cap.prefer_role = TYPEC_NO_PREFERRED_ROLE;
++	chip->cap.orientation_aware = true;
++	chip->cap.driver_data = chip;
++	chip->cap.ops = &fusb301_typec_ops;
++	chip->port = typec_register_port(dev, &chip->cap);
++	if (IS_ERR(chip->port))
++		return dev_err_probe(dev, PTR_ERR(chip->port),
++				     "failed to register Type-C port\n");
++
++	ret = devm_request_threaded_irq(dev, client->irq, NULL,
++					fusb301_irq_thread,
++					IRQF_ONESHOT | IRQF_TRIGGER_LOW,
++					dev_name(dev), chip);
++	if (ret) {
++		typec_unregister_port(chip->port);
++		return dev_err_probe(dev, ret, "failed to request IRQ\n");
++	}
++
++	i2c_set_clientdata(client, chip);
++
++	/* Report initial state */
++	{
++		int status = fusb301_read(chip, FUSB301_REG_STATUS);
++
++		if (status >= 0 && (status & FUSB301_ATTACH)) {
++			int type = fusb301_read(chip, FUSB301_REG_TYPE);
++
++			if (type >= 0)
++				fusb301_attach(chip, status,
++					       type & FUSB301_TYPE_MASK);
++		}
++	}
++
++	return 0;
++}
++
++static void fusb301_remove(struct i2c_client *client)
++{
++	struct fusb301 *chip = i2c_get_clientdata(client);
++
++	fusb301_detach(chip);
++	fusb301_write(chip, FUSB301_REG_MASK, FUSB301_INT_DISABLE);
++	typec_unregister_port(chip->port);
++}
++
++static const struct of_device_id fusb301_of_match[] = {
++	{ .compatible = "fcs,fusb301" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, fusb301_of_match);
++
++static struct i2c_driver fusb301_driver = {
++	.driver = {
++		.name = "fusb301",
++		.of_match_table = fusb301_of_match,
++	},
++	.probe = fusb301_probe,
++	.remove = fusb301_remove,
++};
++module_i2c_driver(fusb301_driver);
++
++MODULE_AUTHOR("Smartisan ODIN mainline porting effort");
++MODULE_DESCRIPTION("Fairchild FUSB301 Type-C port controller driver");
++MODULE_LICENSE("GPL");
+-- 
+2.48.1
+

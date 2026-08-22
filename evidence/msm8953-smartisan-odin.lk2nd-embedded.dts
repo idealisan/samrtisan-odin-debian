@@ -1,0 +1,50 @@
+/dts-v1/;
+
+/ {
+	#address-cells = <0x02>;
+	#size-cells = <0x02>;
+	model = "msm8953-smartisan-odin";
+	qcom,msm-id = <0x125 0x00>;
+	qcom,board-id = <0x0b 0x01>;
+
+	chosen {
+	};
+
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x00 0x80000000 0x00 0x00>;
+	};
+
+	lk2nd {
+		model = "Smartisan U2 Pro (ODIN)";
+		compatible = "smartisan,odin";
+		lk2nd,dtb-files = "msm8953-smartisan-odin";
+
+		panel {
+			compatible = "smartisan,odin-panel", "lk2nd,panel";
+
+			qcom,mdss_dsi_r69006_1080p_cmd {
+				compatible = "smartisan,odin-r69006-cmd";
+			};
+
+			qcom,mdss_dsi_r69006_1080p_video {
+				compatible = "smartisan,odin-r69006-video";
+			};
+
+			qcom,mdss_dsi_ft8716_1080p_video {
+				compatible = "smartisan,odin-ft8716";
+			};
+
+			qcom,mdss_dsi_nt36672_1080p_video {
+				compatible = "smartisan,odin-nt36672";
+			};
+
+			qcom,mdss_dsi_sharp_ft8716_1080p_video {
+				compatible = "smartisan,odin-sharp-ft8716";
+			};
+		};
+	};
+
+	lk2nd-hw {
+	};
+};

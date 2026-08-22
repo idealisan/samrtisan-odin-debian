@@ -1,0 +1,58 @@
+From: Smartisan ODIN mainline porting effort
+Subject: [PATCH 2/2] msm8953: add Smartisan ODIN (U2 Pro) device
+
+Map all five stock panel names to their mainline kernel
+compatibles so lk2nd replaces the placeholder compatible in the
+Linux device tree with the detected panel.
+---
+--- /dev/null
++++ b/lk2nd/device/dts/msm8953/msm8953-smartisan-odin.dts
+@@ -0,0 +1,38 @@
++// SPDX-License-Identifier: BSD-3-Clause
++
++/dts-v1/;
++
++#include <skeleton64.dtsi>
++#include <lk2nd.dtsi>
++
++/ {
++	qcom,msm-id = <QCOM_ID_MSM8953 0>;
++	qcom,board-id = <0x0b 0x01>;
++};
++
++&lk2nd {
++	model = "Smartisan U2 Pro (ODIN)";
++	compatible = "smartisan,odin";
++
++	lk2nd,dtb-files = "msm8953-smartisan-odin";
++
++	panel {
++		compatible = "smartisan,odin-panel", "lk2nd,panel";
++
++		qcom,mdss_dsi_r69006_1080p_cmd {
++			compatible = "smartisan,odin-r69006-cmd";
++		};
++		qcom,mdss_dsi_r69006_1080p_video {
++			compatible = "smartisan,odin-r69006-video";
++		};
++		qcom,mdss_dsi_ft8716_1080p_video {
++			compatible = "smartisan,odin-ft8716";
++		};
++		qcom,mdss_dsi_nt36672_1080p_video {
++			compatible = "smartisan,odin-nt36672";
++		};
++		qcom,mdss_dsi_sharp_ft8716_1080p_video {
++			compatible = "smartisan,odin-sharp-ft8716";
++		};
++	};
++};
+--- a/lk2nd/device/dts/msm8953/rules.mk
++++ b/lk2nd/device/dts/msm8953/rules.mk
+@@ -15,6 +15,7 @@
+ 	$(LOCAL_DIR)/msm8953-oppo-r9s.dtb \
+ 	$(LOCAL_DIR)/msm8953-qrd.dtb \
+ 	$(LOCAL_DIR)/msm8953-qrd-sku3.dtb \
++	$(LOCAL_DIR)/msm8953-smartisan-odin.dtb \
+ 	$(LOCAL_DIR)/msm8953-wingtech-wt89536.dtb \
+ 	$(LOCAL_DIR)/msm8953-xiaomi-common.dtb \
+ 	$(LOCAL_DIR)/msm8953-xiaomi-daisy.dtb \

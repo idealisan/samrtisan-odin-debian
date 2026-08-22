@@ -1,0 +1,174 @@
+From 1d12b99bebc7d5a5840567b3d727e77f471e02be Mon Sep 17 00:00:00 2001
+From: odin-port <odin@port.local>
+Date: Sat, 22 Aug 2026 00:08:02 +0800
+Subject: [PATCH 3/7] regulator: add Qualcomm SMBCHG OTG boost VBUS regulator
+
+Expose the OTG boost converter of the Qualcomm SMBCHG charger block
+(e.g. PMI8950 on the Smartisan ODIN) as a fixed 5V regulator. The
+boost converter is controlled by a single bit in the battery
+interface CMD_CHG register (base + 0x42).
+
+This provides VBUS power for USB host mode (external storage).
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+---
+ drivers/regulator/Kconfig           |   9 +++
+ drivers/regulator/Makefile          |   1 +
+ drivers/regulator/qcom-smbchg-otg.c | 116 ++++++++++++++++++++++++++++
+ 3 files changed, 126 insertions(+)
+ create mode 100644 drivers/regulator/qcom-smbchg-otg.c
+
+diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+index d2335276c..ce10f8a20 100644
+--- a/drivers/regulator/Kconfig
++++ b/drivers/regulator/Kconfig
+@@ -1185,6 +1185,15 @@ config REGULATOR_QCOM_SMD_RPM
+ 	  Qualcomm RPM as a module. The module will be named
+ 	  "qcom_smd-regulator".
+ 
++config REGULATOR_QCOM_SMBCHG_OTG
++	tristate "Qualcomm SMBCHG OTG boost VBUS regulator"
++	depends on SPMI || COMPILE_TEST
++	help
++	  Say Y or M here to expose the OTG boost converter of the Qualcomm
++	  SMBCHG charger block (e.g. PMI8950, Smartisan ODIN) as a fixed
++	  5V regulator for USB host VBUS.
++
++
+ config REGULATOR_QCOM_SPMI
+ 	tristate "Qualcomm SPMI regulator driver"
+ 	depends on SPMI || COMPILE_TEST
+diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+index 1beba1493..cf8e46f14 100644
+--- a/drivers/regulator/Makefile
++++ b/drivers/regulator/Makefile
+@@ -216,3 +216,4 @@ obj-$(CONFIG_REGULATOR_WM8400) += wm8400-regulator.o
+ obj-$(CONFIG_REGULATOR_WM8994) += wm8994-regulator.o
+ 
+ ccflags-$(CONFIG_REGULATOR_DEBUG) += -DDEBUG
++obj-$(CONFIG_REGULATOR_QCOM_SMBCHG_OTG) += qcom-smbchg-otg.o
+diff --git a/drivers/regulator/qcom-smbchg-otg.c b/drivers/regulator/qcom-smbchg-otg.c
+new file mode 100644
+index 000000000..247c80f74
+--- /dev/null
++++ b/drivers/regulator/qcom-smbchg-otg.c
+@@ -0,0 +1,116 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Qualcomm SMBCHG OTG boost VBUS regulator
++ *
++ * Minimal regulator exposing the OTG boost converter found in the
++ * Qualcomm SMBCHG battery charger block (e.g. PMI8950 as used by the
++ * Smartisan ODIN). The boost converter is enabled by a single bit in
++ * the battery interface CMD_CHG register.
++ */
++
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/regulator/driver.h>
++#include <linux/regulator/of_regulator.h>
++
++#define SMBCHG_CMD_CHG_REG		0x42
++#define SMBCHG_OTG_EN_BIT		BIT(0)
++
++struct smbchg_otg {
++	struct regmap *regmap;
++	u32 base;
++};
++
++static int smbchg_otg_enable(struct regulator_dev *rdev)
++{
++	struct smbchg_otg *chip = rdev_get_drvdata(rdev);
++
++	return regmap_update_bits(chip->regmap, chip->base + SMBCHG_CMD_CHG_REG,
++				  SMBCHG_OTG_EN_BIT, SMBCHG_OTG_EN_BIT);
++}
++
++static int smbchg_otg_disable(struct regulator_dev *rdev)
++{
++	struct smbchg_otg *chip = rdev_get_drvdata(rdev);
++
++	return regmap_update_bits(chip->regmap, chip->base + SMBCHG_CMD_CHG_REG,
++				  SMBCHG_OTG_EN_BIT, 0);
++}
++
++static int smbchg_otg_is_enabled(struct regulator_dev *rdev)
++{
++	struct smbchg_otg *chip = rdev_get_drvdata(rdev);
++	unsigned int val;
++	int ret;
++
++	ret = regmap_read(chip->regmap, chip->base + SMBCHG_CMD_CHG_REG, &val);
++	if (ret)
++		return ret;
++
++	return !!(val & SMBCHG_OTG_EN_BIT);
++}
++
++static const struct regulator_ops smbchg_otg_ops = {
++	.enable		= smbchg_otg_enable,
++	.disable	= smbchg_otg_disable,
++	.is_enabled	= smbchg_otg_is_enabled,
++};
++
++static const struct regulator_desc smbchg_otg_desc = {
++	.name = "smbchg-otg-vbus",
++	.of_match = of_match_ptr("otg-vbus"),
++	.ops = &smbchg_otg_ops,
++	.type = REGULATOR_VOLTAGE,
++	.owner = THIS_MODULE,
++	.fixed_uV = 5000000,
++	.n_voltages = 1,
++};
++
++static int smbchg_otg_probe(struct platform_device *pdev)
++{
++	struct regulator_config rcfg = { };
++	struct smbchg_otg *chip;
++	struct device *dev = &pdev->dev;
++	int ret;
++
++	chip = devm_kzalloc(dev, sizeof(*chip), GFP_KERNEL);
++	if (!chip)
++		return -ENOMEM;
++
++	chip->regmap = dev_get_regmap(dev->parent, NULL);
++	if (!chip->regmap)
++		return dev_err_probe(dev, -ENXIO,
++				     "failed to get parent regmap\n");
++
++	ret = of_property_read_u32_index(dev->of_node, "reg", 0, &chip->base);
++	if (ret)
++		return dev_err_probe(dev, ret, "failed to read base address\n");
++
++	rcfg.dev = dev;
++	rcfg.driver_data = chip;
++	rcfg.of_node = dev->of_node;
++
++	return PTR_ERR_OR_ZERO(devm_regulator_register(dev, &smbchg_otg_desc,
++						       &rcfg));
++}
++
++static const struct of_device_id smbchg_otg_of_match[] = {
++	{ .compatible = "qcom,pmi8950-smbchg-otg" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, smbchg_otg_of_match);
++
++static struct platform_driver smbchg_otg_driver = {
++	.driver = {
++		.name = "qcom-smbchg-otg",
++		.of_match_table = smbchg_otg_of_match,
++	},
++	.probe = smbchg_otg_probe,
++};
++module_platform_driver(smbchg_otg_driver);
++
++MODULE_AUTHOR("Smartisan ODIN mainline porting effort");
++MODULE_DESCRIPTION("Qualcomm SMBCHG OTG boost VBUS regulator");
++MODULE_LICENSE("GPL");
+-- 
+2.48.1
+

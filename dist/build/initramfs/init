@@ -1,0 +1,74 @@
+#!/bin/sh
+# ODIN Debian minimal initramfs
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+mount -t proc none /proc
+mount -t sysfs none /sys
+mount -t devtmpfs none /dev 2>/dev/null || mdev -s
+mount -t configfs none /sys/kernel/config 2>/dev/null
+
+RESCUE=0
+for x in $(cat /proc/cmdline); do
+    [ "$x" = "odin.telnet=always" ] && RESCUE=1
+done
+
+usb_up() {
+    G=/sys/kernel/config/usb_gadget/odin
+    [ -d /sys/kernel/config/usb_gadget ] || return 1
+    [ -e $G/UDC ] && return 0
+    mkdir -p $G/functions/ncm.usb0 $G/configs/c.1 2>/dev/null
+    echo 0x18d1 > $G/idVendor 2>/dev/null
+    echo 0x4ee1 > $G/idProduct 2>/dev/null
+    ln -sf $G/functions/ncm.usb0 $G/configs/c.1/f1 2>/dev/null
+    UDC=$(ls /sys/class/udc 2>/dev/null | head -n1)
+    [ -n "$UDC" ] && echo "$UDC" > $G/UDC 2>/dev/null || return 1
+    sleep 1
+    ip link set usb0 up 2>/dev/null
+    ip addr add 172.16.42.1/24 dev usb0 2>/dev/null
+}
+
+try_mount_root() {
+    ROOT=$(findfs LABEL=pmOS_root 2>/dev/null)
+    if [ -n "$ROOT" ] && mount -t ext4 -o ro "$ROOT" /mnt 2>/dev/null; then
+        [ -x /mnt/sbin/init ] && return 0
+        umount /mnt
+    fi
+    # fallback: brute scan mmc partitions for our marker
+    for dev in /dev/mmcblk0p* /dev/mmcblk1p* /dev/mmcblk0 /dev/mmcblk1; do
+        [ -b "$dev" ] || continue
+        mount -t ext4 -o ro "$dev" /mnt 2>/dev/null || continue
+        if [ -x /mnt/sbin/init ] && [ -f /mnt/.odin-debian ]; then
+            ROOT="$dev"; return 0
+        fi
+        umount /mnt
+    done
+    return 1
+}
+
+echo "[initramfs] waiting for pmOS_root ..."
+i=0; ROOT=""
+while [ $i -lt 150 ]; do          # ~30s
+    if try_mount_root; then
+        echo "[initramfs] root found on $ROOT"
+        break
+    fi
+    [ $((i % 25)) -eq 0 ] && { usb_up; telnetd -l /bin/sh -p 23 2>/dev/null; }
+    sleep 0.2; i=$((i+1))
+done
+
+if [ -z "$ROOT" ]; then
+    echo "[initramfs] BOOT FAILED - rescue: telnet 172.16.42.2->23 / UART ttyMSM0"
+    usb_up; telnetd -l /bin/sh -p 23 2>/dev/null
+    while ! try_mount_root; do sleep 5; done
+    echo "[initramfs] root appeared, booting"
+fi
+
+[ "$RESCUE" = "1" ] && { echo "staying in rescue shell"; exec sh; }
+
+umount /mnt
+kill %1 %2 2>/dev/null
+mount --move /dev  /mnt/dev   2>/dev/null || { mkdir -p /mnt/dev;  mount -t devtmpfs none /mnt/dev; }
+mount --move /proc /mnt/proc  2>/dev/null || { mkdir -p /mnt/proc; mount -t proc none /mnt/proc; }
+mount --move /sys  /mnt/sys   2>/dev/null || { mkdir -p /mnt/sys;  mount -t sysfs none /mnt/sys; }
+exec switch_root /mnt /sbin/init
+echo "[initramfs] switch_root FAILED - emergency shell"
+exec sh

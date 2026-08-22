@@ -1,0 +1,580 @@
+From c5981699769e0ee63528693eff90454a0b3823a6 Mon Sep 17 00:00:00 2001
+From: odin-port <odin@port.local>
+Date: Sat, 22 Aug 2026 00:08:17 +0800
+Subject: [PATCH 4/7] drm/panel: add Smartisan ODIN R69006 1080p DSI panel
+ driver
+
+Add support for the R69006-based 1080x1920 panels found in the
+Smartisan ODIN, in both command mode (stock preferred panel) and
+video mode variants. Initialization sequences are taken verbatim
+from the stock (downstream) device tree.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+---
+ drivers/gpu/drm/panel/Kconfig        |  30 ++
+ drivers/gpu/drm/panel/Makefile       |   3 +
+ drivers/gpu/drm/panel/panel-r69006.c | 503 +++++++++++++++++++++++++++
+ 3 files changed, 536 insertions(+)
+ create mode 100644 drivers/gpu/drm/panel/panel-r69006.c
+
+diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
+index 7a83804fe..fe8600a96 100644
+--- a/drivers/gpu/drm/panel/Kconfig
++++ b/drivers/gpu/drm/panel/Kconfig
+@@ -1211,3 +1211,33 @@ config DRM_PANEL_XINPENG_XPP055C272
+ 	  XPP055C272 controller for 720x1280 LCD panels with MIPI/RGB/SPI
+ 	  system interfaces.
+ endmenu
++
++config DRM_PANEL_SMARTISAN_R69006
++	tristate "Smartisan ODIN R69006-based 1080p MIPI-DSI panels"
++	depends on OF
++	depends on DRM_MIPI_DSI
++	depends on BACKLIGHT_CLASS_DEVICE
++	help
++	  Say Y here if you want to enable support for the R69006-based
++	  1080x1920 command and video mode DSI panels found in the Smartisan
++	  ODIN (U2 Pro) smartphone.
++
++config DRM_PANEL_SMARTISAN_FT8716
++	tristate "Smartisan ODIN FocalTech FT8716-based 1080p MIPI-DSI panels"
++	depends on OF
++	depends on DRM_MIPI_DSI
++	depends on BACKLIGHT_CLASS_DEVICE
++	help
++	  Say Y here if you want to enable support for the FocalTech FT8716
++	  TDDI-based 1080x1920 video mode DSI panels (including the Sharp
++	  module variant) found in the Smartisan ODIN (U2 Pro) smartphone.
++
++config DRM_PANEL_SMARTISAN_NT36672
++	tristate "Smartisan ODIN Novatek NT36672 1080p MIPI-DSI panel"
++	depends on OF
++	depends on DRM_MIPI_DSI
++	depends on BACKLIGHT_CLASS_DEVICE
++	help
++	  Say Y here if you want to enable support for the Novatek NT36672
++	  1080x1920 video mode DSI panel found in the Smartisan ODIN (U2 Pro)
++	  smartphone.
+diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
+index b9562a6fd..9056f48be 100644
+--- a/drivers/gpu/drm/panel/Makefile
++++ b/drivers/gpu/drm/panel/Makefile
+@@ -120,3 +120,6 @@ obj-$(CONFIG_DRM_PANEL_VISIONOX_VTDR6130) += panel-visionox-vtdr6130.o
+ obj-$(CONFIG_DRM_PANEL_VISIONOX_R66451) += panel-visionox-r66451.o
+ obj-$(CONFIG_DRM_PANEL_WIDECHIPS_WS2401) += panel-widechips-ws2401.o
+ obj-$(CONFIG_DRM_PANEL_XINPENG_XPP055C272) += panel-xinpeng-xpp055c272.o
++obj-$(CONFIG_DRM_PANEL_SMARTISAN_R69006) += panel-r69006.o
++obj-$(CONFIG_DRM_PANEL_SMARTISAN_FT8716) += panel-ft8716.o
++obj-$(CONFIG_DRM_PANEL_SMARTISAN_NT36672) += panel-nt36672.o
+diff --git a/drivers/gpu/drm/panel/panel-r69006.c b/drivers/gpu/drm/panel/panel-r69006.c
+new file mode 100644
+index 000000000..fda042b84
+--- /dev/null
++++ b/drivers/gpu/drm/panel/panel-r69006.c
+@@ -0,0 +1,503 @@
++// SPDX-License-Identifier: GPL-2.0-only
++// Copyright (c) 2026 Smartisan ODIN panel porting effort
++// Generated with linux-mdss-dsi-panel-driver-generator from vendor device tree:
++//   Copyright (c) 2013, The Linux Foundation. All rights reserved.
++
++#include <linux/delay.h>
++#include <linux/gpio/consumer.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/regulator/consumer.h>
++
++#include <drm/drm_mipi_dsi.h>
++#include <drm/drm_modes.h>
++#include <drm/drm_panel.h>
++
++struct r69006 {
++	struct drm_panel panel;
++	struct mipi_dsi_device *dsi;
++	struct gpio_desc *reset_gpio;
++	struct regulator_bulk_data supplies[4];
++	bool prepared;
++	const struct odin_panel_variant *variant;
++};
++
++static inline struct r69006 *to_r69006(struct drm_panel *panel)
++{
++	return container_of(panel, struct r69006, panel);
++}
++
++#define dsi_generic_write_seq(dsi, seq...) do {				\
++		static const u8 d[] = { seq };				\
++		int ret;							\
++		ret = mipi_dsi_generic_write(dsi, d, ARRAY_SIZE(d));	\
++		if (ret < 0)							\
++			return ret;						\
++	} while (0)
++
++#define dsi_dcs_write_seq(dsi, seq...) do {				\
++		static const u8 d[] = { seq };				\
++		int ret;							\
++		ret = mipi_dsi_dcs_write_buffer(dsi, d, ARRAY_SIZE(d));	\
++		if (ret < 0)							\
++			return ret;						\
++	} while (0)
++
++static void r69006_cmd_panel_reset(struct r69006 *ctx)
++{
++	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
++	usleep_range(10000, 11000);
++	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
++	usleep_range(10000, 11000);
++	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
++	usleep_range(10000, 11000);
++}
++
++static int r69006_cmd_panel_on(struct r69006 *ctx)
++{
++	struct mipi_dsi_device *dsi = ctx->dsi;
++	struct device *dev = &dsi->dev;
++	int ret;
++
++	dsi->mode_flags |= MIPI_DSI_MODE_LPM;
++
++	dsi_generic_write_seq(dsi, 0xb0, 0x00);
++	dsi_generic_write_seq(dsi, 0xb3, 0x04, 0x10, 0x00, 0x00, 0x00);
++	dsi_generic_write_seq(dsi, 0xb4, 0x0c, 0x00);
++	dsi_generic_write_seq(dsi, 0xb6, 0x3b, 0xd3, 0x00);
++	dsi_generic_write_seq(dsi, 0xc0, 0x00);
++	dsi_dcs_write_seq(dsi, 0x36, 0x98);
++	dsi_generic_write_seq(dsi, 0xcc, 0x04);
++	dsi_generic_write_seq(dsi, 0xc1,
++			      0x84, 0x00, 0x10, 0xef, 0x8b, 0xf1, 0xff, 0xff,
++			      0xdf, 0x9c, 0xc5, 0x9a, 0x73, 0x8d, 0xad, 0x63,
++			      0xfe, 0xff, 0xff, 0xcb, 0xf8, 0x01, 0x00, 0xaa,
++			      0x40, 0x02, 0xc2, 0x01, 0x08, 0x00, 0x01);
++	dsi_generic_write_seq(dsi, 0xcb,
++			      0x0d, 0xfe, 0x1f, 0x2c, 0x00, 0x00, 0x00, 0x00,
++			      0x00);
++	dsi_generic_write_seq(dsi, 0xc2,
++			      0x01, 0xf7, 0x80, 0x04, 0x63, 0x00, 0x60, 0x00,
++			      0x01, 0x30);
++	dsi_generic_write_seq(dsi, 0xc3, 0x55, 0x01, 0x00, 0x01, 0x00, 0x00);
++	dsi_generic_write_seq(dsi, 0xc4,
++			      0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++			      0x00, 0x02, 0x01, 0x00, 0x05, 0x01, 0x00, 0x00,
++			      0x00);
++	dsi_generic_write_seq(dsi, 0xc6,
++			      0x57, 0x07, 0x4a, 0x07, 0x4a, 0x01, 0x0e, 0x01,
++			      0x02, 0x01, 0x02, 0x09, 0x15, 0x07);
++	dsi_generic_write_seq(dsi, 0xc7,
++			      0x00, 0x06, 0x0c, 0x16, 0x27, 0x35, 0x3f, 0x4d,
++			      0x33, 0x3c, 0x49, 0x5b, 0x64, 0x66, 0x67, 0x00,
++			      0x06, 0x0c, 0x16, 0x27, 0x35, 0x3f, 0x4d, 0x33,
++			      0x3c, 0x49, 0x5b, 0x64, 0x66, 0x67);
++	dsi_generic_write_seq(dsi, 0xc8,
++			      0x00, 0x00, 0xfe, 0x01, 0x08, 0xe7, 0x00, 0x00,
++			      0xfd, 0x02, 0x03, 0xa8, 0x00, 0x00, 0xfc, 0xe7,
++			      0xe9, 0xc9, 0x00);
++	dsi_generic_write_seq(dsi, 0xc9,
++			      0x1f, 0x68, 0x1f, 0x68, 0x4c, 0x4c, 0xc4, 0x11);
++	dsi_generic_write_seq(dsi, 0xd0,
++			      0x11, 0x01, 0x91, 0x0b, 0xd9, 0x19, 0x19, 0x00,
++			      0x00, 0x00, 0x19, 0x99, 0x00, 0x00, 0x00, 0x00);
++	dsi_generic_write_seq(dsi, 0xd3,
++			      0x1b, 0x3b, 0xbb, 0xad, 0xa5, 0x33, 0x33, 0x33,
++			      0x00, 0x80, 0xad, 0xa8, 0x37, 0x33, 0x33, 0x33,
++			      0x33, 0xf7, 0xf2, 0x1f, 0x7d, 0x7c, 0xff, 0x0f,
++			      0x99, 0x00, 0xff, 0xff);
++	dsi_generic_write_seq(dsi, 0xd4, 0x57, 0x33, 0x03);
++	dsi_generic_write_seq(dsi, 0xd5,
++			      0x66, 0x00, 0x00, 0x01, 0x32, 0x01, 0x32, 0x00,
++			      0x0b, 0x00, 0x0b);
++	dsi_generic_write_seq(dsi, 0xbe, 0x04);
++	dsi_generic_write_seq(dsi, 0xcf,
++			      0x40, 0x10, 0x00, 0x00, 0x00, 0x00, 0x32, 0x00,
++			      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
++	dsi_generic_write_seq(dsi, 0xde, 0x00, 0x00, 0x3f, 0xff, 0x10);
++	dsi_generic_write_seq(dsi, 0xe9, 0x00);
++	dsi_generic_write_seq(dsi, 0xf2, 0x00);
++	dsi_generic_write_seq(dsi, 0xd6, 0x01);
++	dsi_dcs_write_seq(dsi, 0x35, 0x00);
++	dsi_dcs_write_seq(dsi, 0x51, 0xff);
++	dsi_dcs_write_seq(dsi, 0x53, 0x2c);
++	dsi_dcs_write_seq(dsi, 0x55, 0x00);
++
++	ret = mipi_dsi_dcs_exit_sleep_mode(dsi);
++	if (ret < 0) {
++		dev_err(dev, "Failed to exit sleep mode: %d\n", ret);
++		return ret;
++	}
++	msleep(120);
++
++	ret = mipi_dsi_dcs_set_display_on(dsi);
++	if (ret < 0) {
++		dev_err(dev, "Failed to set display on: %d\n", ret);
++		return ret;
++	}
++	msleep(20);
++
++	return 0;
++}
++
++static int r69006_cmd_panel_off(struct r69006 *ctx)
++{
++	struct mipi_dsi_device *dsi = ctx->dsi;
++	struct device *dev = &dsi->dev;
++	int ret;
++
++	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
++
++	ret = mipi_dsi_dcs_set_display_off(dsi);
++	if (ret < 0) {
++		dev_err(dev, "Failed to set display off: %d\n", ret);
++		return ret;
++	}
++	usleep_range(10000, 11000);
++
++	dsi_generic_write_seq(dsi, 0xd3,
++			      0x13, 0x3b, 0xbb, 0xa5, 0xa5, 0x33, 0x33, 0x33,
++			      0x00, 0x80, 0xa4, 0xa8, 0x37, 0x33, 0x33, 0x33,
++			      0x33, 0xf7, 0xf2, 0x1f, 0x7d, 0x7c, 0xff, 0x0f,
++			      0x99, 0x00, 0xff, 0xff);
++
++	ret = mipi_dsi_dcs_enter_sleep_mode(dsi);
++	if (ret < 0) {
++		dev_err(dev, "Failed to enter sleep mode: %d\n", ret);
++		return ret;
++	}
++	msleep(90);
++
++	return 0;
++}
++
++static const struct drm_display_mode r69006_cmd_mode = {
++	.clock = (1080 + 100 + 20 + 82) * (1920 + 3 + 15 + 9) * 60 / 1000,
++	.hdisplay = 1080,
++	.hsync_start = 1080 + 100,
++	.hsync_end = 1080 + 100 + 20,
++	.htotal = 1080 + 100 + 20 + 82,
++	.vdisplay = 1920,
++	.vsync_start = 1920 + 3,
++	.vsync_end = 1920 + 3 + 15,
++	.vtotal = 1920 + 3 + 15 + 9,
++	.width_mm = 0,
++	.height_mm = 0,
++};
++
++static void r69006_video_panel_reset(struct r69006 *ctx)
++{
++	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
++	msleep(20);
++	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
++	usleep_range(2000, 3000);
++	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
++	msleep(20);
++}
++
++static int r69006_video_panel_on(struct r69006 *ctx)
++{
++	struct mipi_dsi_device *dsi = ctx->dsi;
++	struct device *dev = &dsi->dev;
++	int ret;
++
++	dsi->mode_flags |= MIPI_DSI_MODE_LPM;
++
++	dsi_generic_write_seq(dsi, 0xb0, 0x00);
++	dsi_generic_write_seq(dsi, 0xb3, 0x05, 0x10, 0x00, 0x00, 0x00);
++	dsi_generic_write_seq(dsi, 0xb4, 0x0c, 0x00);
++	dsi_generic_write_seq(dsi, 0xb6, 0x3b, 0xc3, 0x00);
++	dsi_generic_write_seq(dsi, 0xc0, 0x00);
++	dsi_dcs_write_seq(dsi, 0x36, 0x98);
++	dsi_generic_write_seq(dsi, 0xcc, 0x04);
++	dsi_generic_write_seq(dsi, 0xc1,
++			      0x84, 0x00, 0x10, 0xef, 0x8b, 0xf1, 0xff, 0xff,
++			      0xdf, 0x9c, 0xc5, 0x9a, 0x73, 0x8d, 0xad, 0x63,
++			      0xfe, 0xff, 0xff, 0xcb, 0xf8, 0x01, 0x00, 0xaa,
++			      0x40, 0x00, 0xc2, 0x01, 0x08, 0x00, 0x01);
++	dsi_generic_write_seq(dsi, 0xcb,
++			      0x0d, 0xfe, 0x1f, 0x2c, 0x00, 0x00, 0x00, 0x00,
++			      0x00);
++	dsi_generic_write_seq(dsi, 0xc2,
++			      0x01, 0xf7, 0x80, 0x04, 0x63, 0x00, 0x60, 0x00,
++			      0x01, 0x30);
++	dsi_generic_write_seq(dsi, 0xc3, 0x55, 0x01, 0x00, 0x01, 0x00, 0x00);
++	dsi_generic_write_seq(dsi, 0xc4,
++			      0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++			      0x00, 0x02, 0x01, 0x00, 0x05, 0x01, 0x00, 0x00,
++			      0x00);
++	dsi_generic_write_seq(dsi, 0xc6,
++			      0x59, 0x07, 0x4a, 0x07, 0x4a, 0x01, 0x0e, 0x01,
++			      0x02, 0x01, 0x02, 0x09, 0x15, 0x07);
++	dsi_generic_write_seq(dsi, 0xc7,
++			      0x00, 0x30, 0x32, 0x34, 0x42, 0x4e, 0x56, 0x62,
++			      0x44, 0x4a, 0x54, 0x62, 0x6b, 0x73, 0x7f, 0x08,
++			      0x30, 0x32, 0x34, 0x42, 0x4e, 0x56, 0x62, 0x44,
++			      0x4a, 0x54, 0x62, 0x6b, 0x73, 0x7f);
++	dsi_generic_write_seq(dsi, 0xc8,
++			      0x00, 0x00, 0x00, 0x00, 0x00, 0xfc, 0x00, 0x00,
++			      0x00, 0x00, 0x00, 0xfc, 0x00, 0x00, 0x00, 0x00,
++			      0x00, 0xfc, 0x00);
++	dsi_generic_write_seq(dsi, 0xc9,
++			      0x1f, 0x68, 0x1f, 0x68, 0x4c, 0x4c, 0xc4, 0x11);
++	dsi_generic_write_seq(dsi, 0xd0,
++			      0x33, 0x01, 0x91, 0x0b, 0xd9, 0x19, 0x19, 0x00,
++			      0x00, 0x00, 0x19, 0x99, 0x00, 0x00, 0x00, 0x00);
++	dsi_generic_write_seq(dsi, 0xd3,
++			      0x1b, 0x3b, 0xbb, 0xad, 0xa5, 0x33, 0x33, 0x33,
++			      0x00, 0x80, 0xad, 0xa8, 0x6f, 0x6f, 0x33, 0x33,
++			      0x33, 0xf7, 0xf2, 0x1f, 0x7d, 0x7c, 0xff, 0x0f,
++			      0x99, 0x00, 0xff, 0xff);
++	dsi_generic_write_seq(dsi, 0xd4, 0x57, 0x33, 0x03);
++	dsi_generic_write_seq(dsi, 0xd5,
++			      0x66, 0x00, 0x00, 0x01, 0x27, 0x01, 0x27, 0x00,
++			      0x6d, 0x00, 0x6d);
++	dsi_generic_write_seq(dsi, 0xd6, 0x81);
++
++	ret = mipi_dsi_dcs_exit_sleep_mode(dsi);
++	if (ret < 0) {
++		dev_err(dev, "Failed to exit sleep mode: %d\n", ret);
++		return ret;
++	}
++	msleep(120);
++
++	ret = mipi_dsi_dcs_set_display_on(dsi);
++	if (ret < 0) {
++		dev_err(dev, "Failed to set display on: %d\n", ret);
++		return ret;
++	}
++	msleep(120);
++
++	return 0;
++}
++
++static int r69006_video_panel_off(struct r69006 *ctx)
++{
++	struct mipi_dsi_device *dsi = ctx->dsi;
++	struct device *dev = &dsi->dev;
++	int ret;
++
++	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
++
++	ret = mipi_dsi_dcs_set_display_off(dsi);
++	if (ret < 0) {
++		dev_err(dev, "Failed to set display off: %d\n", ret);
++		return ret;
++	}
++	msleep(120);
++
++	ret = mipi_dsi_dcs_enter_sleep_mode(dsi);
++	if (ret < 0) {
++		dev_err(dev, "Failed to enter sleep mode: %d\n", ret);
++		return ret;
++	}
++	msleep(150);
++
++	return 0;
++}
++
++static const struct drm_display_mode r69006_video_mode = {
++	.clock = (1080 + 100 + 20 + 82) * (1920 + 3 + 15 + 9) * 60 / 1000,
++	.hdisplay = 1080,
++	.hsync_start = 1080 + 100,
++	.hsync_end = 1080 + 100 + 20,
++	.htotal = 1080 + 100 + 20 + 82,
++	.vdisplay = 1920,
++	.vsync_start = 1920 + 3,
++	.vsync_end = 1920 + 3 + 15,
++	.vtotal = 1920 + 3 + 15 + 9,
++	.width_mm = 0,
++	.height_mm = 0,
++};
++
++struct odin_panel_variant {
++	void (*reset)(struct r69006 *ctx);
++	int (*on)(struct r69006 *ctx);
++	int (*off)(struct r69006 *ctx);
++	const struct drm_display_mode *mode;
++	unsigned long mode_flags;
++};
++static const struct odin_panel_variant r69006_cmd_variant = {
++	.reset = r69006_cmd_panel_reset,
++	.on = r69006_cmd_panel_on,
++	.off = r69006_cmd_panel_off,
++	.mode = &r69006_cmd_mode,
++	.mode_flags = MIPI_DSI_MODE_VIDEO_BURST|MIPI_DSI_CLOCK_NON_CONTINUOUS,
++};
++
++
++static const struct odin_panel_variant r69006_video_variant = {
++	.reset = r69006_video_panel_reset,
++	.on = r69006_video_panel_on,
++	.off = r69006_video_panel_off,
++	.mode = &r69006_video_mode,
++	.mode_flags = MIPI_DSI_MODE_VIDEO|MIPI_DSI_MODE_VIDEO_BURST|MIPI_DSI_MODE_VIDEO_HSE|MIPI_DSI_MODE_NO_EOT_PACKET|MIPI_DSI_CLOCK_NON_CONTINUOUS,
++};
++
++static int r69006_prepare(struct drm_panel *panel)
++{
++	struct r69006 *ctx = to_r69006(panel);
++	struct device *dev = &ctx->dsi->dev;
++	int ret;
++
++	if (ctx->prepared)
++		return 0;
++
++	ret = regulator_bulk_enable(ARRAY_SIZE(ctx->supplies), ctx->supplies);
++	if (ret < 0) {
++		dev_err(dev, "Failed to enable regulators: %d\n", ret);
++		return ret;
++	}
++
++	ctx->variant->reset(ctx);
++
++	ret = ctx->variant->on(ctx);
++	if (ret < 0) {
++		dev_err(dev, "Failed to initialize panel: %d\n", ret);
++		regulator_bulk_disable(ARRAY_SIZE(ctx->supplies), ctx->supplies);
++		gpiod_set_value_cansleep(ctx->reset_gpio, 1);
++		return ret;
++	}
++
++	ctx->prepared = true;
++	return 0;
++}
++
++static int r69006_unprepare(struct drm_panel *panel)
++{
++	struct r69006 *ctx = to_r69006(panel);
++	struct device *dev = &ctx->dsi->dev;
++	int ret;
++
++	if (!ctx->prepared)
++		return 0;
++
++	ret = ctx->variant->off(ctx);
++	if (ret < 0)
++		dev_err(dev, "Failed to un-initialize panel: %d\n", ret);
++
++	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
++	regulator_bulk_disable(ARRAY_SIZE(ctx->supplies), ctx->supplies);
++
++	ctx->prepared = false;
++	return 0;
++}
++
++static int r69006_get_modes(struct drm_panel *panel,
++			 struct drm_connector *connector)
++{
++	struct r69006 *ctx = to_r69006(panel);
++	const struct drm_display_mode *desc_mode = ctx->variant->mode;
++	struct drm_display_mode *mode;
++
++	mode = drm_mode_duplicate(connector->dev, desc_mode);
++	if (!mode)
++		return -ENOMEM;
++
++	drm_mode_set_name(mode);
++
++	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
++	connector->display_info.width_mm = mode->width_mm;
++	connector->display_info.height_mm = mode->height_mm;
++	drm_mode_probed_add(connector, mode);
++
++	return 1;
++}
++
++static const struct drm_panel_funcs r69006_panel_funcs = {
++	.prepare = r69006_prepare,
++	.unprepare = r69006_unprepare,
++	.get_modes = r69006_get_modes,
++};
++
++static const struct of_device_id r69006_of_match[] = {
++	{ .compatible = "smartisan,odin-r69006-cmd", .data = &r69006_cmd_variant },
++	{ .compatible = "smartisan,odin-r69006-video", .data = &r69006_video_variant },
++	{ /* sentinel */ }
++};
++
++static int r69006_probe(struct mipi_dsi_device *dsi)
++{
++	struct device *dev = &dsi->dev;
++	struct r69006 *ctx;
++	const struct of_device_id *id;
++	int ret;
++
++	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
++	if (!ctx)
++		return -ENOMEM;
++
++	id = of_match_device(r69006_of_match, dev);
++	if (!id)
++		return -ENODEV;
++	ctx->variant = id->data;
++
++	ctx->supplies[0].supply = "vddio";
++	ctx->supplies[1].supply = "vdd";
++	ctx->supplies[2].supply = "lab";
++	ctx->supplies[3].supply = "ibb";
++
++	ret = devm_regulator_bulk_get(dev, ARRAY_SIZE(ctx->supplies),
++				      ctx->supplies);
++	if (ret < 0)
++		return dev_err_probe(dev, ret, "Failed to get regulators\n");
++
++	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
++	if (IS_ERR(ctx->reset_gpio))
++		return dev_err_probe(dev, PTR_ERR(ctx->reset_gpio),
++				     "Failed to get reset-gpios\n");
++
++	ctx->dsi = dsi;
++	mipi_dsi_set_drvdata(dsi, ctx);
++
++	dsi->lanes = 4;
++	dsi->format = MIPI_DSI_FMT_RGB888;
++	dsi->mode_flags = ctx->variant->mode_flags;
++
++	drm_panel_init(&ctx->panel, dev, &r69006_panel_funcs,
++		       DRM_MODE_CONNECTOR_DSI);
++
++	ret = drm_panel_of_backlight(&ctx->panel);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to get backlight\n");
++
++	drm_panel_add(&ctx->panel);
++
++	ret = mipi_dsi_attach(dsi);
++	if (ret < 0) {
++		dev_err(dev, "Failed to attach to DSI host: %d\n", ret);
++		drm_panel_remove(&ctx->panel);
++		return ret;
++	}
++
++	return 0;
++}
++
++static void r69006_remove(struct mipi_dsi_device *dsi)
++{
++	struct r69006 *ctx = mipi_dsi_get_drvdata(dsi);
++	int ret;
++
++	ret = mipi_dsi_detach(dsi);
++	if (ret < 0)
++		dev_err(&dsi->dev, "Failed to detach from DSI host: %d\n", ret);
++
++	drm_panel_remove(&ctx->panel);
++}
++
++MODULE_DEVICE_TABLE(of, r69006_of_match);
++
++static struct mipi_dsi_driver r69006_driver = {
++	.probe = r69006_probe,
++	.remove = r69006_remove,
++	.driver = {
++		.name = "r69006",
++		.of_match_table = r69006_of_match,
++	},
++};
++module_mipi_dsi_driver(r69006_driver);
++
++MODULE_AUTHOR("linux-mdss-dsi-panel-driver-generator <fix@me>");
++MODULE_DESCRIPTION("DRM driver for Smartisan ODIN panels (r69006)");
++MODULE_LICENSE("GPL");
+-- 
+2.48.1
+

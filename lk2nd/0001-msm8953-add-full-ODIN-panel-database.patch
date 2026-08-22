@@ -1,0 +1,2273 @@
+From: Smartisan ODIN mainline porting effort
+Subject: [PATCH 1/2] msm8953: add full ODIN panel database to GCDB and target table
+
+Add the FT8716, Sharp FT8716 and NT36672 1080p panel definitions
+generated from the stock Smartisan ODIN device tree, and register
+them in the msm8953 target panel table alongside the existing
+R69006 cmd/video panels. All five stock ODIN panels can now be
+selected via fastboot/lk2nd menu.
+---
+--- /dev/null
++++ b/dev/gcdb/display/include/panel_ft8716_1080p_video.h
+@@ -0,0 +1,813 @@
++/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
++ *
++ * Generated for the Smartisan ODIN from the stock device tree.
++ */
++
++#ifndef _PANEL_FT8716_1080P_VIDEO_H_
++#define _PANEL_FT8716_1080P_VIDEO_H_
++
++#include "panel.h"
++
++/*---------------------------------------------------------------------------*/
++/* Panel configuration                                                       */
++/*---------------------------------------------------------------------------*/
++static struct panel_config ft8716_1080p_video_panel_data = {
++	"qcom,mdss_dsi_ft8716_1080p_video", "dsi:0:", "qcom,mdss-dsi-panel",
++	10, 0, "DISPLAY_1", 0, 0, 60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL
++};
++
++/*---------------------------------------------------------------------------*/
++/* Panel resolution                                                          */
++/*---------------------------------------------------------------------------*/
++static struct panel_resolution ft8716_1080p_video_panel_res = {
++	1080, 1920, 96, 96, 4, 0,
++	16, 16, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0
++};
++
++/*---------------------------------------------------------------------------*/
++/* Panel color information                                                   */
++/*---------------------------------------------------------------------------*/
++static struct color_info ft8716_1080p_video_color = {
++	24, 0, 0xff, 0, 0, 0
++};
++
++/*---------------------------------------------------------------------------*/
++/* Panel on command information                                              */
++/*---------------------------------------------------------------------------*/
++static char ft8716_1080p_video_on_cmd_cmd0[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd1[] = {
++	0x04, 0x00, 0x39, 0xC0, 0xFF, 0x87, 0x16, 0x01
++};
++
++static char ft8716_1080p_video_on_cmd_cmd2[] = {
++	0x00, 0x80, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd3[] = {
++	0x03, 0x00, 0x39, 0xC0, 0xFF, 0x87, 0x16, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd4[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd5[] = {
++	0x19, 0x00, 0x39, 0xC0, 0xE1, 0x00, 0x0A, 0x23,
++	0x38, 0x42, 0x4D, 0x61, 0x6E, 0x74, 0x7C, 0x81,
++	0x89, 0x71, 0x6D, 0x6B, 0x64, 0x56, 0x49, 0x3B,
++	0x31, 0x26, 0x14, 0x04, 0x03, 0xFF, 0xFF, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd6[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd7[] = {
++	0x19, 0x00, 0x39, 0xC0, 0xE2, 0x00, 0x0A, 0x23,
++	0x38, 0x42, 0x4D, 0x61, 0x6E, 0x74, 0x7C, 0x81,
++	0x89, 0x71, 0x6D, 0x6B, 0x64, 0x56, 0x49, 0x3B,
++	0x31, 0x26, 0x14, 0x04, 0x03, 0xFF, 0xFF, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd8[] = {
++	0x00, 0x80, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd9[] = {
++	0x0B, 0x00, 0x39, 0xC0, 0xCA, 0x80, 0xE5, 0xFF,
++	0xCC, 0xFF, 0x94, 0xFF, 0x00, 0x00, 0x00, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd10[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd11[] = {
++	0xC6, 0x10, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd12[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd13[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x90, 0x9A, 0x9A,
++	0x9A, 0xBA, 0xAB, 0x99, 0xA8, 0xA9, 0xA9, 0xDA,
++	0x99, 0x89, 0x78, 0x56, 0x34, 0x22, 0x22, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd14[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd15[] = {
++	0xC6, 0x11, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd16[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd17[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x90, 0x9A, 0x8A,
++	0x9A, 0xB9, 0xAA, 0x99, 0x99, 0x9A, 0x99, 0xBB,
++	0x9A, 0x88, 0x88, 0x67, 0x45, 0x22, 0x22, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd18[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd19[] = {
++	0xC6, 0x12, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd20[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd21[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x90, 0x99, 0x9A,
++	0x99, 0xA9, 0x9B, 0x99, 0x89, 0x9A, 0x99, 0xBA,
++	0x9A, 0x88, 0x88, 0x67, 0x45, 0x33, 0x23, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd22[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd23[] = {
++	0xC6, 0x13, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd24[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd25[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x9A, 0x8A,
++	0x99, 0xA9, 0x9A, 0x99, 0x98, 0x9A, 0x89, 0xAA,
++	0x8B, 0x89, 0x88, 0x78, 0x45, 0x33, 0x33, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd26[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd27[] = {
++	0xC6, 0x14, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd28[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd29[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x8A, 0x8A,
++	0x8A, 0xA9, 0x9A, 0x89, 0x99, 0x99, 0x89, 0xAA,
++	0x9A, 0x88, 0x88, 0x78, 0x56, 0x44, 0x33, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd30[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd31[] = {
++	0xC6, 0x15, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd32[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd33[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x99, 0x99,
++	0x89, 0xA9, 0xA9, 0x89, 0x89, 0x99, 0x89, 0xA9,
++	0xAA, 0x87, 0x88, 0x88, 0x56, 0x44, 0x44, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd34[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd35[] = {
++	0xC6, 0x16, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd36[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd37[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x99, 0x89,
++	0x99, 0x98, 0x9A, 0x98, 0x98, 0x99, 0x89, 0xA8,
++	0x9A, 0x88, 0x88, 0x88, 0x67, 0x45, 0x44, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd38[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd39[] = {
++	0xC6, 0x17, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd40[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd41[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x89, 0x99,
++	0x89, 0x99, 0x99, 0x89, 0x98, 0x98, 0x89, 0x99,
++	0x9A, 0x88, 0x88, 0x88, 0x67, 0x55, 0x45, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd42[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd43[] = {
++	0xC6, 0x18, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd44[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd45[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x98, 0x89,
++	0x89, 0x99, 0x99, 0x88, 0x89, 0x89, 0x89, 0x99,
++	0xA9, 0x88, 0x88, 0x88, 0x68, 0x55, 0x55, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd46[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd47[] = {
++	0xC6, 0x19, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd48[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd49[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x98, 0x98,
++	0x89, 0x98, 0x99, 0x88, 0x89, 0x98, 0x89, 0x98,
++	0xA9, 0x88, 0x88, 0x88, 0x78, 0x56, 0x55, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd50[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd51[] = {
++	0xC6, 0x1A, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd52[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd53[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x88, 0x99,
++	0x88, 0x98, 0x99, 0x88, 0x98, 0x88, 0x89, 0x98,
++	0x99, 0x88, 0x88, 0x88, 0x78, 0x66, 0x66, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd54[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd55[] = {
++	0xC6, 0x1B, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd56[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd57[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x88, 0x89,
++	0x88, 0x89, 0xA8, 0x88, 0x88, 0x89, 0x98, 0x88,
++	0x99, 0x88, 0x88, 0x88, 0x88, 0x67, 0x66, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd58[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd59[] = {
++	0xC6, 0x1C, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd60[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd61[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x88, 0x98,
++	0x88, 0x98, 0x98, 0x88, 0x88, 0x89, 0x98, 0x97,
++	0x89, 0x88, 0x88, 0x88, 0x88, 0x77, 0x67, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd62[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd63[] = {
++	0xC6, 0x1D, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd64[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd65[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x88, 0x88,
++	0x88, 0x89, 0x98, 0x88, 0x88, 0x98, 0x88, 0x98,
++	0x88, 0x89, 0x88, 0x88, 0x88, 0x77, 0x77, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd66[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd67[] = {
++	0xC6, 0x1E, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd68[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd69[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x88, 0x88,
++	0x88, 0x88, 0x89, 0x88, 0x88, 0x88, 0x88, 0x98,
++	0x98, 0x88, 0x88, 0x88, 0x88, 0x88, 0x77, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd70[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd71[] = {
++	0xC6, 0x1F, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd72[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd73[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x88, 0x88,
++	0x88, 0x88, 0x88, 0x88, 0x88, 0x79, 0x88, 0x89,
++	0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd74[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd75[] = {
++	0xC6, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd76[] = {
++	0x00, 0x01, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd77[] = {
++	0xC6, 0x10, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd78[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd79[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC8, 0x90, 0x78, 0x56,
++	0x34, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x43,
++	0x44, 0x43, 0x44, 0x44, 0x44, 0x44, 0x54, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd80[] = {
++	0x00, 0x01, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd81[] = {
++	0xC6, 0x11, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd82[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd83[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC8, 0xC0, 0x8A, 0x57,
++	0x34, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33,
++	0x33, 0x33, 0x33, 0x44, 0x44, 0x44, 0x44, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd84[] = {
++	0x00, 0x01, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd85[] = {
++	0xC6, 0x12, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd86[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd87[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC8, 0xF0, 0x9D, 0x57,
++	0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x23,
++	0x32, 0x23, 0x22, 0x44, 0x44, 0x44, 0x34, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd88[] = {
++	0x02, 0x00, 0x39, 0xC0, 0x00, 0x01, 0xFF, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd89[] = {
++	0x02, 0x00, 0x39, 0xC0, 0xC6, 0x00, 0xFF, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd90[] = {
++	0x00, 0x80, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd91[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD8, 0x81, 0x84, 0x84,
++	0x85, 0x86, 0x87, 0x88, 0x88, 0x87, 0x86, 0x84,
++	0x00, 0xFF, 0xFF, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd92[] = {
++	0x00, 0x90, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd93[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD8, 0x01, 0x02, 0x03,
++	0x03, 0x04, 0x04, 0x03, 0x04, 0x04, 0x03, 0x03,
++	0x00, 0xFF, 0xFF, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd94[] = {
++	0x00, 0xA0, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd95[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD8, 0x00, 0x00, 0x01,
++	0x03, 0x06, 0x09, 0x0D, 0x12, 0x19, 0x1E, 0x21,
++	0x27, 0xFF, 0xFF, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd96[] = {
++	0x00, 0xB0, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd97[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD8, 0x01, 0x03, 0x04,
++	0x04, 0x06, 0x07, 0x07, 0x09, 0x09, 0x0A, 0x0A,
++	0x07, 0xFF, 0xFF, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd98[] = {
++	0x00, 0xC0, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd99[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD8, 0x85, 0x8B, 0x8F,
++	0x93, 0x9C, 0xA4, 0xAD, 0xB5, 0xBF, 0xC6, 0xC6,
++	0xC4, 0xFF, 0xFF, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd100[] = {
++	0x00, 0xD0, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd101[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD8, 0x06, 0x0B, 0x10,
++	0x16, 0x20, 0x2A, 0x35, 0x40, 0x4D, 0x56, 0x58,
++	0x57, 0xFF, 0xFF, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd102[] = {
++	0x00, 0xE0, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd103[] = {
++	0x04, 0x00, 0x39, 0xC0, 0xD8, 0xFF, 0xEE, 0xE0
++};
++
++static char ft8716_1080p_video_on_cmd_cmd104[] = {
++	0x00, 0xC0, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd105[] = {
++	0xD7, 0x01, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd106[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd107[] = {
++	0x00, 0xA0, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd108[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD6, 0x0B, 0x0D, 0x0F,
++	0x0F, 0x0F, 0x13, 0x11, 0x10, 0x0F, 0x14, 0x12,
++	0x10, 0xFF, 0xFF, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd109[] = {
++	0x00, 0xB0, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd110[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD6, 0x80, 0x80, 0x8D,
++	0x9A, 0x9A, 0x9A, 0x9A, 0x9A, 0x98, 0xA0, 0xC0,
++	0xA0, 0xFF, 0xFF, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd111[] = {
++	0x00, 0xC0, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd112[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD6, 0x90, 0x80, 0x91,
++	0x91, 0x91, 0x91, 0x91, 0x91, 0x90, 0x95, 0xAB,
++	0x95, 0xFF, 0xFF, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd113[] = {
++	0x00, 0xD0, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd114[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD6, 0x90, 0x89, 0x89,
++	0x89, 0x89, 0x89, 0x89, 0x89, 0x88, 0x8B, 0x95,
++	0x8B, 0xFF, 0xFF, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd115[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd116[] = {
++	0x04, 0x00, 0x39, 0xC0, 0xFF, 0x00, 0x00, 0x00
++};
++
++static char ft8716_1080p_video_on_cmd_cmd117[] = {
++	0x00, 0x80, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd118[] = {
++	0x03, 0x00, 0x39, 0xC0, 0xFF, 0x00, 0x00, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd119[] = {
++	0x03, 0x00, 0x39, 0xC0, 0x91, 0x80, 0x00, 0xFF
++};
++
++static char ft8716_1080p_video_on_cmd_cmd120[] = {
++	0x51, 0xFF, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd121[] = {
++	0x53, 0x2C, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd122[] = {
++	0x55, 0x03, 0x15, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd123[] = {
++	0x11, 0x00, 0x05, 0x80
++};
++
++static char ft8716_1080p_video_on_cmd_cmd124[] = {
++	0x29, 0x00, 0x05, 0x80
++};
++
++static struct mipi_dsi_cmd ft8716_1080p_video_on_command[] = {
++	{0x4, ft8716_1080p_video_on_cmd_cmd0, 0x00},
++	{0x8, ft8716_1080p_video_on_cmd_cmd1, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd2, 0x00},
++	{0x8, ft8716_1080p_video_on_cmd_cmd3, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd4, 0x00},
++	{0x20, ft8716_1080p_video_on_cmd_cmd5, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd6, 0x00},
++	{0x20, ft8716_1080p_video_on_cmd_cmd7, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd8, 0x00},
++	{0x10, ft8716_1080p_video_on_cmd_cmd9, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd10, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd11, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd12, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd13, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd14, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd15, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd16, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd17, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd18, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd19, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd20, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd21, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd22, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd23, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd24, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd25, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd26, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd27, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd28, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd29, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd30, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd31, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd32, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd33, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd34, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd35, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd36, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd37, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd38, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd39, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd40, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd41, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd42, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd43, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd44, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd45, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd46, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd47, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd48, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd49, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd50, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd51, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd52, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd53, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd54, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd55, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd56, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd57, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd58, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd59, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd60, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd61, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd62, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd63, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd64, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd65, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd66, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd67, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd68, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd69, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd70, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd71, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd72, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd73, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd74, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd75, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd76, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd77, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd78, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd79, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd80, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd81, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd82, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd83, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd84, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd85, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd86, 0x00},
++	{0x18, ft8716_1080p_video_on_cmd_cmd87, 0x00},
++	{0x8, ft8716_1080p_video_on_cmd_cmd88, 0x00},
++	{0x8, ft8716_1080p_video_on_cmd_cmd89, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd90, 0x00},
++	{0x14, ft8716_1080p_video_on_cmd_cmd91, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd92, 0x00},
++	{0x14, ft8716_1080p_video_on_cmd_cmd93, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd94, 0x00},
++	{0x14, ft8716_1080p_video_on_cmd_cmd95, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd96, 0x00},
++	{0x14, ft8716_1080p_video_on_cmd_cmd97, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd98, 0x00},
++	{0x14, ft8716_1080p_video_on_cmd_cmd99, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd100, 0x00},
++	{0x14, ft8716_1080p_video_on_cmd_cmd101, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd102, 0x00},
++	{0x8, ft8716_1080p_video_on_cmd_cmd103, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd104, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd105, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd106, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd107, 0x00},
++	{0x14, ft8716_1080p_video_on_cmd_cmd108, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd109, 0x00},
++	{0x14, ft8716_1080p_video_on_cmd_cmd110, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd111, 0x00},
++	{0x14, ft8716_1080p_video_on_cmd_cmd112, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd113, 0x00},
++	{0x14, ft8716_1080p_video_on_cmd_cmd114, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd115, 0x00},
++	{0x8, ft8716_1080p_video_on_cmd_cmd116, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd117, 0x00},
++	{0x8, ft8716_1080p_video_on_cmd_cmd118, 0x00},
++	{0x8, ft8716_1080p_video_on_cmd_cmd119, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd120, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd121, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd122, 0x00},
++	{0x4, ft8716_1080p_video_on_cmd_cmd123, 0x80},
++	{0x4, ft8716_1080p_video_on_cmd_cmd124, 0x20}
++};
++
++#define FT8716_1080P_VIDEO_ON_COMMAND 125
++
++/*---------------------------------------------------------------------------*/
++/* Panel off command information                                             */
++/*---------------------------------------------------------------------------*/
++static char ft8716_1080p_video_off_cmd_cmd0[] = {
++	0x28, 0x00, 0x05, 0x80
++};
++
++static char ft8716_1080p_video_off_cmd_cmd1[] = {
++	0x10, 0x00, 0x05, 0x80
++};
++
++static struct mipi_dsi_cmd ft8716_1080p_video_off_command[] = {
++	{0x4, ft8716_1080p_video_off_cmd_cmd0, 0x32},
++	{0x4, ft8716_1080p_video_off_cmd_cmd1, 0x78}
++};
++
++#define FT8716_1080P_VIDEO_OFF_COMMAND 2
++
++static struct command_state ft8716_1080p_video_state = {
++	0, 1
++};
++
++/*---------------------------------------------------------------------------*/
++/* Command mode panel information                                            */
++/*---------------------------------------------------------------------------*/
++static struct commandpanel_info ft8716_1080p_video_command_panel = {
++	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
++};
++
++/*---------------------------------------------------------------------------*/
++/* Video mode panel information                                              */
++/*---------------------------------------------------------------------------*/
++static struct videopanel_info ft8716_1080p_video_video_panel = {
++	1, 0, 0, 0, 1, 1, 2, 0, 0x9
++};
++
++/*---------------------------------------------------------------------------*/
++/* Lane configuration                                                        */
++/*---------------------------------------------------------------------------*/
++static struct lane_configuration ft8716_1080p_video_lane_config = {
++	4, 0, 1, 1, 1, 1, 0
++};
++
++/*---------------------------------------------------------------------------*/
++/* Panel timing                                                              */
++/*---------------------------------------------------------------------------*/
++static const uint32_t ft8716_1080p_video_timings[] = {
++	0xBF382601, 0x686E2A3C, 0x2C030400
++};
++
++static const uint32_t ft8716_1080p_video_14nm_video_timings[] = {
++	0x241f0809, 0x50304a0, 0x2f1f0809, 0x50304a0, 0x2f1f0809, 0xa0,
++	0x50304a0, 0x2f1f0809, 0x50304a0, 0x2f1b0809, 0x50304a0, 0xa0,
++};
++
++static struct panel_timing ft8716_1080p_video_timing_info = {
++	0, 4, 0x0d, 0x30
++};
++
++/*---------------------------------------------------------------------------*/
++/* Panel reset sequence                                                      */
++/*---------------------------------------------------------------------------*/
++static struct panel_reset_sequence ft8716_1080p_video_reset_seq = {
++	{1, 0, 1, }, {2, 2, 3, }, 2
++};
++
++/*---------------------------------------------------------------------------*/
++/* Backlight setting                                                         */
++/*---------------------------------------------------------------------------*/
++static struct backlight ft8716_1080p_video_backlight = {
++	1, 1, 4095, 100, 1, "PMIC_8941"
++};
++
++static struct labibb_desc ft8716_1080p_video_labibb = {
++	0, 1, 5700000, 5700000, 5700000, 5700000, 3, 3, 1, 0
++};
++
++#define FT8716_1080P_VIDEO_PANEL_ON_DELAY 32
++
++#define FT8716_1080P_VIDEO_SIGNATURE 0xFFFF
++
++#endif /*_PANEL_FT8716_1080P_VIDEO_H_*/
+--- /dev/null
++++ b/dev/gcdb/display/include/panel_nt36672_1080p_video.h
+@@ -0,0 +1,508 @@
++/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
++ *
++ * Generated for the Smartisan ODIN from the stock device tree.
++ */
++
++#ifndef _PANEL_NT36672_1080P_VIDEO_H_
++#define _PANEL_NT36672_1080P_VIDEO_H_
++
++#include "panel.h"
++
++/*---------------------------------------------------------------------------*/
++/* Panel configuration                                                       */
++/*---------------------------------------------------------------------------*/
++static struct panel_config nt36672_1080p_video_panel_data = {
++	"qcom,mdss_dsi_nt36672_1080p_video", "dsi:0:", "qcom,mdss-dsi-panel",
++	10, 0, "DISPLAY_1", 0, 0, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL
++};
++
++/*---------------------------------------------------------------------------*/
++/* Panel resolution                                                          */
++/*---------------------------------------------------------------------------*/
++static struct panel_resolution nt36672_1080p_video_panel_res = {
++	1080, 1920, 20, 280, 4, 0,
++	20, 20, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0
++};
++
++/*---------------------------------------------------------------------------*/
++/* Panel color information                                                   */
++/*---------------------------------------------------------------------------*/
++static struct color_info nt36672_1080p_video_color = {
++	24, 0, 0xff, 0, 0, 0
++};
++
++/*---------------------------------------------------------------------------*/
++/* Panel on command information                                              */
++/*---------------------------------------------------------------------------*/
++static char nt36672_1080p_video_on_cmd_cmd0[] = {
++	0xFF, 0x22, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd1[] = {
++	0x07, 0x6B, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd2[] = {
++	0x08, 0x67, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd3[] = {
++	0x0A, 0x5D, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd4[] = {
++	0x0B, 0x57, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd5[] = {
++	0x0C, 0x52, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd6[] = {
++	0x0D, 0x4D, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd7[] = {
++	0x0E, 0x48, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd8[] = {
++	0x0F, 0x44, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd9[] = {
++	0x17, 0x00, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd10[] = {
++	0x53, 0x01, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd11[] = {
++	0x54, 0x00, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd12[] = {
++	0x55, 0x88, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd13[] = {
++	0x56, 0x75, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd14[] = {
++	0x58, 0x55, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd15[] = {
++	0x59, 0x4D, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd16[] = {
++	0x5A, 0x45, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd17[] = {
++	0x5B, 0x45, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd18[] = {
++	0x5C, 0x47, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd19[] = {
++	0x5D, 0x44, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd20[] = {
++	0x5E, 0x41, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd21[] = {
++	0x5F, 0x40, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd22[] = {
++	0x60, 0x40, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd23[] = {
++	0x61, 0x40, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd24[] = {
++	0x62, 0x40, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd25[] = {
++	0x63, 0x40, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd26[] = {
++	0x64, 0x43, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd27[] = {
++	0x65, 0x47, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd28[] = {
++	0x66, 0x4A, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd29[] = {
++	0x67, 0x4D, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd30[] = {
++	0x68, 0x50, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd31[] = {
++	0x69, 0x55, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd32[] = {
++	0x6A, 0x58, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd33[] = {
++	0x6B, 0x55, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd34[] = {
++	0x6C, 0x54, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd35[] = {
++	0x6D, 0x53, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd36[] = {
++	0x6E, 0x54, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd37[] = {
++	0x6F, 0x55, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd38[] = {
++	0x73, 0x05, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd39[] = {
++	0x83, 0x03, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd40[] = {
++	0x84, 0x28, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd41[] = {
++	0x86, 0x40, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd42[] = {
++	0x87, 0x43, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd43[] = {
++	0x89, 0x20, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd44[] = {
++	0x8A, 0x37, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd45[] = {
++	0x97, 0xC0, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd46[] = {
++	0x9A, 0x4C, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd47[] = {
++	0x9B, 0x5A, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd48[] = {
++	0x9C, 0x4C, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd49[] = {
++	0xA2, 0x20, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd50[] = {
++	0xB3, 0x00, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd51[] = {
++	0xB7, 0x70, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd52[] = {
++	0xB8, 0x70, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd53[] = {
++	0xFB, 0x01, 0x15, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd54[] = {
++	0xFF, 0x20, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd55[] = {
++	0xFB, 0x01, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd56[] = {
++	0x78, 0x00, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd57[] = {
++	0xFF, 0x24, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd58[] = {
++	0xFB, 0x01, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd59[] = {
++	0xC2, 0x80, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd60[] = {
++	0x68, 0xC3, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd61[] = {
++	0x78, 0x80, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd62[] = {
++	0xFF, 0x26, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd63[] = {
++	0xFB, 0x01, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd64[] = {
++	0x1C, 0xFA, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd65[] = {
++	0xFF, 0xE0, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd66[] = {
++	0xFB, 0x01, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd67[] = {
++	0x17, 0x40, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd68[] = {
++	0xFF, 0x25, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd69[] = {
++	0xFB, 0x01, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd70[] = {
++	0x17, 0x9F, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd71[] = {
++	0xFF, 0x10, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd72[] = {
++	0x51, 0xFF, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd73[] = {
++	0x53, 0x2C, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd74[] = {
++	0x55, 0x82, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd75[] = {
++	0x11, 0x00, 0x29, 0x80
++};
++
++static char nt36672_1080p_video_on_cmd_cmd76[] = {
++	0x29, 0x00, 0x29, 0x80
++};
++
++static struct mipi_dsi_cmd nt36672_1080p_video_on_command[] = {
++	{0x4, nt36672_1080p_video_on_cmd_cmd0, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd1, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd2, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd3, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd4, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd5, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd6, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd7, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd8, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd9, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd10, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd11, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd12, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd13, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd14, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd15, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd16, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd17, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd18, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd19, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd20, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd21, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd22, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd23, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd24, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd25, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd26, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd27, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd28, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd29, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd30, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd31, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd32, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd33, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd34, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd35, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd36, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd37, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd38, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd39, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd40, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd41, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd42, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd43, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd44, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd45, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd46, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd47, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd48, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd49, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd50, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd51, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd52, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd53, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd54, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd55, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd56, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd57, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd58, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd59, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd60, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd61, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd62, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd63, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd64, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd65, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd66, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd67, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd68, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd69, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd70, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd71, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd72, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd73, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd74, 0x00},
++	{0x4, nt36672_1080p_video_on_cmd_cmd75, 0x80},
++	{0x4, nt36672_1080p_video_on_cmd_cmd76, 0x20}
++};
++
++#define NT36672_1080P_VIDEO_ON_COMMAND 77
++
++/*---------------------------------------------------------------------------*/
++/* Panel off command information                                             */
++/*---------------------------------------------------------------------------*/
++static char nt36672_1080p_video_off_cmd_cmd0[] = {
++	0x28, 0x00, 0x05, 0x80
++};
++
++static char nt36672_1080p_video_off_cmd_cmd1[] = {
++	0x10, 0x00, 0x05, 0x80
++};
++
++static struct mipi_dsi_cmd nt36672_1080p_video_off_command[] = {
++	{0x4, nt36672_1080p_video_off_cmd_cmd0, 0x32},
++	{0x4, nt36672_1080p_video_off_cmd_cmd1, 0x78}
++};
++
++#define NT36672_1080P_VIDEO_OFF_COMMAND 2
++
++static struct command_state nt36672_1080p_video_state = {
++	0, 1
++};
++
++/*---------------------------------------------------------------------------*/
++/* Command mode panel information                                            */
++/*---------------------------------------------------------------------------*/
++static struct commandpanel_info nt36672_1080p_video_command_panel = {
++	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
++};
++
++/*---------------------------------------------------------------------------*/
++/* Video mode panel information                                              */
++/*---------------------------------------------------------------------------*/
++static struct videopanel_info nt36672_1080p_video_video_panel = {
++	1, 0, 0, 0, 1, 1, 2, 0, 0x9
++};
++
++/*---------------------------------------------------------------------------*/
++/* Lane configuration                                                        */
++/*---------------------------------------------------------------------------*/
++static struct lane_configuration nt36672_1080p_video_lane_config = {
++	4, 0, 1, 1, 1, 1, 0
++};
++
++/*---------------------------------------------------------------------------*/
++/* Panel timing                                                              */
++/*---------------------------------------------------------------------------*/
++static const uint32_t nt36672_1080p_video_timings[] = {
++	0xBF382601, 0x686C2A3C, 0x2C030400
++};
++
++static const uint32_t nt36672_1080p_video_14nm_video_timings[] = {
++	0x241f0809, 0x50304a0, 0x241f0809, 0x50304a0, 0x241f0809, 0xa0,
++	0x50304a0, 0x241f0809, 0x50304a0, 0x241b0809, 0x50304a0, 0xa0,
++};
++
++static struct panel_timing nt36672_1080p_video_timing_info = {
++	0, 4, 0x0d, 0x30
++};
++
++/*---------------------------------------------------------------------------*/
++/* Panel reset sequence                                                      */
++/*---------------------------------------------------------------------------*/
++static struct panel_reset_sequence nt36672_1080p_video_reset_seq = {
++	{1, 0, 1, }, {10, 2, 10, }, 2
++};
++
++/*---------------------------------------------------------------------------*/
++/* Backlight setting                                                         */
++/*---------------------------------------------------------------------------*/
++static struct backlight nt36672_1080p_video_backlight = {
++	1, 1, 4095, 100, 1, "PMIC_8941"
++};
++
++static struct labibb_desc nt36672_1080p_video_labibb = {
++	0, 1, 5700000, 5700000, 5700000, 5700000, 3, 3, 1, 0
++};
++
++#define NT36672_1080P_VIDEO_PANEL_ON_DELAY 32
++
++#define NT36672_1080P_VIDEO_SIGNATURE 0xFFFF
++
++#endif /*_PANEL_NT36672_1080P_VIDEO_H_*/
+--- /dev/null
++++ b/dev/gcdb/display/include/panel_sharp_ft8716_1080p_video.h
+@@ -0,0 +1,813 @@
++/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
++ *
++ * Generated for the Smartisan ODIN from the stock device tree.
++ */
++
++#ifndef _PANEL_SHARP_FT8716_1080P_VIDEO_H_
++#define _PANEL_SHARP_FT8716_1080P_VIDEO_H_
++
++#include "panel.h"
++
++/*---------------------------------------------------------------------------*/
++/* Panel configuration                                                       */
++/*---------------------------------------------------------------------------*/
++static struct panel_config sharp_ft8716_1080p_video_panel_data = {
++	"qcom,mdss_dsi_sharp_ft8716_1080p_video", "dsi:0:", "qcom,mdss-dsi-panel",
++	10, 0, "DISPLAY_1", 0, 0, 60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL
++};
++
++/*---------------------------------------------------------------------------*/
++/* Panel resolution                                                          */
++/*---------------------------------------------------------------------------*/
++static struct panel_resolution sharp_ft8716_1080p_video_panel_res = {
++	1080, 1920, 96, 96, 4, 0,
++	16, 16, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0
++};
++
++/*---------------------------------------------------------------------------*/
++/* Panel color information                                                   */
++/*---------------------------------------------------------------------------*/
++static struct color_info sharp_ft8716_1080p_video_color = {
++	24, 0, 0xff, 0, 0, 0
++};
++
++/*---------------------------------------------------------------------------*/
++/* Panel on command information                                              */
++/*---------------------------------------------------------------------------*/
++static char sharp_ft8716_1080p_video_on_cmd_cmd0[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd1[] = {
++	0x04, 0x00, 0x39, 0xC0, 0xFF, 0x87, 0x16, 0x01
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd2[] = {
++	0x00, 0x80, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd3[] = {
++	0x03, 0x00, 0x39, 0xC0, 0xFF, 0x87, 0x16, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd4[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd5[] = {
++	0x19, 0x00, 0x39, 0xC0, 0xE1, 0x04, 0x10, 0x27,
++	0x3B, 0x46, 0x53, 0x66, 0x74, 0x7A, 0x83, 0x8B,
++	0x94, 0x64, 0x5D, 0x5A, 0x54, 0x47, 0x3C, 0x2E,
++	0x25, 0x1C, 0x0F, 0x04, 0x03, 0xFF, 0xFF, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd6[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd7[] = {
++	0x19, 0x00, 0x39, 0xC0, 0xE2, 0x04, 0x10, 0x27,
++	0x3B, 0x46, 0x53, 0x66, 0x74, 0x7A, 0x83, 0x8B,
++	0x94, 0x64, 0x5D, 0x5A, 0x54, 0x47, 0x3C, 0x2E,
++	0x25, 0x1C, 0x0F, 0x04, 0x03, 0xFF, 0xFF, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd8[] = {
++	0x00, 0x80, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd9[] = {
++	0x0B, 0x00, 0x39, 0xC0, 0xCA, 0x80, 0xE5, 0xFF,
++	0xCC, 0xFF, 0x94, 0xFF, 0x00, 0x00, 0x00, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd10[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd11[] = {
++	0xC6, 0x10, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd12[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd13[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x90, 0x9A, 0x8B,
++	0xAB, 0xC9, 0x8A, 0x9A, 0xB9, 0xAA, 0xBA, 0xBA,
++	0x98, 0x88, 0x78, 0x56, 0x34, 0x22, 0x12, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd14[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd15[] = {
++	0xC6, 0x11, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd16[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd17[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x90, 0x9A, 0x9A,
++	0x9A, 0xBA, 0x8A, 0x9A, 0xA9, 0xAA, 0xB9, 0xBA,
++	0x88, 0x89, 0x88, 0x67, 0x34, 0x22, 0x22, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd18[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd19[] = {
++	0xC6, 0x12, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd20[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd21[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x90, 0x9A, 0x8A,
++	0x9A, 0xC9, 0x99, 0x99, 0x99, 0xAA, 0x9A, 0xAB,
++	0x89, 0x88, 0x88, 0x67, 0x45, 0x33, 0x22, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd22[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd23[] = {
++	0xC6, 0x13, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd24[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd25[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x9A, 0x8A,
++	0x9A, 0xB9, 0x99, 0x99, 0x99, 0xB9, 0xA8, 0xAA,
++	0x7A, 0x88, 0x88, 0x78, 0x45, 0x33, 0x33, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd26[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd27[] = {
++	0xC6, 0x14, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd28[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd29[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x9A, 0x8A,
++	0x99, 0xA9, 0x99, 0x89, 0x9A, 0xA9, 0x99, 0xAA,
++	0x7A, 0x88, 0x88, 0x78, 0x56, 0x34, 0x33, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd30[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd31[] = {
++	0xC6, 0x15, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd32[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd33[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x99, 0x8A,
++	0x99, 0xA9, 0x99, 0x98, 0x99, 0xA9, 0x98, 0xB9,
++	0x89, 0x88, 0x88, 0x78, 0x56, 0x44, 0x44, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd34[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd35[] = {
++	0xC6, 0x16, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd36[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd37[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x99, 0x99,
++	0x89, 0xA9, 0x89, 0x99, 0x98, 0x99, 0x99, 0xA9,
++	0x99, 0x87, 0x88, 0x88, 0x67, 0x44, 0x44, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd38[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd39[] = {
++	0xC6, 0x17, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd40[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd41[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x89, 0x99,
++	0x89, 0xA9, 0x89, 0x89, 0x89, 0xA9, 0x89, 0xA9,
++	0x89, 0x88, 0x88, 0x88, 0x67, 0x55, 0x44, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd42[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd43[] = {
++	0xC6, 0x18, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd44[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd45[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x89, 0x99,
++	0x89, 0xA8, 0x89, 0x98, 0x98, 0xA8, 0x88, 0xA9,
++	0x99, 0x87, 0x88, 0x88, 0x68, 0x55, 0x55, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd46[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd47[] = {
++	0xC6, 0x19, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd48[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd49[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x98, 0x89,
++	0x89, 0x99, 0x89, 0x88, 0x89, 0x99, 0x98, 0x98,
++	0x8A, 0x88, 0x88, 0x88, 0x78, 0x56, 0x55, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd50[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd51[] = {
++	0xC6, 0x1A, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd52[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd53[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x98, 0x98,
++	0x89, 0x98, 0x89, 0x88, 0x98, 0xA8, 0x88, 0x99,
++	0x89, 0x88, 0x88, 0x88, 0x78, 0x66, 0x56, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd54[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd55[] = {
++	0xC6, 0x1B, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd56[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd57[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x88, 0x89,
++	0x89, 0x98, 0x98, 0x88, 0x98, 0x98, 0x88, 0x99,
++	0x98, 0x88, 0x88, 0x88, 0x88, 0x66, 0x66, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd58[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd59[] = {
++	0xC6, 0x1C, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd60[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd61[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x88, 0x89,
++	0x88, 0x98, 0x98, 0x88, 0x98, 0x88, 0x89, 0x98,
++	0x98, 0x87, 0x88, 0x88, 0x88, 0x77, 0x67, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd62[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd63[] = {
++	0xC6, 0x1D, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd64[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd65[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x88, 0x88,
++	0x89, 0x88, 0x89, 0x88, 0x88, 0x98, 0x88, 0x98,
++	0x98, 0x88, 0x88, 0x88, 0x88, 0x77, 0x77, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd66[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd67[] = {
++	0xC6, 0x1E, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd68[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd69[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x88, 0x88,
++	0x88, 0x98, 0x88, 0x88, 0x98, 0x88, 0x88, 0x98,
++	0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x77, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd70[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd71[] = {
++	0xC6, 0x1F, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd72[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd73[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC7, 0x80, 0x88, 0x88,
++	0x88, 0x88, 0x88, 0x88, 0x88, 0x89, 0x97, 0x88,
++	0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd74[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd75[] = {
++	0xC6, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd76[] = {
++	0x00, 0x01, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd77[] = {
++	0xC6, 0x10, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd78[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd79[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC8, 0x90, 0x78, 0x56,
++	0x34, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x43,
++	0x44, 0x43, 0x44, 0x44, 0x44, 0x44, 0x54, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd80[] = {
++	0x00, 0x01, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd81[] = {
++	0xC6, 0x11, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd82[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd83[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC8, 0xC0, 0x8A, 0x57,
++	0x34, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33,
++	0x33, 0x33, 0x33, 0x44, 0x44, 0x44, 0x44, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd84[] = {
++	0x00, 0x01, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd85[] = {
++	0xC6, 0x12, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd86[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd87[] = {
++	0x13, 0x00, 0x39, 0xC0, 0xC8, 0xF0, 0x9D, 0x57,
++	0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x23,
++	0x32, 0x23, 0x22, 0x44, 0x44, 0x44, 0x34, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd88[] = {
++	0x02, 0x00, 0x39, 0xC0, 0x00, 0x01, 0xFF, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd89[] = {
++	0x02, 0x00, 0x39, 0xC0, 0xC6, 0x00, 0xFF, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd90[] = {
++	0x00, 0x80, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd91[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD8, 0x80, 0x82, 0x82,
++	0x83, 0x85, 0x86, 0x87, 0x87, 0x86, 0x84, 0x82,
++	0x00, 0xFF, 0xFF, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd92[] = {
++	0x00, 0x90, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd93[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD8, 0x00, 0x00, 0x80,
++	0x81, 0x82, 0x82, 0x81, 0x80, 0x00, 0x01, 0x00,
++	0x00, 0xFF, 0xFF, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd94[] = {
++	0x00, 0xA0, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd95[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD8, 0x01, 0x02, 0x03,
++	0x04, 0x06, 0x08, 0x0B, 0x0F, 0x13, 0x17, 0x18,
++	0x1D, 0xFF, 0xFF, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd96[] = {
++	0x00, 0xB0, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd97[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD8, 0x81, 0x84, 0x86,
++	0x89, 0x8E, 0x93, 0x96, 0x99, 0x9B, 0x9C, 0x9C,
++	0x9F, 0xFF, 0xFF, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd98[] = {
++	0x00, 0xC0, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd99[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD8, 0x84, 0x8A, 0x8E,
++	0x92, 0x9B, 0xA5, 0xAD, 0xB3, 0xB9, 0xBC, 0xB9,
++	0xBB, 0xFF, 0xFF, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd100[] = {
++	0x00, 0xD0, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd101[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD8, 0x02, 0x04, 0x05,
++	0x06, 0x08, 0x0C, 0x10, 0x14, 0x19, 0x1C, 0x1A,
++	0x1C, 0xFF, 0xFF, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd102[] = {
++	0x00, 0xE0, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd103[] = {
++	0x04, 0x00, 0x39, 0xC0, 0xD8, 0xFF, 0xF2, 0xF5
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd104[] = {
++	0x00, 0xC0, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd105[] = {
++	0xD7, 0x01, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd106[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd107[] = {
++	0x00, 0xA0, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd108[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD6, 0x0F, 0x13, 0x0F,
++	0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F,
++	0x0F, 0xFF, 0xFF, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd109[] = {
++	0x00, 0xB0, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd110[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD6, 0x80, 0x7C, 0x80,
++	0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
++	0x80, 0xFF, 0xFF, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd111[] = {
++	0x00, 0xC0, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd112[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD6, 0x7F, 0x7D, 0x80,
++	0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
++	0x80, 0xFF, 0xFF, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd113[] = {
++	0x00, 0xD0, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd114[] = {
++	0x0D, 0x00, 0x39, 0xC0, 0xD6, 0x7D, 0x7F, 0x80,
++	0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
++	0x80, 0xFF, 0xFF, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd115[] = {
++	0x00, 0x00, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd116[] = {
++	0x04, 0x00, 0x39, 0xC0, 0xFF, 0x00, 0x00, 0x00
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd117[] = {
++	0x00, 0x80, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd118[] = {
++	0x03, 0x00, 0x39, 0xC0, 0xFF, 0x00, 0x00, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd119[] = {
++	0x03, 0x00, 0x39, 0xC0, 0x91, 0x80, 0x00, 0xFF
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd120[] = {
++	0x51, 0xFF, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd121[] = {
++	0x53, 0x2C, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd122[] = {
++	0x55, 0x03, 0x15, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd123[] = {
++	0x11, 0x00, 0x05, 0x80
++};
++
++static char sharp_ft8716_1080p_video_on_cmd_cmd124[] = {
++	0x29, 0x00, 0x05, 0x80
++};
++
++static struct mipi_dsi_cmd sharp_ft8716_1080p_video_on_command[] = {
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd0, 0x00},
++	{0x8, sharp_ft8716_1080p_video_on_cmd_cmd1, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd2, 0x00},
++	{0x8, sharp_ft8716_1080p_video_on_cmd_cmd3, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd4, 0x00},
++	{0x20, sharp_ft8716_1080p_video_on_cmd_cmd5, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd6, 0x00},
++	{0x20, sharp_ft8716_1080p_video_on_cmd_cmd7, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd8, 0x00},
++	{0x10, sharp_ft8716_1080p_video_on_cmd_cmd9, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd10, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd11, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd12, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd13, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd14, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd15, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd16, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd17, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd18, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd19, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd20, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd21, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd22, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd23, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd24, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd25, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd26, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd27, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd28, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd29, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd30, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd31, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd32, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd33, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd34, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd35, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd36, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd37, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd38, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd39, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd40, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd41, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd42, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd43, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd44, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd45, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd46, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd47, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd48, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd49, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd50, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd51, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd52, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd53, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd54, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd55, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd56, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd57, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd58, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd59, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd60, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd61, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd62, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd63, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd64, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd65, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd66, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd67, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd68, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd69, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd70, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd71, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd72, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd73, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd74, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd75, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd76, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd77, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd78, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd79, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd80, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd81, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd82, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd83, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd84, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd85, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd86, 0x00},
++	{0x18, sharp_ft8716_1080p_video_on_cmd_cmd87, 0x00},
++	{0x8, sharp_ft8716_1080p_video_on_cmd_cmd88, 0x00},
++	{0x8, sharp_ft8716_1080p_video_on_cmd_cmd89, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd90, 0x00},
++	{0x14, sharp_ft8716_1080p_video_on_cmd_cmd91, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd92, 0x00},
++	{0x14, sharp_ft8716_1080p_video_on_cmd_cmd93, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd94, 0x00},
++	{0x14, sharp_ft8716_1080p_video_on_cmd_cmd95, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd96, 0x00},
++	{0x14, sharp_ft8716_1080p_video_on_cmd_cmd97, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd98, 0x00},
++	{0x14, sharp_ft8716_1080p_video_on_cmd_cmd99, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd100, 0x00},
++	{0x14, sharp_ft8716_1080p_video_on_cmd_cmd101, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd102, 0x00},
++	{0x8, sharp_ft8716_1080p_video_on_cmd_cmd103, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd104, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd105, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd106, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd107, 0x00},
++	{0x14, sharp_ft8716_1080p_video_on_cmd_cmd108, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd109, 0x00},
++	{0x14, sharp_ft8716_1080p_video_on_cmd_cmd110, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd111, 0x00},
++	{0x14, sharp_ft8716_1080p_video_on_cmd_cmd112, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd113, 0x00},
++	{0x14, sharp_ft8716_1080p_video_on_cmd_cmd114, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd115, 0x00},
++	{0x8, sharp_ft8716_1080p_video_on_cmd_cmd116, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd117, 0x00},
++	{0x8, sharp_ft8716_1080p_video_on_cmd_cmd118, 0x00},
++	{0x8, sharp_ft8716_1080p_video_on_cmd_cmd119, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd120, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd121, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd122, 0x00},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd123, 0x80},
++	{0x4, sharp_ft8716_1080p_video_on_cmd_cmd124, 0x20}
++};
++
++#define SHARP_FT8716_1080P_VIDEO_ON_COMMAND 125
++
++/*---------------------------------------------------------------------------*/
++/* Panel off command information                                             */
++/*---------------------------------------------------------------------------*/
++static char sharp_ft8716_1080p_video_off_cmd_cmd0[] = {
++	0x28, 0x00, 0x05, 0x80
++};
++
++static char sharp_ft8716_1080p_video_off_cmd_cmd1[] = {
++	0x10, 0x00, 0x05, 0x80
++};
++
++static struct mipi_dsi_cmd sharp_ft8716_1080p_video_off_command[] = {
++	{0x4, sharp_ft8716_1080p_video_off_cmd_cmd0, 0x32},
++	{0x4, sharp_ft8716_1080p_video_off_cmd_cmd1, 0x78}
++};
++
++#define SHARP_FT8716_1080P_VIDEO_OFF_COMMAND 2
++
++static struct command_state sharp_ft8716_1080p_video_state = {
++	0, 1
++};
++
++/*---------------------------------------------------------------------------*/
++/* Command mode panel information                                            */
++/*---------------------------------------------------------------------------*/
++static struct commandpanel_info sharp_ft8716_1080p_video_command_panel = {
++	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
++};
++
++/*---------------------------------------------------------------------------*/
++/* Video mode panel information                                              */
++/*---------------------------------------------------------------------------*/
++static struct videopanel_info sharp_ft8716_1080p_video_video_panel = {
++	1, 0, 0, 0, 1, 1, 2, 0, 0x9
++};
++
++/*---------------------------------------------------------------------------*/
++/* Lane configuration                                                        */
++/*---------------------------------------------------------------------------*/
++static struct lane_configuration sharp_ft8716_1080p_video_lane_config = {
++	4, 0, 1, 1, 1, 1, 0
++};
++
++/*---------------------------------------------------------------------------*/
++/* Panel timing                                                              */
++/*---------------------------------------------------------------------------*/
++static const uint32_t sharp_ft8716_1080p_video_timings[] = {
++	0xBF382601, 0x686E2A3C, 0x2C030400
++};
++
++static const uint32_t sharp_ft8716_1080p_video_14nm_video_timings[] = {
++	0x241f0809, 0x50304a0, 0x241f0809, 0x50304a0, 0x241f0809, 0xa0,
++	0x50304a0, 0x241f0809, 0x50304a0, 0x241b0809, 0x50304a0, 0xa0,
++};
++
++static struct panel_timing sharp_ft8716_1080p_video_timing_info = {
++	0, 4, 0x0d, 0x30
++};
++
++/*---------------------------------------------------------------------------*/
++/* Panel reset sequence                                                      */
++/*---------------------------------------------------------------------------*/
++static struct panel_reset_sequence sharp_ft8716_1080p_video_reset_seq = {
++	{1, 0, 1, }, {2, 2, 3, }, 2
++};
++
++/*---------------------------------------------------------------------------*/
++/* Backlight setting                                                         */
++/*---------------------------------------------------------------------------*/
++static struct backlight sharp_ft8716_1080p_video_backlight = {
++	1, 1, 4095, 100, 1, "PMIC_8941"
++};
++
++static struct labibb_desc sharp_ft8716_1080p_video_labibb = {
++	0, 1, 5700000, 5700000, 5700000, 5700000, 3, 3, 1, 0
++};
++
++#define SHARP_FT8716_1080P_VIDEO_PANEL_ON_DELAY 32
++
++#define SHARP_FT8716_1080P_VIDEO_SIGNATURE 0xFFFF
++
++#endif /*_PANEL_SHARP_FT8716_1080P_VIDEO_H_*/
+--- a/target/msm8953/oem_panel.c
++++ b/target/msm8953/oem_panel.c
+@@ -49,6 +49,9 @@
+ #include "include/panel_truly_1080p_cmd.h"
+ #include "include/panel_r69006_1080p_video.h"
+ #include "include/panel_r69006_1080p_cmd.h"
++#include "include/panel_ft8716_1080p_video.h"
++#include "include/panel_nt36672_1080p_video.h"
++#include "include/panel_sharp_ft8716_1080p_video.h"
+ #include "include/panel_truly_wuxga_video.h"
+ #include "include/panel_hx8399c_fhd_pluse_video.h"
+ #include "include/panel_hx8399c_hd_plus_video.h"
+@@ -64,6 +67,9 @@
+ 	TRULY_WUXGA_VIDEO_PANEL,
+ 	HX8399C_FHD_PLUSE_VIDEO_PANEL,
+ 	HX8399C_HD_PLUS_VIDEO_PANEL,
++	FT8716_1080P_VIDEO_PANEL,
++	NT36672_1080P_VIDEO_PANEL,
++	SHARP_FT8716_1080P_VIDEO_PANEL,
+ 	UNKNOWN_PANEL
+ };
+ 
+@@ -77,6 +83,9 @@
+ 	{"r69006_1080p_video", R69006_1080P_VIDEO_PANEL},
+ 	{"r69006_1080p_cmd", R69006_1080P_CMD_PANEL},
+ 	{"truly_wuxga_video", TRULY_WUXGA_VIDEO_PANEL},
++	{"ft8716_1080p_video", FT8716_1080P_VIDEO_PANEL},
++	{"nt36672_1080p_video", NT36672_1080P_VIDEO_PANEL},
++	{"sharp_ft8716_1080p_video", SHARP_FT8716_1080P_VIDEO_PANEL},
+ 	{"hx8399c_fhd_pluse_video", HX8399C_FHD_PLUSE_VIDEO_PANEL},
+ 	{"hx8399c_hd_plus_video", HX8399C_HD_PLUS_VIDEO_PANEL},
+ };
+@@ -317,7 +326,88 @@
+ 		memcpy(phy_db->timing,
+ 			hx8399c_hd_plus_14nm_video_timings, MAX_TIMING_CONFIG * sizeof(uint32_t));
+ 		pinfo->mipi.signature    = HX8399C_HD_PLUS_VIDEO_SIGNATURE;
++		break;
++	case FT8716_1080P_VIDEO_PANEL:
++		panelstruct->paneldata    = &ft8716_1080p_video_panel_data;
++		panelstruct->paneldata->panel_with_enable_gpio = 0;
++		panelstruct->panelres     = &ft8716_1080p_video_panel_res;
++		panelstruct->color        = &ft8716_1080p_video_color;
++		panelstruct->videopanel   = &ft8716_1080p_video_video_panel;
++		panelstruct->commandpanel = &ft8716_1080p_video_command_panel;
++		panelstruct->state        = &ft8716_1080p_video_state;
++		panelstruct->laneconfig   = &ft8716_1080p_video_lane_config;
++		panelstruct->paneltiminginfo
++			= &ft8716_1080p_video_timing_info;
++		panelstruct->panelresetseq
++					 = &ft8716_1080p_video_reset_seq;
++		panelstruct->backlightinfo = &ft8716_1080p_video_backlight;
++		pinfo->mipi.panel_on_cmds
++			= ft8716_1080p_video_on_command;
++		pinfo->mipi.num_of_panel_on_cmds
++			= FT8716_1080P_VIDEO_ON_COMMAND;
++		pinfo->mipi.panel_off_cmds
++			= ft8716_1080p_video_off_command;
++		pinfo->mipi.num_of_panel_off_cmds
++			= FT8716_1080P_VIDEO_OFF_COMMAND;
++		memcpy(phy_db->timing,
++			ft8716_1080p_video_14nm_video_timings,
++			MAX_TIMING_CONFIG * sizeof(uint32_t));
++		pinfo->mipi.signature 	= FT8716_1080P_VIDEO_SIGNATURE;
++		break;
++	case NT36672_1080P_VIDEO_PANEL:
++		panelstruct->paneldata    = &nt36672_1080p_video_panel_data;
++		panelstruct->paneldata->panel_with_enable_gpio = 0;
++		panelstruct->panelres     = &nt36672_1080p_video_panel_res;
++		panelstruct->color        = &nt36672_1080p_video_color;
++		panelstruct->videopanel   = &nt36672_1080p_video_video_panel;
++		panelstruct->commandpanel = &nt36672_1080p_video_command_panel;
++		panelstruct->state        = &nt36672_1080p_video_state;
++		panelstruct->laneconfig   = &nt36672_1080p_video_lane_config;
++		panelstruct->paneltiminginfo
++			= &nt36672_1080p_video_timing_info;
++		panelstruct->panelresetseq
++					 = &nt36672_1080p_video_reset_seq;
++		panelstruct->backlightinfo = &nt36672_1080p_video_backlight;
++		pinfo->mipi.panel_on_cmds
++			= nt36672_1080p_video_on_command;
++		pinfo->mipi.num_of_panel_on_cmds
++			= NT36672_1080P_VIDEO_ON_COMMAND;
++		pinfo->mipi.panel_off_cmds
++			= nt36672_1080p_video_off_command;
++		pinfo->mipi.num_of_panel_off_cmds
++			= NT36672_1080P_VIDEO_OFF_COMMAND;
++		memcpy(phy_db->timing,
++			nt36672_1080p_video_14nm_video_timings,
++			MAX_TIMING_CONFIG * sizeof(uint32_t));
++		pinfo->mipi.signature 	= NT36672_1080P_VIDEO_SIGNATURE;
+ 		break;
++	case SHARP_FT8716_1080P_VIDEO_PANEL:
++		panelstruct->paneldata    = &sharp_ft8716_1080p_video_panel_data;
++		panelstruct->paneldata->panel_with_enable_gpio = 0;
++		panelstruct->panelres     = &sharp_ft8716_1080p_video_panel_res;
++		panelstruct->color        = &sharp_ft8716_1080p_video_color;
++		panelstruct->videopanel   = &sharp_ft8716_1080p_video_video_panel;
++		panelstruct->commandpanel = &sharp_ft8716_1080p_video_command_panel;
++		panelstruct->state        = &sharp_ft8716_1080p_video_state;
++		panelstruct->laneconfig   = &sharp_ft8716_1080p_video_lane_config;
++		panelstruct->paneltiminginfo
++			= &sharp_ft8716_1080p_video_timing_info;
++		panelstruct->panelresetseq
++					 = &sharp_ft8716_1080p_video_reset_seq;
++		panelstruct->backlightinfo = &sharp_ft8716_1080p_video_backlight;
++		pinfo->mipi.panel_on_cmds
++			= sharp_ft8716_1080p_video_on_command;
++		pinfo->mipi.num_of_panel_on_cmds
++			= SHARP_FT8716_1080P_VIDEO_ON_COMMAND;
++		pinfo->mipi.panel_off_cmds
++			= sharp_ft8716_1080p_video_off_command;
++		pinfo->mipi.num_of_panel_off_cmds
++			= SHARP_FT8716_1080P_VIDEO_OFF_COMMAND;
++		memcpy(phy_db->timing,
++			sharp_ft8716_1080p_video_14nm_video_timings,
++			MAX_TIMING_CONFIG * sizeof(uint32_t));
++		pinfo->mipi.signature 	= SHARP_FT8716_1080P_VIDEO_SIGNATURE;
++		break;
+ 	case UNKNOWN_PANEL:
+ 	default:
+ 		memset(panelstruct, 0, sizeof(struct panel_struct));
