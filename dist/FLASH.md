@@ -2,9 +2,9 @@
 
 | 产物 | 大小 | 用途 |
 |------|------|------|
-| `lk2nd.img` | 356 KB | 二级引导，刷入 boot 分区 |
+| `lk2nd.img` | 358 KB | 二级引导，刷入 boot 分区 |
 | `odin-debian.img` | 1.13 GB (raw) | 完整系统（Debian rootfs+内核+引导配置），刷入 userdata |
-| `odin-debian-sparse.img` | 642 MB | 同上的 sparse 版，**推荐**（fastboot 分块流式传输） |
+| `odin-debian-sparse.img` | 646 MB | 同上的 sparse 版，**推荐**（fastboot 分块流式传输） |
 
 > ⚠️ **刷 userdata 会清空手机全部数据**（照片/应用/聊天记录），先备份！
 > 本包不触碰 aboot/modem/persist 等分区；恢复原厂可用线刷包 EDL 全量救砖。
@@ -70,7 +70,7 @@ fastboot reboot
 telnet 内常用救援命令示例：
 ```sh
 mount -t ext4 /dev/mmcblk0pNN /mnt   # 手动挂根检查
-cat /proc/cmdline; blkid
+cat /proc/cmdline; findfs LABEL=pmOS_root
 ```
 
 ## 六、故障排查
