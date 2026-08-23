@@ -1,0 +1,33 @@
+#!/usr/bin/expect -f
+# ODIN QEMU 客体内诊断（经 hostfwd SSH）
+set timeout 90
+log_user 1
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -p 2222 user@127.0.0.1
+expect {
+    -re "(?i)password:" { send "user\r" }
+    timeout { puts "\n[ERR] no password prompt"; exit 1 }
+}
+expect {
+    -re {\$ $} {}
+    -re {# $} {}
+    timeout { puts "\n[ERR] no shell"; exit 1 }
+}
+send -- "echo ===DIAG_BEGIN===\r"
+send -- "hostname; uname -a | cut -d' ' -f1-3\r"
+sleep 1
+send -- "systemctl --no-pager --failed | tail -n 6\r"
+sleep 2
+send -- "lsblk -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINT\r"
+sleep 2
+send -- "dmesg | grep -iE 'usb-storage|vendor: QEMU|sda)' | head -n 8\r"
+sleep 2
+send -- "echo user | sudo -S mount /dev/sda1 /mnt 2>/dev/null && ls -la /mnt && sudo umount /mnt && echo USB_MOUNT_OK\r"
+sleep 3
+send -- "systemctl status odin-firstboot-resize --no-pager 2>&1 | head -n 5\r"
+sleep 2
+send -- "systemctl is-active serial-getty@ttyAMA0; systemctl is-enabled systemd-udev-trigger.service\r"
+sleep 2
+send -- "echo ===DIAG_END===\r"
+sleep 2
+send -- "exit\r"
+expect eof

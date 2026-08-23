@@ -27,16 +27,19 @@ usb_up() {
 }
 
 try_mount_root() {
+    # NOTE: 判定用真实文件而非 /mnt/sbin/init——后者是指向
+    # /lib/systemd/systemd 的绝对路径符号链接，在 initramfs 环境下
+    # 解析到 initramfs 自身根目录而必然失效。
     ROOT=$(findfs LABEL=pmOS_root 2>/dev/null)
     if [ -n "$ROOT" ] && mount -t ext4 -o ro "$ROOT" /mnt 2>/dev/null; then
-        [ -x /mnt/sbin/init ] && return 0
+        [ -x /mnt/usr/lib/systemd/systemd ] && return 0
         umount /mnt
     fi
     # fallback: brute scan mmc partitions for our marker
-    for dev in /dev/mmcblk0p* /dev/mmcblk1p* /dev/mmcblk0 /dev/mmcblk1; do
+    for dev in /dev/mmcblk0p* /dev/mmcblk1p* /dev/mmcblk0 /dev/mmcblk1 /dev/vd[a-z]; do
         [ -b "$dev" ] || continue
         mount -t ext4 -o ro "$dev" /mnt 2>/dev/null || continue
-        if [ -x /mnt/sbin/init ] && [ -f /mnt/.odin-debian ]; then
+        if [ -x /mnt/usr/lib/systemd/systemd ] && [ -f /mnt/.odin-debian ]; then
             ROOT="$dev"; return 0
         fi
         umount /mnt
@@ -64,7 +67,8 @@ fi
 
 [ "$RESCUE" = "1" ] && { echo "staying in rescue shell"; exec sh; }
 
-umount /mnt
+# 注意：此处不得 umount /mnt —— 根必须保持挂载态供 switch_root 使用；
+# 只读挂载由 systemd 依 fstab 重挂为 rw。
 kill %1 %2 2>/dev/null
 mount --move /dev  /mnt/dev   2>/dev/null || { mkdir -p /mnt/dev;  mount -t devtmpfs none /mnt/dev; }
 mount --move /proc /mnt/proc  2>/dev/null || { mkdir -p /mnt/proc; mount -t proc none /mnt/proc; }
