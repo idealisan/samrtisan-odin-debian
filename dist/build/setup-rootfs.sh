@@ -100,6 +100,13 @@ echo "en_US.UTF-8 UTF-8" > $R/etc/locale.gen
 chroot $R locale-gen >/dev/null 2>&1 || true
 chroot $R systemd-machine-id-setup 2>/dev/null || true
 
+# --- WiFi management (equivalent to postmarketOS: NetworkManager + wpa) ---
+sed -i 's/ main$/ main contrib non-free non-free-firmware/' $R/etc/apt/sources.list
+chroot $R apt-get update -qq
+chroot $R apt-get install -y -qq network-manager wpasupplicant iw wireless-tools rfkill firmware-atheros
+chroot $R systemctl enable NetworkManager.service
+chroot $R systemctl enable wpa_supplicant.service 2>/dev/null || true
+
 # --- enable ssh ---
 chroot $R systemctl enable ssh.service
 echo SETUP_DONE
