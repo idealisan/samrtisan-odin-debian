@@ -16,6 +16,10 @@ cat > $R/etc/fstab << 'FSTAB'
 tmpfs                         /tmp  tmpfs defaults,nosuid                       0 0
 FSTAB
 
+# --- ensure udev is installed (provides systemd-udevd, rules, net naming) ---
+chroot $R apt-get update -qq
+chroot $R apt-get install -y -qq udev
+
 # marker for initramfs fallback scan
 touch $R/.odin-debian
 

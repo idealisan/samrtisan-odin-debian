@@ -27,7 +27,7 @@ exec qemu-system-aarch64 \
     -nographic \
     -kernel Image \
     -initrd initramfs.cpio.gz \
-    -append "console=ttyAMA0 earlycon=pl011,0x9000000 root=/dev/disk/by-label/pmOS_root rootwait rw ip=10.0.2.15::10.0.2.2:255.255.255.0::eth0:off" \
+    -append "console=ttyAMA0 earlycon=pl011,0x9000000 root=/dev/disk/by-label/pmOS_root rootwait rw ip=10.0.2.15::10.0.2.2:255.255.255.0::eth0:off net.ifnames=0" \
     -drive file="$DISK",format=raw,if=virtio \
     -device qemu-xhci,id=xhci \
     -device usb-storage,bus=xhci.0,drive=ud0 \
