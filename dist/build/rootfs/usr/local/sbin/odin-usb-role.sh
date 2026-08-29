@@ -30,6 +30,15 @@ DRY_RUN=0
 [ "$1" = "--dry-run" ] && DRY_RUN=1
 HOST_IP=172.16.42.1
 CLIENT_IP=172.16.42.2
+CLIENT_IP_MAX=172.16.42.10   # 地址池上限（兜底：MAC 万一变了也不会无地址可分）
+
+# 固定的 NCM MAC 地址（基于本机序列号 <emmc-serial>，本地管理地址，第二位为 2 合法）
+# 为什么必须写死：gadget 每次重启都会随机生成 MAC，PC 侧网卡的 MAC 随之变化，
+# dnsmasq 会当成全新客户端；而地址池若被旧 MAC 的租约(12h)占住，就会出现
+#   "DHCPDISCOVER(usb0) xx:xx:... no address available"
+# 于是 PC 只能拿到 169.254 自分配地址、必须手工配静态 IP（真机踩过两次）。
+GADGET_HOST_MAC="${ODIN_GADGET_HOST_MAC:-02:00:0d:1d:00:01}"   # PC 侧看到的 MAC
+GADGET_DEV_MAC="${ODIN_GADGET_DEV_MAC:-02:00:0d:1d:00:02}"     # 手机侧 usb0 的 MAC
 
 log() { echo "$(date -Is) $*" >> "$LOG" 2>/dev/null; }
 
@@ -106,6 +115,12 @@ apply_device() {
 		|| echo "ODIN Debian" > "$CFG/configs/c.1/strings/0x409/configuration" 2>/dev/null
 	ln -sf "$CFG/functions/ncm.usb0" "$CFG/configs/c.1/f1" 2>/dev/null
 
+	# 绑定 UDC 之前写死 MAC，否则 gadget 会用随机 MAC（见文件头注释）
+	[ -f "$CFG/functions/ncm.usb0/host_addr" ] \
+		|| echo "$GADGET_HOST_MAC" > "$CFG/functions/ncm.usb0/host_addr" 2>/dev/null
+	[ -f "$CFG/functions/ncm.usb0/dev_addr" ] \
+		|| echo "$GADGET_DEV_MAC" > "$CFG/functions/ncm.usb0/dev_addr" 2>/dev/null
+
 	# 【关键】先清空再写名字，否则 configfs 保留旧 udc_name 直接 -EBUSY
 	local cur=""
 	[ -r "$CFG/UDC" ] && cur=$(cat "$CFG/UDC" 2>/dev/null)
@@ -134,7 +149,7 @@ apply_device() {
 	#      手机上没有别的用途，已在镜像里 disable 掉系统 dnsmasq。
 	dnsmasq --no-daemon --pid-file="$PIDFILE" --interface=usb0 \
 		--conf-file=/dev/null \
-		--bind-interfaces --dhcp-range=${CLIENT_IP},${CLIENT_IP},12h \
+		--bind-interfaces --dhcp-range=${CLIENT_IP},${CLIENT_IP_MAX},12h \
 		--dhcp-option=option:router --no-resolv --no-hosts \
 		--log-facility=/var/log/odin-dnsmasq.log &
 	dnsmasq_pid=$!
