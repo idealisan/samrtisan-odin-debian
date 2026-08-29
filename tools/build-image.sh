@@ -71,6 +71,9 @@ normalize_modules "$STAGE/usr/lib/modules" "$STAGE"
 # 回填旧值（/etc/machine-id 为空时的 dbus 兼容路径），两个都必须清。
 : > "$STAGE/etc/machine-id"
 [ -f "$STAGE/var/lib/dbus/machine-id" ] && : > "$STAGE/var/lib/dbus/machine-id"
+# SSH 主机私钥同理：镜像要公开发布，带一把固定私钥等于所有设备共用同一身份。
+# 由 odin-ssh-hostkeys.service 在首启用 ssh-keygen -A 生成（apply-staging-fixes.sh 装的）。
+rm -f "$STAGE"/etc/ssh/ssh_host_*_key "$STAGE"/etc/ssh/ssh_host_*_key.pub
 rm -f  "$STAGE/var/lib/systemd/random-seed"
 rm -rf "$STAGE"/var/log/journal/*
 rm -f  "$STAGE/var/log/wtmp" "$STAGE/var/log/btmp" "$STAGE/var/log/lastlog"

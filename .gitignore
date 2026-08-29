@@ -7,3 +7,29 @@
 # QEMU 回归用的临时测试盘（由 odin-qemu/test-automount.sh 现场生成，不必入库）
 odin-qemu/test-*.img
 odin-qemu/testdisk.img
+
+# ---------------------------------------------------------------------------
+# 构建产物 / 二进制：一律不入库，统一作为 GitHub Release 资产发布。
+# 仓库只保留"能从零重建出这些东西的源码与脚本"。
+# ---------------------------------------------------------------------------
+*.img          # 分区镜像、刷机镜像（含 lk2nd）
+*.dtb          # 编译产物，源码是同名的 .dts
+*.ko           # 内核模块
+*.mbn          # 原厂 aboot
+*.tar
+*.tar.gz
+*.tgz
+*.cpio.gz
+*.bin
+*.elf
+
+# 从设备/镜像里解出来的整棵内核模块树与 busybox（都是别人的构建产物）
+dist/stage/modules/
+dist/build/initramfs/bin/
+
+# QEMU 测试用内核与磁盘镜像
+odin-qemu/Image
+odin-qemu/*.img
+
+# shell 误操作留下的空文件（待清理，先别让它进版本库）
+power_on

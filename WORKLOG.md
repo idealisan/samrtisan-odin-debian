@@ -675,3 +675,128 @@ cmdline: console=ttyMSM0,115200n8 ... console=tty0     ← 控制台上屏
    若要从零复现，需用 fastboot 重刷 dist/lk2nd.img + dist/odin-debian-sparse.img
 6. 考虑把 dist/lk2nd.img 换成精简版（去掉 markw）：需要刷 boot 分区（有风险，需确认）
 
+
+---
+
+## 拾柒 [2026-08-29 22:30] 需求：整理成「从原生 Fastboot 从头刷入」的完整可复现流程
+
+用户原话：「我们需要给它整理成能够从头刷入的脚本和镜像。从头刷入的意思是，从设备自带的
+原生的 Fastboot 开始，刷入 LK2ND，然后再执行的一系列操作，到能够连接 SSH。成功使用这个
+系统，这样一个完整的流程……先说说你准备怎么做？」
+
+### 现状盘点（22:26 实测）
+| 产物/资源 | 路径 | 状态 |
+|---|---|---|
+| 内核树 | `/Volumes/caseSensitiveBar/linux-msm8953`（分支 odin-wip） | 在，含 0001-0008 |
+| 补丁 | `patches/0001..0008` | 齐（0008=面板 init 挪到 enable） |
+| DTB | `dts/*.dtb` × 4 | 齐（含背光 2048/GPU 修复） |
+| lk2nd 原版 | `dist/lk2nd.img` 366608 B + `lk2nd/bin/emmc_appsboot.mbn` | 已真机验证可启动 |
+| lk2nd 精简版 | `dist/lk2nd-nomarkw.img` 364560 B（去掉 markw 条目） | **未经真机验证** |
+| Debian 镜像 | `dist/odin-debian.img` 2GiB + `-sparse.img` 660MB | 8/29 12:46 批次，**不含** 0008/背光/DHCP 三项修复 |
+| rootfs overlay | `dist/build/rootfs/`（6 个文件） | 含最新 odin-usb-role.sh（单地址池） |
+| staging 修复 | `dist/build/apply-staging-fixes.sh` | 含 §4/§5/§6 |
+| 镜像导出 | `tools/build-image.sh` | 含全量回读校验 |
+| 构建容器 | docker `odin-build`（debian:bookworm，Up 27h） | 在 |
+| 主机 fastboot | `/opt/homebrew/bin/fastboot` 36.0.0 | 在 |
+
+### ⚠️ 关键判断
+**现有 dist/ 镜像落后于真机**：手机现在跑的是「早期镜像 + 增量部署的 .ko / DTB / 脚本」，
+而 `dist/odin-debian.img` 是 12:46 生成的，之后的三项关键修复（0008 面板、DTB 背光+GPU、
+odin-usb-role.sh 单地址池）**都没烘焙进去**。直接拿它从头刷 ⇒ 必然黑屏 + DHCP 不稳。
+⇒ 所以「从头刷入」的第一步不是刷机，而是 **先重跑一遍构建管线，产出一个与真机等价的镜像**。
+
+### 计划（待用户确认后执行）
+
+**A. 构建侧 —— `tools/build-all.sh`（一条命令重建全部产物）**
+1. 校验内核树：确认 0001-0008 已 apply（`git -C linux-msm8953 log/diff`）
+2. 重编 `panel-ft8716.ko`（容器内 `make ARCH=arm64 M=drivers/gpu/drm/panel modules`）
+3. `dts/build-dtb.sh` → 4 个 DTB
+4. 以**当前真机系统**为基线建 staging（SSH + rsync/tar 拉回，而非用旧的 /mnt/debian），
+   再套 `apply-staging-fixes.sh` 打 overlay + 新 .ko + 新 DTB + extlinux.conf
+5. `tools/build-image.sh` → `odin-debian.img` + `-sparse.img`，全量回读校验
+6. 生成 `dist/MANIFEST.sha256`，记录每个产物的 md5/大小/来源
+
+**B. 刷机侧 —— `flash/flash-all.sh`（原生 fastboot → SSH 可用，可重入）**
+拆成带序号的阶段脚本，任何一步失败都能从那一步重跑：
+```
+00-precheck      本机 fastboot/镜像/md5 校验、SSH 可达性、备份提醒
+10-backup        经 SSH 备份真机关键文件（/extlinux /usr/local/sbin /etc/udev
+                 /lib/modules/.../panel-ft8716.ko /etc/systemd 自研单元）
+20-fastboot      轮询等待设备进入原生 fastboot（引导用户按 音量减+电源）
+30-flash-boot    fastboot flash boot <lk2nd>
+40-flash-data    fastboot flash userdata odin-debian-sparse.img（失败回退 raw，带重试）
+50-boot          fastboot reboot，等待 USB NCM 网卡出现
+60-usbnet        等 PC 拿到 172.16.42.2（DHCP 优先，超时则静态兜底）
+70-ssh           等 22 端口可达，SSH 登录
+80-verify        跑 12 项验收（内核/面板/背光/DRM/usb0/dnsmasq/扩容/…）
+90-handoff       提示切 l0 完整版、OTG、GPU 微码等后续项
+```
+配套：`flash/lib/common.sh`（日志/重试/超时/时间戳）、`flash/rescue.sh`（IPv6 EUI-64 /
+initramfs telnet / 串口 三条兜底通道）、`flash/STATE.md`（状态机 A/B/C/D 与循环策略）。
+
+**C. 需要用户拍板的两件事**
+1. 首刷用哪个 lk2nd：原版（已验证，但可能命中 markw 条目 ⇒ 无屏）/ 精简版（强制命中 odin，
+   理论上必亮屏，但从未刷入过真机）
+2. 刷 userdata 会清空手机全部数据 —— 是否需要先做一次 userdata 全量备份
+
+### 待办（延续）
+（见上一节 1-6 项，另加：本轮新增的构建/刷机脚本）
+
+---
+
+## 拾捌 [2026-08-29 22:50] 全量备份 + 发布准备
+
+### A. 真机全量备份（已完成）
+产物在**手机上**：`/root/odin-backup/rootfs-full.tar`（953 MB，16392 条目，tar rc=0，
+`DONE` 标记已落）。脚本 `flash/stages/10-backup.sh`，三个子命令：
+- 无参数：在手机上打包（nohup 后台 + 每 5s 轮询大小，只用一条 stat，hub 繁忙也安全）
+- `--status`：看进度
+- `--fetch`：HTTP 拉回（`python3 -m http.server` 绑 172.16.42.1，`curl -C -` 断点续传）
+
+**踩坑 1（重要）**：最初写成 `ssh 设备 tar -cf - / | gzip > 本机`，两次都在 ~14s/~110MB
+处断，设备随后 30s 完全不响应 ping。分离测试证明**不是网络问题**——纯流量压测
+400MB 用 20s 跑完（约 20MB/s）。是设备端 tar 边读边往外吐时 USB NCM 会 stall。
+⇒ 大批量数据先在设备本地落盘，传输阶段只做顺序大文件拷贝。
+
+**踩坑 2**：`/root` 是 0700，用 `odin_ssh`（user 身份）去 `tar -tf` 只得到空输出，
+差点把一份完好的备份判成"截断"。⇒ 涉及 /root 一律用 `odin_sudo*`。
+已把这条写进 `flash/lib/common.sh` 的注释。
+
+**踩坑 3**：bash 在 C locale 下把紧跟在 `$VAR` 后面的中文字符当变量名的一部分
+（`DEVICE_IP）——先确认` ⇒ `DEVICE_IP\uFFFD: unbound variable`）。
+⇒ 所有脚本里变量一律写成 `${VAR}`。
+
+### B. 关键事实修正：boot 分区里不是我们的 lk2nd
+实测 `/dev/disk/by-partlabel/boot` 的 bootimg 头 `kernel_size=339260`，
+既不是 `dist/lk2nd.img`(352980) 也不是 `lk2nd-nomarkw.img`(351316) ⇒
+**boot 分区至今仍是 pmOS 原版 lk2nd 21.0**（当时只用 `fastboot boot` 内存启动验证过精简版）。
+- 备份 `evidence/live-device-backup/boot-partition.img` 与实时分区**逐字节一致**（md5 相同）
+  ⇒ 有可靠回滚路径。
+- 屏幕之所以亮，靠的是 DTB 里写死 `compatible="smartisan,odin-ft8716"`，
+  与 lk2nd 选中哪个条目无关。所以刷精简版 lk2nd 是"再加一道保险"，不是雪中送炭。
+
+### C. 发布前的安全修复：SSH 主机密钥
+`git grep "BEGIN ... PRIVATE KEY"` 在两个刷机镜像里命中 —— 镜像带着一把固定的
+SSH 主机私钥，公开发布等于所有设备共用同一身份（可 MITM）。
+- `tools/build-image.sh` §2 干净化：删除 `/etc/ssh/ssh_host_*`
+- `dist/build/apply-staging-fixes.sh` §2b：新增 `odin-ssh-hostkeys.service`
+  （`Before=ssh.service`，`ssh-keygen -A` 只补缺失的类型，尾部 `exit 0` 保证失败也不挡 SSH）
+- 不能用 ssh.service 的 ExecStartPre drop-in：Debian 自带 `ExecStartPre=/usr/sbin/sshd -t`，
+  而 drop-in 的 ExecStartPre 是**追加**在其后，无密钥时 `sshd -t` 直接退出，轮不到生成动作。
+
+### D. extlinux.conf 与 DTB 对齐真机
+真机验证可用的是 `*-ft8716*.dtb`（面板写死），仓库里却指向自动识别版，且 append 少了
+`console=tty0`（控制台上屏开关）。已同步：
+- `dist/build/rootfs/extlinux/extlinux.conf` 两个 label 都改指 ft8716 变体 + 补 `console=tty0`
+- `apply-staging-fixes.sh` §4 改为部署**四个** DTB（主用 ft8716 对，自动识别对留作换屏退路）
+
+### E. 准备公开仓库（进行中）
+- 安装 `git-filter-repo` 2.47.0
+- 审计结果：730 个二进制文件 / 5.18 GB 已入库，`.git` 达 4.7 GB
+  （2GB 刷机镜像、660MB sparse、147MB 内核模块树、40MB busybox、2.2GB QEMU 测试盘、
+  evidence 下解出来的整个 initramfs 树）
+- 隐私扫描：无私钥/无 `/Users/xxx` 路径；有设备侧 MAC（由 eMMC 序列号派生）与
+  PC 主机名（DHCP 日志里的 `<pc-hostname>`）
+- `.gitignore` 已加上 `*.img/*.dtb/*.ko/*.mbn/*.tar*/*.cpio.gz/*.bin/*.elf` 等规则
+- 计划：在 `/tmp` 的克隆副本上跑 filter-repo 清历史（**不动源仓库**），
+  验证干净后再推 `git@github.com:idealisan/samrtisan-odin-debian.git`

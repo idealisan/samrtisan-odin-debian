@@ -95,6 +95,41 @@ NMC
 chmod 0644 "$R/etc/NetworkManager/conf.d/99-odin-usb0.conf"
 say "NetworkManager: usb0 marked unmanaged"
 
+# ------------------------------------------------------- 2b. SSH 主机密钥首次开机生成
+# 镜像要公开发布，绝不能带着一把固定的主机私钥——那等于所有刷了这个镜像的设备
+# 共用同一把私钥，任何下载过镜像的人都能冒充设备（MITM）。
+# 做法：镜像里不带密钥，开机由本服务用 ssh-keygen -A 现场生成。
+#
+# 为什么是独立 oneshot 而不是 ssh.service 的 ExecStartPre drop-in：
+# Debian 的 ssh.service 自带 ExecStartPre=/usr/sbin/sshd -t，而 drop-in 里的
+# ExecStartPre 是**追加**在主配置之后的；sshd -t 在没有主机密钥时会直接报错退出，
+# 排在它后面的生成动作根本轮不上。用 Before=ssh.service 的独立 oneshot 才能保证顺序。
+#
+# 为什么命令尾部是 `exit 0`：生成失败也不能让 ssh 起不来——SSH 是本机唯一的
+# 远程救援通道，服务挂掉比"密钥类型不全"严重得多。
+mkdir -p "$R/etc/systemd/system"
+cat > "$R/etc/systemd/system/odin-ssh-hostkeys.service" << 'UNIT'
+[Unit]
+Description=Generate SSH host keys on first boot (image ships none)
+Before=ssh.service
+After=local-fs.target
+
+[Service]
+Type=oneshot
+# -A 只为"缺失的"类型生成，已存在的不动，因此可安全重复执行
+ExecStart=/bin/sh -c 'ssh-keygen -A >/dev/null 2>&1; exit 0'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+chmod 0644 "$R/etc/systemd/system/odin-ssh-hostkeys.service"
+# 与 resize 同批：镜像里删掉密钥，靠这个服务补回来
+rm -f "$R"/etc/ssh/ssh_host_*_key "$R"/etc/ssh/ssh_host_*_key.pub
+ln -sfn /etc/systemd/system/odin-ssh-hostkeys.service \
+  "$R/etc/systemd/system/multi-user.target.wants/odin-ssh-hostkeys.service"
+say "ssh: 镜像内主机密钥已清除，改由 odin-ssh-hostkeys.service 首启生成"
+
 # 首启已有扩容/日志压力，不要让 network-online 再用 90s 超时拖慢启动
 rm -f "$R/etc/systemd/system/network-online.target.wants/NetworkManager-wait-online.service"
 
@@ -125,7 +160,10 @@ REPO="$HERE/../.."
 
 if [ -d "$REPO/dts" ]; then
 	mkdir -p "$R/boot/dtbs/qcom"
-	for d in msm8953-smartisan-odin msm8953-smartisan-odin-norolesw; do
+	# 四个都发：主用 *-ft8716*（面板写死，不依赖 lk2nd 选中哪个条目），
+	# 另两个自动识别版留作换屏后的退路。每个才 44 KB。
+	for d in msm8953-smartisan-odin-ft8716 msm8953-smartisan-odin-ft8716-norolesw \
+	         msm8953-smartisan-odin msm8953-smartisan-odin-norolesw; do
 		if [ -f "$REPO/dts/$d.dtb" ]; then
 			cp -f "$REPO/dts/$d.dtb" "$R/boot/dtbs/qcom/$d.dtb"
 			chmod 0644 "$R/boot/dtbs/qcom/$d.dtb"
@@ -133,7 +171,7 @@ if [ -d "$REPO/dts" ]; then
 			echo "[fix] WARN: 缺少 $REPO/dts/$d.dtb，跳过（先跑 dts/build-dtb.sh）" >&2
 		fi
 	done
-	say "dtb: 完整版 + 安全版已就位"
+	say "dtb: 四个变体已就位（主用 ft8716 写死版）"
 fi
 
 if [ -f "$HERE/rootfs/extlinux/extlinux.conf" ]; then
