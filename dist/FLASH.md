@@ -32,8 +32,16 @@ python3 ../tools/check_sparse.py odin-debian-sparse.img odin-debian.img   # 期�
 
 | label | DTB | 用途 |
 |---|---|---|
-| `l0-safe`（**首刷默认**） | `msm8953-smartisan-odin-norolesw.dtb` | USB 固定 device 模式，UDC 恒在，SSH 救援通道不依赖 Type-C 角色判定；**代价：完全没有 OTG host** |
-| `l0` | `msm8953-smartisan-odin.dtb` | 完整版：Type-C 角色切换 + OTG host |
+| `l0-safe`（**首刷默认**） | `msm8953-smartisan-odin-ft8716-norolesw.dtb` | USB 固定 device 模式，UDC 恒在，SSH 救援通道不依赖 Type-C 角色判定；**代价：完全没有 OTG host** |
+| `l0` | `msm8953-smartisan-odin-ft8716.dtb` | 完整版：Type-C 角色切换 + OTG host |
+
+> 两个 label 用的都是**面板写死 FT8716** 的那对 DTB（`*-ft8716*`）。
+> 早先这里写的是自动识别版（`msm8953-smartisan-odin[-norolesw].dtb`），已过时——
+> 写死之后面板能否点亮不再取决于 lk2nd 选中哪个 QCDT 条目，排障面小得多。
+> 自动识别版仍随镜像发布，换屏后把 `fdt` 改回去即可。
+> `append` 末尾的 `console=tty0` 也不能删，它是控制台上屏的开关。
+>
+> 更完整的说明见仓库 `docs/`（以 `docs/` 为准）。
 
 首刷用 `l0-safe`。拿到 SSH 并确认整机可用后，在系统内执行：
 
