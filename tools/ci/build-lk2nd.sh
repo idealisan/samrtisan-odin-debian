@@ -7,10 +7,13 @@
 # 而 lk2nd 就是刷进 boot 分区的那个二级引导——由它去扫描分区、
 # 找到 /extlinux/extlinux.conf，才谈得上启动 Debian。
 #
-# 上游固定为 msm8916-mainline/lk2nd 的 19.0 tag（postmarketOS 用的就是这个版本，
-# 设备上跑的 `lk2nd:version : 21.0-r0-postmarketos` 即由此打包而来）。
-# 注意不是 msm8953-mainline/lk2nd —— 那个仓库的目录结构不一样
-# （设备树在 dts/、设备表在 dts/rules.mk），我们的补丁对它不适用。
+# 上游固定为 msm8916-mainline/lk2nd 的 23.1 tag。
+# 选 23.x 而不是设备上跑过的 21.0-r0-postmarketOS，是因为我们的补丁按 23.x
+# 的 lk2nd/device/dts/msm8953/rules.mk 生成：19.x 的设备表只有 21 个条目且
+# 行尾是两个空格，21.0 把 flipkart-rimob 改名成 billion-rimob、还缺
+# qrd-sku3 / wingtech / sdm632-mtp-3 等条目 —— 0002 的上下文对不上，直接
+# "Hunk #1 FAILED"。23.0 与 23.1 的 rules.mk 逐字节一致，取较新的 23.1。
+# 注意不是 msm8953-mainline/lk2nd —— 那个仓库的目录结构不一样。
 #
 # 两个产物：
 #   lk2nd.img         完整版（打 0001-0003）：保留全部 29 个设备条目
@@ -21,7 +24,7 @@ set -euo pipefail
 
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../.." && pwd)
 OUT=${1:?用法: build-lk2nd.sh <输出目录>}
-LK2ND_VER=${LK2ND_VER:-19.0}
+LK2ND_VER=${LK2ND_VER:-23.1}
 SRC=${SRC:-/tmp/lk2nd-src}
 
 mkdir -p "$OUT"

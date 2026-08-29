@@ -1,7 +1,7 @@
-From af739964a9522753d2d8173908baf20e6eaac975 Mon Sep 17 00:00:00 2001
+From 05f7e89ab9731565d8a62e3b5d1ec206485eeb0b Mon Sep 17 00:00:00 2001
 From: odin-port <odin@port.local>
 Date: Sat, 22 Aug 2026 00:08:47 +0800
-Subject: [PATCH 7/7] arm64: dts: qcom: add device tree for Smartisan ODIN (U2
+Subject: [PATCH 7/8] arm64: dts: qcom: add device tree for Smartisan ODIN (U2
  Pro)
 
 Add initial support for the Smartisan ODIN (U2 Pro), an MSM8953
@@ -17,11 +17,18 @@ Add initial support for the Smartisan ODIN (U2 Pro), an MSM8953
   Sharp FT8716, NT36672) are available.
 - Volume keys, console UART, ramoops
 
+背光与 GPU 两处按实机结果修正：
+- &pmi8950_wled 去掉 qcom,external-pfet / qcom,cabc，qcom,ovp-millivolt
+  由 29500 改为 29600（29500 不在 qcom-wled.c 的合法值表内，probe -EINVAL
+  会导致背光设备创建失败，整条显示链路断掉）
+- 新增 &gpu { status = "okay"; }（msm8953.dtsi 里 gpu 默认 disabled，
+  不启用会 "msm_mdp: no GPU device was found"）
+
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 ---
  arch/arm64/boot/dts/qcom/Makefile             |   1 +
- .../boot/dts/qcom/msm8953-smartisan-odin.dts  | 383 ++++++++++++++++++
- 2 files changed, 384 insertions(+)
+ .../boot/dts/qcom/msm8953-smartisan-odin.dts  | 449 ++++++++++++++++++
+ 2 files changed, 450 insertions(+)
  create mode 100644 arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
 
 diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
@@ -38,10 +45,10 @@ index 6f34d5ed3..a83b6cd1a 100644
  dtb-$(CONFIG_ARCH_QCOM)	+= msm8956-sony-xperia-loire-suzu.dtb
 diff --git a/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
 new file mode 100644
-index 000000000..9bde23936
+index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,383 @@
+@@ -0,0 +1,449 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -201,11 +208,29 @@ index 000000000..9bde23936
 +};
 +
 +&pmi8950_wled {
++	/*
++	 * 2026-08-29 实机修正：原配置带 qcom,external-pfet + qcom,cabc，导致
++	 * qcom,wled probe 返回 -22(EINVAL)：
++	 *   qcom,wled 200f000.spmi:pmic@3:leds@d800: probe ... failed with error -22
++	 * 背光设备创建失败 ⇒ panel@0 的 backlight 拿不到 ⇒ 整条显示链路断掉（无 /dev/dri）。
++	 * 现对齐真机已验证可用的 markw 配置（只有下面三项，实测出 backlight 正常）。
++	 */
++	/*
++	 * 取值必须落在 drivers/video/backlight/qcom-wled.c 的值表内（WLED4，
++	 * 即 qcom,pmi8950-wled），否则 probe 直接 -EINVAL：
++	 *   qcom,ovp-millivolt       合法表 = { 31100, 29600, 19600, 18100 }
++	 *                            原写 29500 不在表内 ⇒ "invalid value for
++	 *                            'qcom,ovp-millivolt'" ⇒ 背光失败 ⇒ 整条
++	 *                            显示链路断（无 /dev/dri、黑屏）
++	 *   qcom,current-limit-microamp 合法表 = { 0, 2500, ... 20000 ... 30000 }
++	 *   qcom,num-strings             合法范围 = 1 .. max_string_count(4)
++	 */
 +	qcom,current-limit-microamp = <20000>;
-+	qcom,ovp-millivolt = <29500>;
++	qcom,ovp-millivolt = <29600>;
 +	qcom,num-strings = <2>;
-+	qcom,external-pfet;
-+	qcom,cabc;
++
++	label = "backlight";
++	default-brightness = <2048>;   /* 50%：之前写 200 只有 5%，屏幕看起来像没开背光 */
 +
 +	status = "okay";
 +};
@@ -427,6 +452,51 @@ index 000000000..9bde23936
 +		};
 +	};
 +};
++
++&gpu {
++	/*
++	 * 2026-08-29 实机补漏：msm8953.dtsi 里 gpu@1c00000 默认 status="disabled"，
++	 * 而本文件此前完全没有启用它 ⇒ 实机 "msm_mdp: no GPU device was found"、
++	 * GPU 设备不存在、无 /dev/kgsl*。对比 markw 的 DTB 是有完整 gpu 节点的。
++	 * 启用 GPU 后 msm_drm 的显示管线才完整（面板 DSI 命令 -EINVAL 的嫌疑对象）。
++	 *
++	 * zap-shader 的 memory-region 由 msm8953.dtsi 的 gpu_zap_shader 提供；
++	 * a506_zap.mdt 是 postmarketOS 专有固件（从原厂 ROM 提取），Debian 与容器中都没有，
++	 * 缺它时 GPU 仍可初始化，只是没有 zap 安全内容保护，等取到固件后再补 firmware-name。
++	 */
++	status = "okay";
++};
++
++/*
++ * WiFi（WCNSS / pronto）—— 2026-08-30 实机补漏
++ *
++ * msm8953.dtsi 里 wcnss: remoteproc@a204000 默认 status="disabled"，本文件此前
++ * 也没启用它 ⇒ 实机上根本没有 wlan0，NetworkManager 里只有 lo 和 usb0。
++ *
++ * 配置照抄自能正常用 WiFi 的 markw（小米 Redmi 4 Prime）的 DTB：
++ *   iris compatible = "qcom,wcn3660b"
++ *   vddxo→l7  vddrfa→l19  vddpa→l9  vdddig→l5  vddpx→l5
++ * 这几个 LDO 在本文件里的电压范围（l5 1.8V、l7 1.8~1.9V、l9 3.0~3.3V、
++ * l19 1.2~1.38V）与 markw 一致，也与原厂 DTB 声明的
++ * iris-vddxo/rfa/pa/dig = 1.8V / 1.3V / 3.3V / 1.8V 对得上。
++ *
++ * 还需要的用户态文件（不在 DTB 里，见 dist/build/rootfs 的说明）：
++ *   /lib/firmware/wlan/prima/WCNSS_qcom_wlan_nv.bin   板级校准数据
++ *   来源：persist 分区（mmcblk0p24，原厂未动过）里的 WCNSS_qcom_wlan_nv.bin，
++ *   由 odin-wlan-nv.service 首启拷过去。
++ */
++&wcnss {
++	status = "okay";
++	vddpx-supply = <&pm8953_l5>;
++};
++
++&wcnss_iris {
++	compatible = "qcom,wcn3660b";
++	vddxo-supply = <&pm8953_l7>;
++	vddrfa-supply = <&pm8953_l19>;
++	vddpa-supply = <&pm8953_l9>;
++	vdddig-supply = <&pm8953_l5>;
++	status = "okay";
++};
 -- 
 2.48.1
-

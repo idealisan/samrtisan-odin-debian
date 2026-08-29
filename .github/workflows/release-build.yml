@@ -5,8 +5,11 @@
 #
 # 三个外部依赖全部固定到具体 commit / tag，上游再动也不影响复现：
 #   · 内核        msm8953-mainline/linux  @ 05f7e89ab9731565d8a62e3b5d1ec206485eeb0b（Linux 6.19）
-#   · lk2nd       msm8916-mainline/lk2nd @ tag 19.0（postmarketOS 用的就是这个
-#                 版本；不是 msm8953-mainline/lk2nd，那个目录结构不一样）
+#   · lk2nd       msm8916-mainline/lk2nd @ tag 23.1（设备上跑过的是
+#                 21.0-r0-postmarketOS，但我们的 QCDT/面板补丁只对 23.x
+#                 的 rules.mk 成立：19.x 的设备表条目与上下文完全不同，
+#                 0002 打不上去）。注意不是 msm8953-mainline/lk2nd，
+#                 那个仓库目录结构不一样。
 #   · Debian      发行版套件 bookworm（debootstrap 现装，不依赖任何预置镜像）
 #
 # 产物（全部挂到该 Release 上）：
@@ -37,7 +40,7 @@ env:
   # 上游基线 Linux 6.19（不是本地 odin-wip 的 HEAD —— 那个已经含我们的补丁）
   KERNEL_SHA: 05f7e89ab9731565d8a62e3b5d1ec206485eeb0b
   # 必须加引号：不加引号 YAML 会把 19.0 解析成浮点数 19，URL 就错了
-  LK2ND_VER: "19.0"
+  LK2ND_VER: "23.1"
 
 jobs:
   # ------------------------------------------------------------------ 设备树
