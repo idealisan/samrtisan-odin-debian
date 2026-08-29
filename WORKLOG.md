@@ -172,8 +172,75 @@ dist/odin-debian-sparse.img b7aea6cfe5f4a167f2a8796e8cade624
   注：上面 sparse 的 md5 是 12:47 那次；随后 12:47 又为 dry-run 重建过一次，
   以 `tools/check_sparse.py` 复跑为准（最近一次为 IDENTICAL）。
 
-- **12:50 T14 进行中** — FLASH.md 已更新（双 label、显式 fdt 的来由、外置存储矩阵、
-  自愈看门狗、role 回退缺口）。**README 与 reports/017 待补，git 未提交。**
+### 柒、真机刷入循环（用户授权选项二：无人值守执行）
+
+**流程依据**：`reports/018`（状态机、命令、红线）。红线：**只刷 userdata，绝不刷 boot**。
+
+**13:19 前置确认**
+- 状态 A：pmOS 运行，`model = Xiaomi Redmi 4 Prime`，lk2nd `21.0-r0-postmarketos`
+- `extlinux.conf` 真实位置 `/boot/extlinux/extlinux.conf`（`/boot` = `pmOS_boot` 子分区）
+- 备份已在本地 `evidence/live-device-backup/`（boot 分区 64M / /boot 28M / GPT 前 8M / STATE.txt）
+
+**13:20 步骤 ① A→B：改名引导配置 → 重启 → lk2nd 停 fastboot ✅**
+- 只 `mv` 未删除：`extlinux.conf` → `extlinux.conf.DISABLED`，内容校验完整
+- 两次踩坑：macOS 无 `timeout` 命令；`pm_do.exp` 执行的是手机上的 `/tmp/pmr.sh`，
+  必须走 `sh /tmp/pmr.sh <本地脚本>` 才会先 scp 上传
+- 重启后 ~60s：`fastboot devices` → **`<emmc-serial>  fastboot`** ✅
+  **实测证实：lk2nd 启动失败确实会自动停在 fastboot**（与用户判断一致）
+
+**13:22 fastboot 只读探测 —— 拿到高价值信息（已存档 `fastboot-getvar-all.txt`）**
+```
+lk2nd:version    : 21.0-r0-postmarketos
+lk2nd:model      : Xiaomi Redmi 4 Prime (markw)      ← lk2nd 选中的是 markw 条目
+lk2nd:compatible : xiaomi,markw
+lk2nd:panel      : qcom,mdss_dsi_ft8716_1080p_video  ← ★ 面板名
+unlocked         : yes
+max-download-size: 0x1fe00000 (534 MB)
+partition-size:userdata : 0x1bfabfbe00 (111.9 GiB)
+```
+- ★ **`lk2nd:panel` 有值 ⇒ 原厂 aboot 确实透传了面板名**，reports/010 §七 悬而未决的问题
+  答案是"是"。且面板为 **FT8716**，正是补丁 0005 支持的型号。
+- lk2nd 仍选中 markw（不是 odin）⇒ 我们的 `smartisan,odin-panel` 占位不会被替换 ⇒
+  **预期无屏**，与 reports/017 的分析一致。
+- 推论：硬件 target major = 0x10（故 markw 以 major 精确匹配胜出），
+  即使换成我们的 lk2nd，markw 仍会赢 ⇒ **必须精简 lk2nd（去掉 markw）才能让 odin 命中**。
+
+**13:24 步骤 ② 刷入 userdata ✅（EXIT=0，178 秒）**
+```
+Sending sparse 'userdata' 1/2 (522237 KB)  OKAY [ 13.021s]
+Writing  'userdata'                        OKAY [ 14.222s]
+Sending sparse 'userdata' 2/2 (122484 KB)  OKAY [  2.957s]
+Writing  'userdata'                        OKAY [147.606s]
+```
+
+**13:27 步骤 ③ `fastboot reboot` → 至今（13:48）未出 SSH —— 状态 D，无响应**
+
+诊断：
+- `fastboot devices` 空（不在 fastboot）
+- SSH 两个密码（user / cheng）均超时
+- PC 侧 USB 网卡 en17 消失
+- `ioreg`/`system_profiler` 上**完全没有手机**，只剩 Hub(`Xiaomi Type-C 5-in-1 Hub`) 与 RTL9210 硬盘盒
+  ⇒ **手机不是直连，是接在 Type-C Hub 上**（新发现，之前没注意到）
+
+分析（推测，待串口证实）：
+- 与 ① 不同：这次 lk2nd **找到了** extlinux.conf 并成功跳转内核，
+  所以"找不到配置→停 fastboot"这条救援路径**不再触发**
+- 内核若 panic 或卡死，USB gadget 不会枚举 ⇒ PC 上完全看不到设备 ⇒ 与观察吻合
+- 已排除扩容因素：无 64bit 特性下 895 个组、只需 6 个 reserved GDT（有 127），分钟级
+
+**当前阻塞**：无串口输出，无法定位卡在哪一步；恢复需要人工长按电源键 + 音量键进 fastboot。
+
+**下一步（等用户在场或授权）**
+1. 长按电源 10–15s 强制关机 → 音量减+电源 进 fastboot
+2. `fastboot boot` 试启动，或换 `l0`/`l0-safe`、或改用 markw DTB 试
+3. 若都不行，用 pmbootstrap 重装 pmOS 回到已知可用状态
+
+- **12:50 T14 完成** — FLASH.md 已更新（双 label、显式 fdt 的来由、外置存储矩阵、
+  自愈看门狗、role 回退缺口）。README 已更新（§四刷机包与用户态组件、§五已验证内容、
+  §六刷入步骤、§七已知限制、§八决策）。reports/017 实施报告已写。
+- **13:16 仓库收尾完成** — 4 个提交：
+  `8f43fac` 阶段0/1/3 落地 · `6a5aab8` 文档与报告 · `5fa186b` 镜像产物 · `9988689` 备份与操作手册
+  `git status` 干净。
 
 - **12:20 QEMU 首次回归（用第 1 批重建的镜像）** —— 三个重要发现：
   1. ✅ 4 个 USB 盘（vfat/exfat/ntfs/ext4 superfloppy）全部识别，
