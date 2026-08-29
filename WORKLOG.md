@@ -352,6 +352,81 @@ dmesg: gcc-msm8953 sync_state() pending due to 1a00000.display-subsystem
 - `kmod` 未装 ⇒ `modprobe` 不存在 ⇒ 模块自动加载机制失效
 - `iputils-ping` 未装 ⇒ `ping` 不可用
 
+**★ 屏幕取得实质进展（ovp 改 29600 并重启后）**
+```
+/sys/class/backlight : backlight          ← 背光设备出现 ✅（WLED probe 不再报错）
+/dev/dri             : by-path card0 renderD128   ← DRM card0 出现 ✅
+/sys/class/drm       : card0 card0-DSI-1 renderD128
+[drm] Initialized msm 1.13.0 ... minor 0
+[drm] fb0: msmdrmfb frame buffer device   ← fb0 出现 ✅
+panel compatible     : smartisan,odin-ft8716（写死生效，lk2nd 未覆盖）
+```
+**仍未点亮** —— 只剩最后一步：
+```
+ft8716 1a94000.dsi.0: Failed to initialize panel: -22
+[drm:mdp5_irq_error_handler] *ERROR* errors: 04000000
+```
+即背光/DRM 框架都起来了，但面板驱动自身的初始化序列返回 -EINVAL，需查
+`drivers/gpu/drm/panel/panel-ft8716.c` 的 probe（供电/时序/命令序列）。
+
+### 拾、USB 网络自动分配 IP —— 根因已查明，修复已提交，但尚未部署成功
+
+**两层原因（都是实机抓出来的，不是推测）**
+
+第 1 层：dnsmasq 根本起不来
+```
+dnsmasq: cannot set --bind-interfaces and --bind-dynamic
+```
+/etc/dnsmasq.d/zz-gadget-exclude.conf 里有 `bind-dynamic`，与脚本命令行的
+`--bind-interfaces` 互斥 ⇒ dnsmasq 读配置后直接退出（日志里 "dnsmasq started
+(pid N)" 是假象，进程随即消失、pgrep 查不到）。
+另外系统 dnsmasq 用 bind-dynamic 绑通配地址，占住 UDP 67。
+
+第 2 层：地址池"没有可用地址"
+```
+DHCPDISCOVER(usb0) a6:df:c9:9c:b7:3e   no address available
+租约文件: 66:ec:1e:92:ff:3f 172.16.42.2 <pc-hostname>
+```
+地址池当时只有 172.16.42.2 一个；手机每次重启 USB gadget 会**重新生成随机 MAC**，
+PC 侧网卡 MAC 跟着变 ⇒ dnsmasq 当成全新客户端，而唯一地址被旧 MAC 的 12h 租约占住
+⇒ PC 只能拿 169.254 自分配地址。
+**这正是 postmarketOS 用 unudhcpd 的原因**（它不做租约管理，任何客户端都给固定 IP）。
+
+**修复（已提交 fe2904d）**
+1. 写死 NCM 的 host_addr/dev_addr（02:00:0d:1d:00:01 / …ba，基于序列号 <emmc-serial>）
+2. 地址池扩到 172.16.42.2–172.16.42.10 兜底
+3. gadget dnsmasq 加 `--conf-file=/dev/null`（不读系统配置）
+4. apply-staging-fixes.sh 里 mask 系统 dnsmasq
+5. 脚本加启动后校验：dnsmasq 没活下来就记日志 + 打自身日志
+
+**⚠️ 部署尚未成功（当前卡点）**
+- 失败的写法：`ssh ... 'echo user | sudo -S bash -s' <<'EOF'`
+  —— `echo user |` 把 sudo 的 stdin 占用了，`bash -s` 读不到 heredoc ⇒ 命令没执行。
+  （之前成功的那次是 `bash /tmp/install_dtbs.sh`，脚本在远端，**不是** `bash -s`）
+- 一旦手机重启，PC 就拿不到 IP（旧脚本还在），于是 SSH 不通 ⇒ 无法部署 ⇒ 死锁。
+- 本机现在 PC 侧是 169.254，IPv4/IPv6 都连不上手机。
+
+**打破死锁：需要人工在 PC 上配一次 IP（最后一次）**
+```sh
+sudo ifconfig enXX alias 172.16.42.10 netmask 255.255.255.0     # enXX = 当前 USB 网卡
+ssh user@172.16.42.1
+```
+连上后执行（注意用远端脚本文件，不要 `bash -s`）：
+```sh
+sshpass -p user ssh ... user@172.16.42.1 'cat > /tmp/rn.sh' < dist/build/rootfs/usr/local/sbin/odin-usb-role.sh
+sshpass -p user ssh ... user@172.16.42.1 'echo user | sudo -S cp /tmp/rn.sh /usr/local/sbin/odin-usb-role.sh'
+sshpass -p user ssh ... user@172.16.42.1 'echo user | sudo -S rm -f /var/lib/misc/dnsmasq.leases'
+sshpass -p user ssh ... user@172.16.42.1 'echo user | sudo -S systemctl reboot'
+```
+重启后 gadget 用固定 MAC 重建，PC 应能**自动**拿到 172.16.42.2，此后无需再手工配置。
+
+**其它待办**
+- 手机尚无外网（无默认路由），wlan0 未起来 ⇒ 后续 apt 装包需先解决联网
+- 离线 deb 已备好（90 个，35MB）在宿主机 `/Volumes/caseSensitiveBar/odin-offline-debs/`，
+  用户指示暂不安装，留待后续
+- `ping`、`modprobe` 等工具缺失（kmod / iputils-ping 未装）；
+  登录 Shell 已确认是 GNU bash 5.2.15（非 busybox），/bin/sh -> dash，符合预期
+
 ### 捌、精简 lk2nd（已完成构建，已被实机验证命中 odin）
 
 - **12:50 T14 完成** — FLASH.md 已更新（双 label、显式 fdt 的来由、外置存储矩阵、
