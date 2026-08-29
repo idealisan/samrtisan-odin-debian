@@ -1,0 +1,94 @@
+diff --git a/drivers/gpu/drm/panel/panel-ft8716.c b/drivers/gpu/drm/panel/panel-ft8716.c
+index cfaff03bb..19a5b1b6e 100644
+--- a/drivers/gpu/drm/panel/panel-ft8716.c
++++ b/drivers/gpu/drm/panel/panel-ft8716.c
+@@ -44,6 +44,15 @@ static inline struct ft8716 *to_ft8716(struct drm_panel *panel)
+ 			return ret;						\
+ 	} while (0)
+ 
++/*
++ * 重要（2026-08-29 实机定位）：初始化 DCS 命令**必须**在 enable 阶段发送，
++ * 不能放在 prepare。msm 的 dsi_host_transfer() 开头有
++ *     if (!msg || !msm_host->power_on) return -EINVAL;   （静默，不打印日志）
++ * 实机时序证明 panel prepare 发生在 DSI 主机上电之前 ⇒ 每条命令都 -EINVAL。
++ * 实测佐证：调试打印显示 cmd[0] len=2 reg=0x00 ret=-22（第一条就失败）。
++ * 因此 on() 在 ft8716_enable() 中调用，off() 在 ft8716_disable() 中调用。
++ */
++
+ static void ft8716_panel_reset(struct ft8716 *ctx)
+ {
+ 	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
+@@ -613,30 +622,60 @@ static int ft8716_prepare(struct drm_panel *panel)
+ 
+ 	ctx->variant->reset(ctx);
+ 
++	/*
++	 * 注意：初始化 DCS 命令**不能**放在 prepare 里发。
++	 * msm 的 dsi_host_transfer() 开头有
++	 *     if (!msg || !msm_host->power_on) return -EINVAL;   （静默，不打印）
++	 * 而实机时序显示 panel prepare 发生在 DSI 主机上电之前 ⇒ 每条命令都返回 -EINVAL。
++	 * 实测佐证：FT8716 DBG cmd[0] len=2 reg=0x00 ret=-22，第一条就失败。
++	 * 因此把 on() 移到 enable()，那时主机已上电并使能。
++	 */
++	ctx->prepared = true;
++	return 0;
++}
++
++static int ft8716_enable(struct drm_panel *panel)
++{
++	struct ft8716 *ctx = to_ft8716(panel);
++	struct device *dev = &ctx->dsi->dev;
++	int ret;
++
+ 	ret = ctx->variant->on(ctx);
+ 	if (ret < 0) {
+ 		dev_err(dev, "Failed to initialize panel: %d\n", ret);
+-		regulator_bulk_disable(ARRAY_SIZE(ctx->supplies), ctx->supplies);
+ 		gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+ 		return ret;
+ 	}
+ 
+-	ctx->prepared = true;
+ 	return 0;
+ }
+ 
+-static int ft8716_unprepare(struct drm_panel *panel)
++static int ft8716_disable(struct drm_panel *panel)
+ {
+ 	struct ft8716 *ctx = to_ft8716(panel);
+ 	struct device *dev = &ctx->dsi->dev;
+ 	int ret;
+ 
++	ret = ctx->variant->off(ctx);
++	if (ret < 0)
++		dev_err(dev, "Failed to un-initialize panel: %d\n", ret);
++
++	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
++
++	return 0;
++}
++
++static int ft8716_unprepare(struct drm_panel *panel)
++{
++	struct ft8716 *ctx = to_ft8716(panel);
++	int ret;
++
+ 	if (!ctx->prepared)
+ 		return 0;
+ 
+ 	ret = ctx->variant->off(ctx);
+ 	if (ret < 0)
+-		dev_err(dev, "Failed to un-initialize panel: %d\n", ret);
++		dev_err(&ctx->dsi->dev, "Failed to un-initialize panel: %d\n", ret);
+ 
+ 	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+ 	regulator_bulk_disable(ARRAY_SIZE(ctx->supplies), ctx->supplies);
+@@ -668,6 +707,8 @@ static int ft8716_get_modes(struct drm_panel *panel,
+ 
+ static const struct drm_panel_funcs ft8716_panel_funcs = {
+ 	.prepare = ft8716_prepare,
++	.enable = ft8716_enable,
++	.disable = ft8716_disable,
+ 	.unprepare = ft8716_unprepare,
+ 	.get_modes = ft8716_get_modes,
+ };
