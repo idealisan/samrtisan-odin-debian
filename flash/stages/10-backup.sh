@@ -60,7 +60,7 @@ REMOTE
     PORT=${ODIN_HTTP_PORT:-8080}
     mkdir -p "$(dirname "$OUT")"
     odin_sudo <<REMOTE 2>/dev/null | grep -q '^READY$' \
-      || die "设备上没有就绪的备份（缺 $RDONE），先跑一次不带参数的 10-backup.sh"
+      || die "设备上没有就绪的备份（缺 ${RDONE}），先跑一次不带参数的 10-backup.sh"
       [ -f '$RDONE' ] && echo READY
 REMOTE
 
@@ -70,7 +70,9 @@ REMOTE
 )
     log "远端备份 ${RSIZE} 字节（$(( RSIZE / 1048576 )) MB）"
 
+    # 先清掉可能残留的实例（上次脚本被打断时会留下），否则新实例起不来、端口被占
     odin_sudo <<REMOTE >/dev/null 2>&1
+      pkill -f 'http.server.*$PORT' 2>/dev/null; sleep 1
       cd '$RDIR'
       nohup python3 -m http.server '$PORT' --bind '$DEVICE_IP' >/dev/null 2>&1 &
       echo \$! > '$RDIR/http.pid'
@@ -78,7 +80,9 @@ REMOTE
     log "已在设备 ${DEVICE_IP}:${PORT} 起 HTTP 服务"
 
     t0=$(date +%s)
-    curl -C - --retry 10 --retry-delay 2 --retry-all-errors \
+    # --noproxy '*' 不能省：开发机上普遍设了 http_proxy（本机这个指向 127.0.0.1:3030），
+    # curl 会把 172.16.42.1 的请求也发给代理，表现是"TCP 通、curl 却 code=000"。
+    curl -C - --noproxy '*' --retry 10 --retry-delay 2 --retry-all-errors \
          -o "$OUT" "http://${DEVICE_IP}:${PORT}/rootfs-full.tar"
     rc=$?
 
@@ -90,10 +94,10 @@ REMOTE
     if [ "$rc" -eq 0 ]; then
       sz=$(stat -f%z "$OUT" 2>/dev/null || stat -c%s "$OUT")
       [ "$sz" = "$RSIZE" ] \
-        && ok "已拉回：$OUT（$(( sz / 1048576 )) MB，耗时 $(($(date +%s)-t0))s，大小一致）" \
+        && ok "已拉回：${OUT}（$(( sz / 1048576 )) MB，耗时 $(($(date +%s)-t0))s，大小一致）" \
         || warn "拉回完成但大小不符：本地 $sz != 远端 $RSIZE"
     else
-      die "下载失败（curl rc=$rc），已保留部分文件，重跑本命令可断点续传"
+      die "下载失败（curl rc=${rc}），已保留部分文件，重跑本命令可断点续传"
     fi
     exit 0
     ;;

@@ -800,3 +800,47 @@ SSH 主机私钥，公开发布等于所有设备共用同一身份（可 MITM�
 - `.gitignore` 已加上 `*.img/*.dtb/*.ko/*.mbn/*.tar*/*.cpio.gz/*.bin/*.elf` 等规则
 - 计划：在 `/tmp` 的克隆副本上跑 filter-repo 清历史（**不动源仓库**），
   验证干净后再推 `git@github.com:idealisan/samrtisan-odin-debian.git`
+
+---
+
+## 拾玖 [2026-08-29 23:24] 公开仓库已推送
+
+地址：https://github.com/idealisan/samrtisan-odin-debian （PUBLIC，仓库名沿用用户给的拼写）
+
+### 结果
+| 项 | 前 | 后 |
+|---|---|---|
+| `.git` | 4.7 GB | 772 KB |
+| 跟踪文件 | 908（含 728 个二进制 / 5.18 GB） | 181（纯文本） |
+| 提交 | 31 | 31（全部保留） |
+| 最大文件 | 2 GB 刷机镜像 | 199 KB 内核 config |
+
+### 清理手段（已固化为 `tools/prepare-public-repo.sh`）
+```sh
+tools/prepare-public-repo.sh /tmp/odin-clean ~/.config/odin-port/replacements.txt
+```
+1. 剔除全部二进制（file(1) 判定非 text 的）+ 剔除 >250KB 的 blob（清掉历史里误入库的 2GB 镜像）
+2. 脱敏：`--replace-text`（文件内容）+ `--replace-message`（**提交信息**）
+   —— 只做前者会漏：最初扫历史仍命中 3 处，全在 commit message 里
+3. **源仓库完全不动**，输出是一个独立的、历史已重写的克隆
+
+脱敏规则文件放在仓库**外面**（`~/.config/odin-port/replacements.txt`）：
+规则里必然写着要替换的原串，一旦入库等于把想藏的东西又写回公开仓库。
+
+### 脱敏掉的
+- eMMC 序列号 `<emmc-serial>` → `<emmc-serial>`
+- 由序列号派生的 gadget MAC `02:00:0d:1d:00:02/:b9` → `02:00:0d:1d:00:01/02`
+  （`odin-usb-role.sh` 里原本写死的是本机派生值，已改为通用占位，可用环境变量覆盖）
+- PC 主机名 → `<pc-hostname>`（DHCP 日志片段）
+
+### 脚本本身踩的三个坑（macOS 自带 bash 3.2）
+1. **bash 3.2 解析不了 `$( )` 里带 `;;` 的 case** —— macOS 默认 shell 就是 3.2，
+   最小复现都报 `syntax error near unexpected token ';;'`。把判定抽成 `is_binary()` 函数解决。
+2. `set -e` 下 `is_binary "$f" && printf ...` 遇到文本文件返回 1，作为 while 最后一条
+   命令会把整个子 shell 带崩（脚本静默退出）。改用 if/then/fi。
+3. 私钥自检命中了脚本自己那行 grep 模式 → 加 `grep -v` 过滤自引用。
+
+### 待办
+- **Release 资产尚未发布**：`dist/` 里的 Debian 镜像还是 8/29 12:46 批次，缺 0008/背光/GPU/
+  DHCP 四项修复。等 `tools/build-all.sh` 重建出与真机等价的新镜像后，再一次性发布 v0.1，
+  含 lk2nd 两个版本 + 4 个 DTB + 新镜像 + MANIFEST。现在发只会发布一个必然黑屏的镜像。
