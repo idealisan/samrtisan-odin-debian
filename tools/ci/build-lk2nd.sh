@@ -74,7 +74,9 @@ cp "$SRC/build-lk2nd-msm8953/lk2nd.img" "$OUT/lk2nd.img"
 say "完整版: $OUT/lk2nd.img ($(stat -c%s "$OUT/lk2nd.img") 字节)"
 
 # ------------------------------------------------- 2) 精简版（再打 0004）
-apply_patch "$REPO/lk2nd/0004-*.patch"
+# 注意：glob 必须写在引号外面，写成 "$REPO/lk2nd/0004-*.patch" 整串被引号包住时
+# 不会展开，patch 会拿到一个字面量的星号文件名然后 No such file or directory
+apply_patch "$REPO"/lk2nd/0004-*.patch
 # 增量重编即可：改的是设备表，make 会重编 QCDT 并重新打包
 build
 cp "$SRC/build-lk2nd-msm8953/lk2nd.img" "$OUT/lk2nd-nomarkw.img"
