@@ -32,11 +32,16 @@ HOST_IP=172.16.42.1
 CLIENT_IP=172.16.42.2
 CLIENT_IP_MAX="${ODIN_CLIENT_IP_MAX:-172.16.42.2}"   # 单地址池——永远只连一台电脑，任何 MAC 都分到同一个 IP
 
-# 固定的 NCM MAC 地址（基于本机序列号 <emmc-serial>，本地管理地址，第二位为 2 合法）
+# 固定的 NCM MAC 地址（本地管理地址：第一个字节的第二位为 2，不会与真实硬件 OUI 冲突）
 # 为什么必须写死：gadget 每次重启都会随机生成 MAC，PC 侧网卡的 MAC 随之变化，
 # dnsmasq 会当成全新客户端；而地址池若被旧 MAC 的租约(12h)占住，就会出现
 #   "DHCPDISCOVER(usb0) xx:xx:... no address available"
 # 于是 PC 只能拿到 169.254 自分配地址、必须手工配静态 IP（真机踩过两次）。
+#
+# 注意：这两个默认值是**通用占位**（0d1d ≈ ODIN），不是某台设备的真实 MAC——
+# 早先这里写的是从本机 eMMC 序列号派生的地址，那样会把设备序列号泄漏到公开仓库里。
+# 因为 USB 是点对点链路，默认值重复不会有问题；若确实要一机一址，用环境变量覆盖：
+#   ODIN_GADGET_HOST_MAC=... ODIN_GADGET_DEV_MAC=... （或写进 /etc/odin/usb-role.env）
 GADGET_HOST_MAC="${ODIN_GADGET_HOST_MAC:-02:00:0d:1d:00:01}"   # PC 侧看到的 MAC
 GADGET_DEV_MAC="${ODIN_GADGET_DEV_MAC:-02:00:0d:1d:00:02}"     # 手机侧 usb0 的 MAC
 
