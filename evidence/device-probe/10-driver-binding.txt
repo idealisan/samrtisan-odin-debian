@@ -1,0 +1,38 @@
+spawn ssh -tt -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR user@172.16.42.1 doas sh /tmp/pmr.sh 2>&1
+(user@172.16.42.1) Password: 
+doas (user@u2pro) password: 
+=== i2c 驱动绑定目录 ===
+ltr501         -> module 
+yas5xx         -> module 
+leds-aw2013    -> module 
+ov5670         -> module 
+s5k2xx         -> module 
+bmi160_i2c     -> 0-0068 module 
+
+=== 各 i2c 设备 waiting_for_supplier / 状态 ===
+0-0023       wfs=0   
+0-002e       wfs=0   
+0-0068       wfs=    /sys/bus/i2c/devices/0-0068/iio:device1 
+1-0045       wfs=0   
+3-002d       wfs=0   
+4-0036       wfs=0   
+
+=== 所有 waiting_for_supplier=1 的设备 ===
+
+=== 模块加载但未使用(Used by 0) ===
+veth xt_tcpudp bridge btqcomsmd wcn36xx des_generic algif_skcipher md5 md4 algif_hash q6cvs qrtr_smd ov5670 s5k2xx venus_dec venus_enc qcom_wcnss_pil qcom_q6v5_pas snd_soc_apq8016_sbc leds_aw2013 qcom_spmi_haptics qcom_pon qcom_spmi_temp_alarm qcom_camss qcom_spmi_vadc bmi160_i2c yamaha_yas530 ltr501 qcom_q6v5_mss ipa2_lite socinfo i2c_qcom_cci qcom_memshare msm 
+
+=== autoload 机制 ===
+[0;0m/usr/lib/systemd/system/systemd-modules-load.service[m
+systemd-modules-load 存在
+[0;0m/etc/modules[m
+af_packet
+ipv6
+
+=== udev 规则目录 ===
+
+ls: /run/udev/rules.d/: No such file or directory 
+expect: spawn id exp6 not open
+    while executing
+"expect eof"
+    (file "/tmp/pm_do.exp" line 15)

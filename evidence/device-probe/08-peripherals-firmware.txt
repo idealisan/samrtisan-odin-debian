@@ -1,0 +1,228 @@
+spawn ssh -tt -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR user@172.16.42.1 doas sh /tmp/pmr.sh 2>&1
+(user@172.16.42.1) Password: 
+doas (user@u2pro) password: 
+########## T. 触摸屏相关内核配置(全) ##########
+CONFIG_KEYBOARD_ADC=m
+CONFIG_KEYBOARD_ATKBD=y
+CONFIG_KEYBOARD_GPIO=y
+CONFIG_INPUT_TOUCHSCREEN=y
+CONFIG_TOUCHSCREEN_ATMEL_MXT=m
+CONFIG_TOUCHSCREEN_GOODIX=m
+CONFIG_TOUCHSCREEN_ILI210X=m
+CONFIG_TOUCHSCREEN_S6SY761=m
+CONFIG_TOUCHSCREEN_NOVATEK_NVT_TS=m
+CONFIG_TOUCHSCREEN_EDT_FT5X06=m
+CONFIG_TOUCHSCREEN_HIMAX_HX83112B=m
+CONFIG_INPUT_MISC=y
+--- 是否有 FocalTech/fts ---
+CONFIG_MOUSE_PS2_FOCALTECH=y
+# CONFIG_MOUSE_ELAN_I2C is not set
+# CONFIG_MOUSE_SYNAPTICS_I2C is not set
+CONFIG_TOUCHSCREEN_GOODIX=m
+# CONFIG_TOUCHSCREEN_GOODIX_BERLIN_I2C is not set
+# CONFIG_TOUCHSCREEN_GOODIX_BERLIN_SPI is not set
+CONFIG_TOUCHSCREEN_EDT_FT5X06=m
+# CONFIG_TOUCHSCREEN_STMFTS is not set
+CONFIG_DRM_PANEL_HUAWEI_MILAN_TIANMA_FOCAL8716=m
+CONFIG_HID_GOODIX_SPI=m
+# CONFIG_I2C_HID_OF_GOODIX is not set
+
+########## U. IIO 全表 ##########
+iio:device1 iio:device2 iio:device3 
+iio:device1    name=bmi120                                   driver=driver
+iio:device2    name=200f000.spmi:pmic@0:adc@3100             driver=driver
+iio:device3    name=200f000.spmi:pmic@2:adc@3100             driver=driver
+--- i2c 设备与驱动绑定 ---
+0-0023         name=ltr559         driver=driver
+0-002e         name=yas537         driver=driver
+0-0068         name=bmi120         driver=bmi160_i2c
+1-0045         name=aw2013         driver=driver
+3-002d         name=s5k3l8         driver=driver
+4-0036         name=ov5670         driver=driver
+i2c-0          name=i2c-gpio       driver=driver
+i2c-1          name=QUP I2C adapter driver=driver
+i2c-2          name=QUP I2C adapter driver=driver
+i2c-3          name=Qualcomm-CCI   driver=driver
+i2c-4          name=Qualcomm-CCI   driver=driver
+
+########## V. I2C 总线与 DT 子节点 ##########
+-- 78b5000.i2c --
+
+-- 78b6000.i2c --
+
+-- 78b7000.i2c --
+
+-- 78b8000.i2c --
+
+-- 78b9000.i2c --
+
+-- 78ba000.i2c --
+
+-- 1b0c000.cci --
+
+--- i2c adapter 映射 ---
+i2c-0      i2c-gpio
+
+i2c-1      QUP I2C adapter
+
+i2c-2      QUP I2C adapter
+
+i2c-3      Qualcomm-CCI
+
+i2c-4      Qualcomm-CCI
+
+
+########## W. 显示最终确认 ##########
+total 0
+-r--r--r--    1 root     root          4096 Aug 29 10:20 [0;0mversion[m
+ls: /dev/dri: No such file or directory
+[1;36mfbcon[m
+--- simple-framebuffer 是否绑定 ---
+ls: /sys/bus/platform/drivers/simple-framebuffer: No such file or directory
+90001000.framebuffer
+--- 显示模块状态 ---
+msm                  1138688  0
+drm_client_lib         12288  1 msm
+gpu_sched              57344  1 msm
+drm_display_helper    204800  1 msm
+drm_kms_helper        196608  3 msm,drm_display_helper,drm_client_lib
+drm                   651264  7 gpu_sched,drm_kms_helper,msm,drm_exec,drm_gpuvm,drm_display_helper,drm_client_lib
+--- 内核启动至今显示相关日志 ---
+[   10.747619] /soc@0/display-subsystem@1a00000/dsi@1a94000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0
+[   10.747764] /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[   20.967043] gcc-msm8953 1800000.clock-controller: sync_state() pending due to e3000.rng
+[   20.967083] gcc-msm8953 1800000.clock-controller: sync_state() pending due to 90001000.framebuffer
+[   20.967102] qnoc-msm8953 500000.interconnect: sync_state() pending due to 1b00020.camss
+[   20.967118] qnoc-msm8953 400000.interconnect: sync_state() pending due to 1b00020.camss
+[   20.967133] gcc-msm8953 1800000.clock-controller: sync_state() pending due to 1b00020.camss
+[   20.967149] gcc-msm8953 1800000.clock-controller: sync_state() pending due to 1b0c000.cci
+[   20.967167] qnoc-msm8953 500000.interconnect: sync_state() pending due to 1d00000.venus
+[   20.967181] qnoc-msm8953 400000.interconnect: sync_state() pending due to 1d00000.venus
+[   20.967194] gcc-msm8953 1800000.clock-controller: sync_state() pending due to 1d00000.venus
+[   20.967208] gcc-msm8953 1800000.clock-controller: sync_state() pending due to 4080000.remoteproc
+[   20.967232] qnoc-msm8953 500000.interconnect: sync_state() pending due to 7900000.ipa
+[   20.967246] qnoc-msm8953 400000.interconnect: sync_state() pending due to 7900000.ipa
+[   20.967260] qnoc-msm8953 580000.interconnect: sync_state() pending due to 7900000.ipa
+[   20.967318] qnoc-msm8953 580000.interconnect:interconnect-snoc: sync_state() pending due to 1d00000.venus
+[   20.967332] qnoc-msm8953 580000.interconnect:interconnect-snoc: sync_state() pending due to 1b00020.camss
+[   25.065981] systemd[1]: Starting Load Kernel Module drm...
+[   25.150771] systemd[1]: modprobe@drm.service: Deactivated successfully.
+[   25.151338] systemd[1]: Finished Load Kernel Module drm.
+
+########## X. RTC / 时钟 ##########
+[1;36m/dev/rtc[m   [1;35m/dev/rtc0[m
+[1;36mrtc0[m
+rtc-pm8xxx 200f000.spmi:pmic@0:rtc@6000
+13:05:46
+--- uptime ---
+144523.68 1125093.37
+
+########## Y. 固件包内容 ##########
+--- firmware-qcom-msm8953 ---
+lib/firmware/tas5728m_dsp_lenovo_cd-18781y.bin
+lib/firmware/ath10k/QCA9379/hw1.0/board-2.bin
+lib/firmware/ath10k/QCA9379/hw1.0/firmware-sdio-6.bin
+lib/firmware/qca/nvm_00150100.bin
+lib/firmware/qca/rampatch_00150100.bin
+lib/firmware/tas5728m_dsp_lenovo_cd-18781y.bin
+lib/firmware/ath10k/QCA9379/hw1.0/board-2.bin
+lib/firmware/ath10k/QCA9379/hw1.0/firmware-sdio-6.bin
+lib/firmware/qca/nvm_00150100.bin
+lib/firmware/qca/rampatch_00150100.bin
+lib/firmware/qcom/msm8953/asus/ze520kl/a506_zap.b02
+lib/firmware/qcom/msm8953/asus/ze520kl/a506_zap.mdt
+lib/firmware/qcom/msm8953/asus/ze552kl/a506_zap.b02
+lib/firmware/qcom/msm8953/asus/ze552kl/a506_zap.mdt
+lib/firmware/qcom/msm8953/fairphone/fp3/a506_zap.b02
+lib/firmware/qcom/msm8953/fairphone/fp3/a506_zap.mdt
+lib/firmware/qcom/msm8953/huawei/milan/a506_zap.b02
+lib/firmware/qcom/msm8953/huawei/milan/a506_zap.mdt
+lib/firmware/qcom/msm8953/lenovo/cd-18781y/a506_zap.b02
+lib/firmware/qcom/msm8953/lenovo/cd-18781y/a506_zap.mdt
+lib/firmware/qcom/msm8953/lenovo/kuntao/a506_zap.b02
+lib/firmware/qcom/msm8953/lenovo/kuntao/a506_zap.mdt
+lib/firmware/qcom/msm8953/motorola/ali/WCNSS_qcom_wlan_nv.bin
+lib/firmware/qcom/msm8953/motorola/ali/a506_zap.b02
+lib/firmware/qcom/msm8953/motorola/ali/a506_zap.mdt
+--- firmware-qcom-adreno-a530 ---
+firmware-qcom-adreno-a530-20241110-r0 contains:
+lib/firmware/qcom/a530_pfp.fw
+lib/firmware/qcom/a530_pm4.fw
+lib/firmware/qcom/a530v3_gpmu.fw2
+
+--- soc-qcom-msm8953-gpu ---
+soc-qcom-msm8953-gpu-18-r1 contains:
+etc/profile.d/adreno-a506-quirks.sh
+
+--- soc-qcom-msm8953-ucm ---
+soc-qcom-msm8953-ucm-18-r1 contains:
+usr/share/alsa/ucm2/DEBUG.md
+usr/share/alsa/ucm2/README.md
+usr/share/alsa/ucm2/ucm.conf
+usr/share/alsa/ucm2/AMD/acp3x-es83xx/HiFi.conf
+usr/share/alsa/ucm2/AMD/acp3x-es83xx/acp3x-es83xx.conf
+usr/share/alsa/ucm2/AMD/acp3xalc5682m98/HiFi.conf
+usr/share/alsa/ucm2/AMD/acp3xalc5682m98/acp3xalc5682m98.conf
+usr/share/alsa/ucm2/AMD/acp5x/HiFi.conf
+usr/share/alsa/ucm2/AMD/acp5x/acp5x.conf
+
+########## Z. lk2nd 与 boot 分区 ##########
+--- lk2nd 包 ---
+lk2nd-msm8953-21.0-r0 contains:
+boot/lk2nd.img
+
+--- boot 分区大小/已用 ---
+Filesystem                Size      Used Available Use% Mounted on
+/dev/mapper/mmcblk1p57p1
+                        227.7M     58.8M    156.8M  27% /boot
+--- mkinitfs 配置 ---
+[1;34mdirs[m         [1;34mfiles[m        [1;34mfiles-extra[m  [1;34mhooks[m        [1;34mhooks-extra[m  [1;34mmodules[m
+--- postmarketos-mkinitfs hooks ---
+
+--- 内核模块加载列表(initramfs) ---
+
+--- /etc/modules-load.d ---
+--- /etc/modprobe.d ---
+[0;0maliases.conf[m    [0;0mblacklist.conf[m  [0;0mi386.conf[m
+# Aliases to tell insmod/modprobe which modules to use
+
+# Uncomment the network protocols you don't want loaded:
+# alias net-pf-1 off		# Unix
+# alias net-pf-2 off		# IPv4
+# alias net-pf-3 off		# Amateur Radio AX.25
+# alias net-pf-4 off		# IPX
+# alias net-pf-5 off		# DDP / appletalk
+# alias net-pf-6 off		# Amateur Radio NET/ROM
+# alias net-pf-9 off		# X.25
+# alias net-pf-10 off		# IPv6
+# alias net-pf-11 off		# ROSE / Amateur Radio X.25 PLP
+# alias net-pf-19 off		# Acorn Econet
+
+alias char-major-10-175	agpgart
+alias char-major-10-200	tun
+alias char-major-81	bttv
+alias char-major-108	ppp_generic
+alias /dev/ppp		ppp_generic
+alias tty-ldisc-3	ppp_async
+
+########## AA. zram 与 swap ##########
+# /usr/lib/systemd/system/postmarketos-zram-swap.service
+[Unit]
+Description=Enable compressed swap in memory using zram
+DefaultDependencies=no
+Before=swap.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=30sec
+ExecCondition=sh -c '. /usr/share/misc/source_deviceinfo'
+ExecStart=/usr/bin/zramstart
+ExecStop=/usr/bin/zramstop
+
+[Install]
+WantedBy=swap.target
+expect: spawn id exp6 not open
+    while executing
+"expect eof"
+    (file "/tmp/pm_do.exp" line 15)

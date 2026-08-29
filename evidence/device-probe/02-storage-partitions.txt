@@ -1,0 +1,269 @@
+spawn ssh -tt -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR user@172.16.42.1 doas sh /tmp/pmr.sh 2>&1
+(user@172.16.42.1) Password: 
+doas (user@u2pro) password: 
+=== id ===
+uid=0(root) gid=0(root) groups=0(root),0(root),1(bin),2(daemon),3(sys),4(adm),6(disk),10(wheel),11(floppy),20(dialout),26(tape),27(video)
+=== 块设备/分区 ===
+total 0
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 DDR -> ../../mmcblk1p16
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 aboot -> ../../mmcblk1p19
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 abootbak -> ../../mmcblk1p20
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 alterable -> ../../mmcblk1p29
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 apdp -> ../../mmcblk1p45
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 boot -> ../../mmcblk1p21
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 cache -> ../../mmcblk1p53
+lrwxrwxrwx    1 root     root            15 Jan  1  1970 cdt -> ../../mmcblk1p9
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 cmnlib -> ../../mmcblk1p39
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 cmnlib64 -> ../../mmcblk1p41
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 cmnlib64bak -> ../../mmcblk1p42
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 cmnlibbak -> ../../mmcblk1p40
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 config -> ../../mmcblk1p27
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 devcfg -> ../../mmcblk1p11
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 devcfgbak -> ../../mmcblk1p12
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 devinfo -> ../../mmcblk1p23
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 dip -> ../../mmcblk1p33
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 dpo -> ../../mmcblk1p47
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 dsp -> ../../mmcblk1p13
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 factory -> ../../mmcblk1p10
+lrwxrwxrwx    1 root     root            15 Jan  1  1970 fsc -> ../../mmcblk1p1
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 fsg -> ../../mmcblk1p48
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 fsg1 -> ../../mmcblk1p49
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 fsg2 -> ../../mmcblk1p50
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 fsg3 -> ../../mmcblk1p51
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 fsg4 -> ../../mmcblk1p55
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 fsg5 -> ../../mmcblk1p56
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 keymaster -> ../../mmcblk1p43
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 keymasterbak -> ../../mmcblk1p44
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 keystore -> ../../mmcblk1p26
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 limits -> ../../mmcblk1p31
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 lksecapp -> ../../mmcblk1p37
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 lksecappbak -> ../../mmcblk1p38
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 mcfg -> ../../mmcblk1p36
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 mdtp -> ../../mmcblk1p34
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 misc -> ../../mmcblk1p25
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 modem -> ../../mmcblk1p52
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 modemst1 -> ../../mmcblk1p14
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 modemst2 -> ../../mmcblk1p15
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 mota -> ../../mmcblk1p32
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 msadp -> ../../mmcblk1p46
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 oem -> ../../mmcblk1p30
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 persist -> ../../mmcblk1p24
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 recovery -> ../../mmcblk1p22
+lrwxrwxrwx    1 root     root            15 Jan  1  1970 rpm -> ../../mmcblk1p5
+lrwxrwxrwx    1 root     root            15 Jan  1  1970 rpmbak -> ../../mmcblk1p6
+lrwxrwxrwx    1 root     root            15 Jan  1  1970 sbl1 -> ../../mmcblk1p3
+lrwxrwxrwx    1 root     root            15 Jan  1  1970 sbl1bak -> ../../mmcblk1p4
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 sec -> ../../mmcblk1p17
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 security -> ../../mmcblk1p28
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 splash -> ../../mmcblk1p18
+lrwxrwxrwx    1 root     root            15 Jan  1  1970 ssd -> ../../mmcblk1p2
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 syscfg -> ../../mmcblk1p35
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 system -> ../../mmcblk1p54
+lrwxrwxrwx    1 root     root            15 Jan  1  1970 tz -> ../../mmcblk1p7
+lrwxrwxrwx    1 root     root            15 Jan  1  1970 tzbak -> ../../mmcblk1p8
+lrwxrwxrwx    1 root     root            16 Jan  1  1970 userdata -> ../../mmcblk1p57
+=== /proc/partitions ===
+major minor  #blocks  name
+
+   7        0   52428800 loop0
+ 179        0  122138624 mmcblk1
+ 179        1          1 mmcblk1p1
+ 179        2          8 mmcblk1p2
+ 179        3        512 mmcblk1p3
+ 179        4        512 mmcblk1p4
+ 179        5        512 mmcblk1p5
+ 179        6        512 mmcblk1p6
+ 179        7       2048 mmcblk1p7
+ 179        8       2048 mmcblk1p8
+ 179        9        512 mmcblk1p9
+ 179       10      32768 mmcblk1p10
+ 179       11        256 mmcblk1p11
+ 179       12        256 mmcblk1p12
+ 179       13      16384 mmcblk1p13
+ 179       14       2048 mmcblk1p14
+ 179       15       2048 mmcblk1p15
+ 179       16         32 mmcblk1p16
+ 179       17         16 mmcblk1p17
+ 179       18      11264 mmcblk1p18
+ 179       19       1024 mmcblk1p19
+ 179       20       1024 mmcblk1p20
+ 179       21      65536 mmcblk1p21
+ 179       22      65536 mmcblk1p22
+ 179       23       1024 mmcblk1p23
+ 179       24      32768 mmcblk1p24
+ 179       25       1024 mmcblk1p25
+ 179       26        512 mmcblk1p26
+ 179       27         32 mmcblk1p27
+ 179       28       1024 mmcblk1p28
+ 179       29      32768 mmcblk1p29
+ 179       30     262144 mmcblk1p30
+ 179       31         32 mmcblk1p31
+ 259        0        512 mmcblk1p32
+ 259        1       1024 mmcblk1p33
+ 259        2      32768 mmcblk1p34
+ 259        3        512 mmcblk1p35
+ 259        4       4096 mmcblk1p36
+ 259        5        128 mmcblk1p37
+ 259        6        128 mmcblk1p38
+ 259        7        256 mmcblk1p39
+ 259        8        256 mmcblk1p40
+ 259        9        256 mmcblk1p41
+ 259       10        256 mmcblk1p42
+ 259       11        256 mmcblk1p43
+ 259       12        256 mmcblk1p44
+ 259       13        256 mmcblk1p45
+ 259       14        256 mmcblk1p46
+ 259       15          8 mmcblk1p47
+ 259       16       2048 mmcblk1p48
+ 259       17       2048 mmcblk1p49
+ 259       18       2048 mmcblk1p50
+ 259       19       2048 mmcblk1p51
+ 259       20      98304 mmcblk1p52
+ 259       21     262144 mmcblk1p53
+ 259       22    3145728 mmcblk1p54
+ 259       23       2048 mmcblk1p55
+ 259       24       2048 mmcblk1p56
+ 259       25  117354479 mmcblk1p57
+ 179       32       4096 mmcblk1boot0
+ 179       64       4096 mmcblk1boot1
+ 253        0     248832 dm-0
+ 253        1  117104623 dm-1
+ 252        0    5465088 zram0
+=== eMMC 信息 ===
+cid                    150100444a4e42345207<emmc-serial>3400
+
+csd                    d02701320f5903fff6dbffef8e404000
+
+date                   03/2017
+
+fwrev                  0x0700000000000000
+
+hwrev                  0x0
+
+manfid                 0x000015
+
+name                   DJNB4R
+
+oemid                  0x0100
+
+serial                 0x<emmc-serial>
+
+type                   MMC
+
+preferred_erase_size   4194304
+
+erase_size             524288
+
+life_time              0x05 0x05
+
+=== 分区类型/大小(blkid) ===
+/dev/mmcblk1p53: LABEL="cache" UUID="f73de97f-7017-ca5e-9b47-ca9c8f633e83" BLOCK_SIZE="4096" TYPE="ext4" PARTLABEL="cache" PARTUUID="5084beef-0cdf-bb0d-4998-b5e353c3da80"
+/dev/mmcblk1p13: LABEL="dsp" UUID="af32c008-2a39-7e5b-a5dc-201456d93103" BLOCK_SIZE="4096" TYPE="ext4" PARTLABEL="dsp" PARTUUID="754162b7-41f6-b5a7-c959-cd27cb9af094"
+/dev/mmcblk1p54: UUID="57f8f4bc-abf4-655f-bf67-946fc0f9f25b" BLOCK_SIZE="4096" TYPE="ext4" PARTLABEL="system" PARTUUID="4a09be16-d508-c5af-d437-cb85699c7b69"
+/dev/mmcblk1p24: UUID="57f8f4bc-abf4-655f-bf67-946fc0f9f25b" BLOCK_SIZE="4096" TYPE="ext4" PARTLABEL="persist" PARTUUID="1eb66a74-46c0-d0d5-9bfa-7e3492728774"
+/dev/mmcblk1p52: SEC_TYPE="msdos" UUID="00BC-614E" BLOCK_SIZE="512" TYPE="vfat" PARTLABEL="modem" PARTUUID="716d6b06-d521-fba0-30e0-3403702ad5b4"
+/dev/mapper/mmcblk1p57p2: LABEL="pmOS_root" UUID="a5513363-8a7f-4b04-9df4-50fc6d89a172" BLOCK_SIZE="4096" TYPE="ext4"
+/dev/mapper/mmcblk1p57p1: LABEL="pmOS_boot" UUID="fc55a496-dbb8-4e08-a2ce-369102ed4f15" BLOCK_SIZE="1024" TYPE="ext2"
+/dev/loop0: LABEL="default" UUID="393d01ca-fbbe-40b6-b2f4-acf9b6fcc748" UUID_SUB="e9398ed0-2a89-4816-a439-998d32517257" BLOCK_SIZE="4096" TYPE="btrfs"
+/dev/mmcblk1p35: PARTLABEL="syscfg" PARTUUID="b2e4d76a-2b2e-94fe-288f-100e7ae6f9d3"
+/dev/mmcblk1p25: PARTLABEL="misc" PARTUUID="512d702c-f9b1-a367-da2c-bf4ad193ba51"
+/dev/mmcblk1p15: PARTLABEL="modemst2" PARTUUID="eaacb882-9314-0821-70cb-97db8da27033"
+/dev/mmcblk1p3: PARTLABEL="sbl1" PARTUUID="94e2beee-c24d-d322-b4f0-d0acee2c27b7"
+/dev/mmcblk1p43: PARTLABEL="keymaster" PARTUUID="bb8bf697-057c-cf78-66d1-9f4659efaf71"
+/dev/mmcblk1p33: PARTLABEL="dip" PARTUUID="4b588075-ed88-f0ad-9498-6249cd3799f7"
+/dev/mmcblk1p23: PARTLABEL="devinfo" PARTUUID="fadaaf20-b3da-501d-3299-32a0ab3577b3"
+/dev/mmcblk1p51: PARTLABEL="fsg3" PARTUUID="f8f7eb47-a35a-aa62-a02f-c14d167029c3"
+/dev/mmcblk1p41: PARTLABEL="cmnlib64" PARTUUID="ffd159f6-2e9c-0de4-b7a2-ae0a836e1d7c"
+/dev/mmcblk1p31: PARTLABEL="limits" PARTUUID="5cb83231-76eb-fc07-e805-7ac90068e7c7"
+/dev/mmcblk1p21: PARTLABEL="boot" PARTUUID="a02a82a7-0ecc-13c6-55e0-8fe69c3a90d3"
+/dev/mmcblk1p11: PARTLABEL="devcfg" PARTUUID="112a3fde-5a93-ee74-3ada-4cfa51592e8d"
+/dev/mmcblk1p8: PARTLABEL="tzbak" PARTUUID="2c4a31f7-d68f-e46d-a04d-0d41bd907173"
+/dev/mmcblk1p48: PARTLABEL="fsg" PARTUUID="68bb754d-ef27-2b78-41e1-d41cc06f6356"
+/dev/mmcblk1p38: PARTLABEL="lksecappbak" PARTUUID="9b0f6911-4e18-e90f-29da-8ef215406bc6"
+/dev/mmcblk1p28: PARTLABEL="security" PARTUUID="949788ca-c888-4f67-af98-a06c38c4aff3"
+/dev/mmcblk1p56: PARTLABEL="fsg5" PARTUUID="05cf7479-b531-5fc5-21b8-d8ca082787e2"
+/dev/mmcblk1p18: PARTLABEL="splash" PARTUUID="88a59449-556e-fc76-d002-7fe9b2b6cd78"
+/dev/mmcblk1p6: PARTLABEL="rpmbak" PARTUUID="e510f726-2029-3f3b-9366-7d9a35a57c68"
+/dev/mmcblk1p46: PARTLABEL="msadp" PARTUUID="5563bfb6-f210-1b75-3b21-2b2cd324d82c"
+/dev/mmcblk1p36: PARTLABEL="mcfg" PARTUUID="b3fe4a09-c4fd-3f94-d22e-7e3e3d0e9d9d"
+/dev/mmcblk1p26: PARTLABEL="keystore" PARTUUID="dfebf703-8d99-ee68-6008-ed87f4953dd2"
+/dev/mmcblk1p16: PARTLABEL="DDR" PARTUUID="97c14d94-15a4-1f16-aa36-448c553ac07f"
+/dev/mmcblk1p4: PARTLABEL="sbl1bak" PARTUUID="6dc200c1-f655-7dc6-8aad-0f4e12f89d71"
+/dev/mmcblk1p44: PARTLABEL="keymasterbak" PARTUUID="f9a7b13b-20de-45dc-c36b-6adb2f2c501e"
+/dev/mmcblk1p34: PARTLABEL="mdtp" PARTUUID="b89e832a-40fd-838d-dbc1-871d9eabf18a"
+/dev/mmcblk1p14: PARTLABEL="modemst1" PARTUUID="b81b0b9c-7b11-246f-be23-ce94ab77084b"
+/dev/mmcblk1p2: PARTLABEL="ssd" PARTUUID="a81fe6fa-78f2-98e2-8f6d-f5ba4063204c"
+/dev/mmcblk1p42: PARTLABEL="cmnlib64bak" PARTUUID="911d3bda-61ef-9827-12f8-2137c522e431"
+/dev/mmcblk1p32: PARTLABEL="mota" PARTUUID="10d8a00d-2932-486f-32f8-2ebf80258a62"
+/dev/mmcblk1p22: PARTLABEL="recovery" PARTUUID="b23cffcd-6da0-d9d6-50e2-21c9df9724b7"
+/dev/mmcblk1p50: PARTLABEL="fsg2" PARTUUID="11d44d31-8bc4-7285-3d1d-e3a1d3cf2eef"
+=== 嵌套GPT(userdata内) ===
+NAME               SIZE TYPE FSTYPE LABEL     PARTLABEL    MOUNTPOINTS
+loop0               50G loop btrfs  default                /var/lib/incus/storage-pools/default
+mmcblk1          116.5G disk                               
+├─mmcblk1p1          1K part                  fsc          
+├─mmcblk1p2          8K part                  ssd          
+├─mmcblk1p3        512K part                  sbl1         
+├─mmcblk1p4        512K part                  sbl1bak      
+├─mmcblk1p5        512K part                  rpm          
+├─mmcblk1p6        512K part                  rpmbak       
+├─mmcblk1p7          2M part                  tz           
+├─mmcblk1p8          2M part                  tzbak        
+├─mmcblk1p9        512K part                  cdt          
+├─mmcblk1p10        32M part                  factory      
+├─mmcblk1p11       256K part                  devcfg       
+├─mmcblk1p12       256K part                  devcfgbak    
+├─mmcblk1p13        16M part ext4   dsp       dsp          /run/msm-firmware-loader/mnt/dsp
+├─mmcblk1p14         2M part                  modemst1     
+├─mmcblk1p15         2M part                  modemst2     
+├─mmcblk1p16        32K part                  DDR          
+├─mmcblk1p17        16K part                  sec          
+├─mmcblk1p18        11M part                  splash       
+├─mmcblk1p19         1M part                  aboot        
+├─mmcblk1p20         1M part                  abootbak     
+├─mmcblk1p21        64M part                  boot         
+├─mmcblk1p22        64M part                  recovery     
+├─mmcblk1p23         1M part                  devinfo      
+├─mmcblk1p24        32M part ext4             persist      /run/msm-firmware-loader/mnt/persist
+├─mmcblk1p25         1M part                  misc         
+├─mmcblk1p26       512K part                  keystore     
+├─mmcblk1p27        32K part                  config       
+├─mmcblk1p28         1M part                  security     
+├─mmcblk1p29        32M part                  alterable    
+├─mmcblk1p30       256M part                  oem          
+├─mmcblk1p31        32K part                  limits       
+├─mmcblk1p32       512K part                  mota         
+├─mmcblk1p33         1M part                  dip          
+├─mmcblk1p34        32M part                  mdtp         
+├─mmcblk1p35       512K part                  syscfg       
+├─mmcblk1p36         4M part                  mcfg         
+├─mmcblk1p37       128K part                  lksecapp     
+├─mmcblk1p38       128K part                  lksecappbak  
+├─mmcblk1p39       256K part                  cmnlib       
+├─mmcblk1p40       256K part                  cmnlibbak    
+├─mmcblk1p41       256K part                  cmnlib64     
+├─mmcblk1p42       256K part                  cmnlib64bak  
+├─mmcblk1p43       256K part                  keymaster    
+├─mmcblk1p44       256K part                  keymasterbak 
+├─mmcblk1p45       256K part                  apdp         
+├─mmcblk1p46       256K part                  msadp        
+├─mmcblk1p47         8K part                  dpo          
+├─mmcblk1p48         2M part                  fsg          
+├─mmcblk1p49         2M part                  fsg1         
+├─mmcblk1p50         2M part                  fsg2         
+├─mmcblk1p51         2M part                  fsg3         
+├─mmcblk1p52        96M part vfat             modem        /run/msm-firmware-loader/mnt/modem
+├─mmcblk1p53       256M part ext4   cache     cache        
+├─mmcblk1p54         3G part ext4             system       
+├─mmcblk1p55         2M part                  fsg4         
+├─mmcblk1p56         2M part                  fsg5         
+└─mmcblk1p57     111.9G part                  userdata     
+  ├─mmcblk1p57p1   243M part ext2   pmOS_boot              /boot
+  └─mmcblk1p57p2 111.7G part ext4   pmOS_root              /
+mmcblk1boot0         4M disk                               
+mmcblk1boot1         4M disk                               
+zram0              5.2G disk swap                          [SWAP]
+expect: spawn id exp6 not open
+    while executing
+"expect eof"
+    (file "/tmp/pm_do.exp" line 15)

@@ -1,0 +1,168 @@
+spawn ssh -tt -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR user@172.16.42.1 doas sh /tmp/pmr.sh 2>&1
+(user@172.16.42.1) Password: 
+doas (user@u2pro) password: 
+=== 关键分区起止扇区(512B) ===
+mmcblk1p3   start=52           size=1024         
+mmcblk1p19  start=393216       size=2048         
+mmcblk1p21  start=397312       size=131072       
+mmcblk1p22  start=528384       size=131072       
+mmcblk1p52  start=2375680      size=196608       
+mmcblk1p53  start=2621440      size=524288       
+mmcblk1p54  start=3145728      size=6291456      
+mmcblk1p57  start=9568256      size=234708959    
+
+=== GPT 全表(起止/扇区) ===
+p1           34          2       0 MiB  1
+p2           36         16       0 MiB  2
+p3           52       1024       0 MiB  3
+p4         1076       1024       0 MiB  4
+p5         2100       1024       0 MiB  5
+p6         3124       1024       0 MiB  6
+p7         4148       4096       2 MiB  7
+p8         8244       4096       2 MiB  8
+p9        12340       1024       0 MiB  9
+p10       13364      65536      32 MiB  10
+p11       78900        512       0 MiB  11
+p12       79412        512       0 MiB  12
+p13       79924      32768      16 MiB  13
+p14      112692       4096       2 MiB  14
+p15      116788       4096       2 MiB  15
+p16      131072         64       0 MiB  16
+p17      131136         32       0 MiB  17
+p18      262144      22528      11 MiB  18
+p19      393216       2048       1 MiB  19
+p20      395264       2048       1 MiB  20
+p21      397312     131072      64 MiB  21
+p22      528384     131072      64 MiB  22
+p23      659456       2048       1 MiB  23
+p24      786432      65536      32 MiB  24
+p25      851968       2048       1 MiB  25
+p26      854016       1024       0 MiB  26
+p27      855040         64       0 MiB  27
+p28      855104       2048       1 MiB  28
+p29      857152      65536      32 MiB  29
+p30      922688     524288     256 MiB  30
+p31     1572864         64       0 MiB  31
+p32     1703936       1024       0 MiB  32
+p33     1704960       2048       1 MiB  33
+p34     1707008      65536      32 MiB  34
+p35     1772544       1024       0 MiB  35
+p36     1773568       8192       4 MiB  36
+p37     1835008        256       0 MiB  37
+p38     1835264        256       0 MiB  38
+p39     1835520        512       0 MiB  39
+p40     1836032        512       0 MiB  40
+p41     1836544        512       0 MiB  41
+p42     1837056        512       0 MiB  42
+p43     1837568        512       0 MiB  43
+p44     1838080        512       0 MiB  44
+p45     1966080        512       0 MiB  45
+p46     2097152        512       0 MiB  46
+p47     2228224         16       0 MiB  47
+p48     2359296       4096       2 MiB  48
+p49     2363392       4096       2 MiB  49
+p50     2367488       4096       2 MiB  50
+p51     2371584       4096       2 MiB  51
+p52     2375680     196608      96 MiB  52
+p53     2621440     524288     256 MiB  53
+p54     3145728    6291456    3072 MiB  54
+p55     9437184       4096       2 MiB  55
+p56     9441280       4096       2 MiB  56
+p57     9568256  234708959  114603 MiB  57
+
+=== boot 分区(mmcblk1p21) 头部 64 字节 ===
+   A   N   D   R   O   I   D   !   <   - 005  \0  \0 200  \0 200
+ 001  \0  \0  \0  \0  \0  \0 201  \0  \0  \0  \0  \0  \0 360 200
+  \0 001  \0 200  \0  \b  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0
+  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0
+=== boot 分区 bootimg 头 ===
+   A   N   D   R   O   I   D   !   <   - 005  \0  \0 200  \0 200
+                                                                      41 4e 44 52 4f 49 44 21 3c 2d 05 00 00 80 00 80
+ 001  \0  \0  \0  \0  \0  \0 201  \0  \0  \0  \0  \0  \0 360 200
+                                                                      01 00 00 00 00 00 00 81 00 00 00 00 00 00 f0 80
+  \0 001  \0 200  \0  \b  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0
+                                                                      00 01 00 80 00 08 00 00 00 00 00 00 00 00 00 00
+=== /boot/lk2nd.img 头部 48 字节 ===
+   A   N   D   R   O   I   D   !   <   - 005  \0  \0 200  \0 200
+                                                                      41 4e 44 52 4f 49 44 21 3c 2d 05 00 00 80 00 80
+ 001  \0  \0  \0  \0  \0  \0 201  \0  \0  \0  \0  \0  \0 360 200
+                                                                      01 00 00 00 00 00 00 81 00 00 00 00 00 00 f0 80
+  \0 001  \0 200  \0  \b  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0
+                                                                      00 01 00 80 00 08 00 00 00 00 00 00 00 00 00 00
+=== 比较 boot 分区 与 /boot/lk2nd.img ===
+4cf0808575b4eb44d31412f66421f068  -
+4cf0808575b4eb44d31412f66421f068  /boot/lk2nd.img
+
+=== initramfs 头 16 字节 ===
+ 1f 8b 08 00 00 00 00 00 00 ff cc bd 0d 78 1c c7
+=== vmlinuz 头 64 字节 ===
+ 1f 8b 08 00 00 00 00 00 02 03 ec 9c 0b 54 1c 55
+ 9a c7 bf aa 6a 9a 0e 8f 80 80 80 e4 41 37 21 66
+ 82 71 46 4d c2 23 0f bb 68 34 89 cf 44 e8 89 b3
+ ba 4a 03 ce 98 31 73 76 06 13 35 9a 28 45 f4 38
+
+=== device-mapper 表 ===
+mmcblk1p57p1	(253:0)
+mmcblk1p57p2	(253:1)
+mmcblk1p57p1: 0 497664 linear 259:25 2048
+mmcblk1p57p2: 0 234209247 linear 259:25 499712
+=== /dev/mapper ===
+total 0
+crw-------    1 root     root       10, 236 Aug 27 19:03 [1;35mcontrol[m
+brw-------    1 root     root      253,   0 Jan  1  1970 [1;35mmmcblk1p57p1[m
+brw-------    1 root     root      253,   1 Jan  1  1970 [1;35mmmcblk1p57p2[m
+=== 是否存在原生子分区节点 ===
+ls: /dev/mmcblk1p57p1: No such file or directory
+ls: /dev/mmcblk1p57p2: No such file or directory
+
+=== /etc/fstab ===
+# <file system> <mount point> <type> <options> <dump> <pass>
+UUID=a5513363-8a7f-4b04-9df4-50fc6d89a172 / ext4 defaults 0 0
+UUID=fc55a496-dbb8-4e08-a2ce-369102ed4f15 /boot ext2 nodev,nosuid,noexec 0 0
+=== /etc/crypttab ===
+cat: can't open '/etc/crypttab': No such file or directory
+=== /proc/mounts ===
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
+sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime 0 0
+dev /dev devtmpfs rw,nosuid,relatime,size=1799040k,nr_inodes=449760,mode=755 0 0
+run /run tmpfs rw,nosuid,nodev,relatime,mode=755 0 0
+devpts /dev/pts devpts rw,relatime,mode=600,ptmxmode=000 0 0
+/dev/mapper/mmcblk1p57p2 / ext4 rw,relatime 0 0
+securityfs /sys/kernel/security securityfs rw,nosuid,nodev,noexec,relatime 0 0
+tmpfs /dev/shm tmpfs rw,nosuid,nodev 0 0
+cgroup2 /sys/fs/cgroup cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot 0 0
+none /sys/fs/pstore pstore rw,nosuid,nodev,noexec,relatime 0 0
+bpf /sys/fs/bpf bpf rw,nosuid,nodev,noexec,relatime,mode=700 0 0
+systemd-1 /proc/sys/fs/binfmt_misc autofs rw,relatime,fd=37,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=3184 0 0
+mqueue /dev/mqueue mqueue rw,nosuid,nodev,noexec,relatime 0 0
+hugetlbfs /dev/hugepages hugetlbfs rw,nosuid,nodev,relatime,pagesize=2M 0 0
+debugfs /sys/kernel/debug debugfs rw,nosuid,nodev,noexec,relatime 0 0
+tracefs /sys/kernel/tracing tracefs rw,nosuid,nodev,noexec,relatime 0 0
+tmpfs /run/credentials/systemd-journald.service tmpfs ro,nosuid,nodev,noexec,relatime,nosymfollow,size=1024k,nr_inodes=1024,mode=700,noswap 0 0
+/dev/mmcblk1p13 /run/msm-firmware-loader/mnt/dsp ext4 ro,nosuid,nodev,noexec,relatime 0 0
+/dev/mmcblk1p24 /run/msm-firmware-loader/mnt/persist ext4 ro,nosuid,nodev,noexec,relatime 0 0
+/dev/mmcblk1p52 /run/msm-firmware-loader/mnt/modem vfat ro,nosuid,nodev,noexec,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro 0 0
+fusectl /sys/fs/fuse/connections fusectl rw,nosuid,nodev,noexec,relatime 0 0
+configfs /sys/kernel/config configfs rw,nosuid,nodev,noexec,relatime 0 0
+tmpfs /tmp tmpfs rw,nosuid,nodev,nr_inodes=1048576 0 0
+/dev/mapper/mmcblk1p57p1 /boot ext2 rw,nosuid,nodev,noexec,relatime,errors=continue 0 0
+tmpfs /run/credentials/getty@tty1.service tmpfs ro,nosuid,nodev,noexec,relatime,nosymfollow,size=1024k,nr_inodes=1024,mode=700,noswap 0 0
+tmpfs /var/lib/incus/devices tmpfs rw,relatime,size=51200k,mode=711 0 0
+tmpfs /var/lib/incus/shmounts tmpfs rw,relatime,size=100k,mode=711 0 0
+tmpfs /var/lib/incus/guestapi tmpfs rw,relatime,size=100k,mode=755 0 0
+overlay /var/lib/docker/rootfs/overlayfs/f890e0219147b270f0c16d56a6aa11f2442f73c69319906d10c0c18f9528e1e2 overlay rw,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/101/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/38/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/37/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/36/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/35/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/32/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/31/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/30/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/29/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/2/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/102/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/102/work 0 0
+overlay /var/lib/docker/rootfs/overlayfs/c94e06734b38f3643f9425232d2f4dc7c50d4cb5974b1c2c81f172fc7fda0fb9 overlay rw,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/86/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/28/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/27/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/21/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/20/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/19/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/18/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/15/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/14/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/13/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/12/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/11/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/10/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/9/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/8/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/7/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/3/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/89/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/89/work 0 0
+overlay /var/lib/docker/rootfs/overlayfs/d097100b81577d679e125c39070bcafc55f57564dd08ef91efe63c9beae9959e overlay rw,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/85/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/23/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/22/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/4/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/88/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/88/work 0 0
+overlay /var/lib/docker/rootfs/overlayfs/7fb301a4e7afeda8135af4c8ac92a1c3a276a30aca506a56ce7aa12a0d33097d overlay rw,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/112/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/26/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/25/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/24/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/6/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/113/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/113/work 0 0
+overlay /var/lib/docker/rootfs/overlayfs/70d464cbdefd067c3c8faf794ec3ee53da2bd41c993d114fc7f22efd04863220 overlay rw,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/87/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/81/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/80/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/79/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/78/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/77/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/76/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/75/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/74/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/73/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/72/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/71/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/70/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/69/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/68/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/67/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/66/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/65/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/59/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/58/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/57/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/90/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/90/work 0 0
+nsfs /run/docker/netns/default nsfs rw 0 0
+nsfs /run/docker/netns/5e49920caef3 nsfs rw 0 0
+nsfs /run/docker/netns/ccf7713681a5 nsfs rw 0 0
+nsfs /run/docker/netns/4d4fc743bde5 nsfs rw 0 0
+/dev/loop0 /var/lib/incus/storage-pools/default btrfs rw,relatime,ssd,discard=async,space_cache=v2,user_subvol_rm_allowed,subvolid=5,subvol=/ 0 0
+binfmt_misc /proc/sys/fs/binfmt_misc binfmt_misc rw,nosuid,nodev,noexec,relatime 0 0
+tmpfs /run/user/10000 tmpfs rw,nosuid,nodev,relatime,size=364316k,nr_inodes=91079,mode=700,uid=10000,gid=10000 0 0
+expect: spawn id exp6 not open
+    while executing
+"expect eof"
+    (file "/tmp/pm_do.exp" line 15)

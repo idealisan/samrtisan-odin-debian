@@ -24,18 +24,31 @@ linux-mdss-dsi-panel-driver-generator 从 boot.img 的 DTB 自动生成后合并
 ## 二、多面板自动选择机制
 
 原厂支持 5 种面板（LK 与 DTB 双重确认）：R69006 cmd/video、FT8716、
-Sharp FT8716、NT36672。本补丁全部实现，无需预知具体硬件批次：
+Sharp FT8716、NT36672。本补丁全部实现，无需预知具体硬件批次。
+
+**先说结论（reports/010 已推翻早先认知）：lk2nd 从不初始化 DSI 面板。**
+lk2nd 在 msm8953 上的构建形态是 `cont-splash`（`project/lk2nd.mk` 的
+`LK2ND_DISPLAY ?= cont-splash`），`target_display_init()` 只做一件事——
+复用上一棒 bootloader 已经画好的帧缓冲，全程零 DSI 操作。面板的识别与初始化
+**全部由原厂 aboot 完成**：
 
 ```
-lk2nd 启动 → 用原厂 LK 同款面板表初始化显示并得到 panel_node_id
-          （如 "qcom,mdss_dsi_r69006_1080p_cmd"）
-          → 在 Linux DTB 中把占位 compatible "smartisan,odin-panel"
-            （须与 lk2nd panel 节点第一个 compatible 一致）
-           替换为对应子节点的真实 compatible
-         → 内核中相应 panel 驱动绑定，DSI/背光/供电按该面板配置工作
+原厂 aboot：GPIO91/92 电平 strap 检测 → DSI 初始化 → 画 splash
+          └─ cmdline 携带 mdss_mdp.panel=<名字>
+               ↓ 跳转
+lk2nd(cont-splash)：解析上一棒 cmdline → 取到 panel.name
+   → 在 Linux DTB 中把占位 compatible "smartisan,odin-panel"
+     （须与 lk2nd panel 节点第一个 compatible 一致）
+     替换为对应子节点的真实 compatible（如 "smartisan,odin-nt36672"）
+   → 内核中相应 panel 驱动绑定，DSI/背光/供电按该面板配置工作
 ```
 
-**lk2nd 侧已完整扩充**（`odin-port/lk2nd/`）：
+也就是说**自动识别是架构天然提供的**（aboot strap 检测 + cmdline 名字透传 + DT 替换），
+三分批次（NT36672 / FT8716 / Sharp FT8716）全覆盖，移植侧不需要再写检测逻辑。
+
+**lk2nd 侧已完整扩充**（`odin-port/lk2nd/`）：补丁 0001 的 GCDB 面板库与补丁 0003 的
+GPIO 检测在 cont-splash 形态下均为**死代码**（`--gc-sections` 后不参与运行路径），
+保留它们是为一/lk1st 形态（lk2nd 直刷 aboot 分区）部署时自动生效：
 
 - `0001-msm8953-add-full-ODIN-panel-database.patch`：从原厂 DTB 生成的
   FT8716 / Sharp FT8716 / NT36672 GCDB 面板表（含完整 DCS 序列、14nm
@@ -46,11 +59,20 @@ lk2nd 启动 → 用原厂 LK 同款面板表初始化显示并得到 panel_node
 - `bin/lk2nd.img` / `bin/emmc_appsboot.mbn`：已构建好的 lk2nd 固件
   （29 个 msm8953 设备 DTB，含 odin）
 
-默认面板 = 复刻原厂 LK 的 GPIO 电平检测（TLMM 91/92 输入 strap）：
-91=1&92=1→NT36672、91=1&92=0→FT8716、91=0→Sharp FT8716（兜底，与出厂行为逐位一致，
-见 reports/009 反汇编证据）。r69006 两变体不参与自动检测（原厂亦然），经
-lk2nd 菜单或 `fastboot oem panel <name>` 显式指定（命令会立即用所选面板重初始化
-显示，黑屏状态下也可经 USB 操作；选择不跨重启持久化）。
+原厂 aboot 的检测规则（reports/009 反汇编实锤，TLMM 91/92 输入 strap）：
+
+```
+91=1 & 92=1 → NT36672
+91=1 & 92=0 → FT8716
+91=0        → Sharp FT8716（兜底）
+```
+
+r69006 的 cmd/video 两个变体**不在 aboot 的 strap 逻辑里**（原厂亦然）；若真存在这类
+机器，原厂系统同样处理，透传出来的名字仍是 aboot 实际选择的面板名。
+
+`fastboot oem panel <name>` 在 cont-splash 形态下只重绘帧缓冲，无法真正重初始化 DSI，
+不具备救援意义。按 reports/010 §七 的定论：**信任 aboot 透传的面板名，不做任何人工
+覆盖机制**（为不存在的场景设计机制，只会引入新的出错面）。
 
 ## 三、USB 外接存储链路
 
@@ -60,41 +82,126 @@ USB-C 插入 OTG/U盘 → FUSB301 CC 检测(IRQ) → role switch → HOST
   → xHCI 枚举 → usb-storage/UAS → /dev/sda1
 ```
 
-内核侧已齐备：usb-storage=y、UAS=y、NTFS3=y（本次配置新增）、
-exFAT/vfat/ext4 原有。用户态建议安装 udisks2 实现自动挂载
-（console UI 默认没有）。
+内核侧已齐备：`usb-storage=y`、`UAS=y`、`NTFS3=y`、`exfat=m`（模块，镜像内已有
+`exfat.ko`，挂载时自动加载）、`vfat=y`。
 
-## 四、已验证内容
+**用户态已落地自动挂载（不用 udisks2）**：
 
+```
+U 盘插入 → udev(99-odin-automount.rules) → odin-automount.sh
+        → odin-mount-opts.sh 按 fstype 分流选项 → systemd-mount --options=...
+        → /run/media/<设备名>（systemd .mount 单元，--collect 在拔盘时自动回收）
+```
+
+> **实测教训**：bookworm 的 systemd 252 里 PID 1 **不读**任何 `SYSTEMD_MOUNT_*`
+> 属性，`systemd-mount` 也**不读** `SYSTEMD_MOUNT_OPTIONS` 环境变量——
+> 只认 `--options=`。所以光写 `TAG+="systemd"` 不会挂载，且选项必须走命令行。
+> 详见 `reports/017` 与 `WORKLOG.md`。
+
+关于 FAT32 中文：内核未编 `CONFIG_NLS_UTF8`（不为它重编内核模块），FAT32 默认按
+`iso8859-1` 解释文件名 ⇒ **中文名会乱码**。exFAT / NTFS3 走内核内建 UTF-16 转换
+（`fs/exfat/super.c:691-697`，不走 `load_nls`），中文正常。**需要中文名的盘请用
+exFAT 或 NTFS。**
+
+## 四、刷机包与用户态组件
+
+刷机包在 `dist/`，**单一文件系统**镜像（只有 `pmOS_root`，`/boot` 与 `/extlinux`
+都在根分区里，不是 pmOS 那种 pmOS_boot+pmOS_root 双分区）。刷入后 `/extlinux/extlinux.conf`
+就在系统内，改完重启即可切换 —— 这一条让"双 label 救援"变得很便宜。
+
+**双 label 引导**
+
+| label | DTB | 用途 |
+|---|---|---|
+| `l0-safe`（首刷默认） | `msm8953-smartisan-odin-norolesw.dtb` | USB 固定 device，UDC 恒在，SSH 不依赖 Type-C 判定；代价：无 OTG |
+| `l0` | `msm8953-smartisan-odin.dtb` | 完整版：Type-C 角色切换 + OTG host |
+
+```sh
+sudo sed -i 's/^default .*/default l0/' /extlinux/extlinux.conf && sudo reboot
+```
+
+**用户态组件的源码在 `dist/build/rootfs/`**（改这里，不要直接改 staging / 镜像内文件，
+否则下次重建会丢），由 `dist/build/apply-staging-fixes.sh` 幂等部署：
+
+| 文件 | 作用 |
+|---|---|
+| `etc/udev/rules.d/99-odin-automount.rules` | U 盘插入即触发自动挂载 |
+| `usr/local/sbin/odin-automount.sh` | 取 fstype → 算选项 → 调 systemd-mount，任何分支 exit 0 |
+| `usr/local/sbin/odin-mount-opts.sh` | 按 fstype 分流挂载选项（vfat/exfat/ntfs/POSIX 各不相同） |
+| `usr/local/sbin/odin-usb-role.sh` | USB 角色切换唯一入口：幂等、先空后名、exit 0、支持 `--dry-run` |
+| `etc/udev/rules.d/99-odin-usb-role.rules` | 监听 UDC add/remove 与 Type-C change |
+| `etc/systemd/system/odin-usb-gadget.{service,timer}` | oneshot 服务 + 30s 自愈看门狗 |
+| `extlinux/extlinux.conf` | 双 label 引导配置 |
+
+设备树源码与构建脚本在 `dts/`：`build-dtb.sh` 一次性编出完整版与安全版两个 DTB，
+并已用两个 dtc 版本（1.6.1 / 1.7.2）交叉验证过能**逐字节复现**既有产物。
+
+## 五、已验证内容
+
+**构建侧**
 - 全量构建通过：Image（30MB）、modules、全部 DTBs（Docker arm64 本机构建）
 - 新驱动 W=1 零警告；DTB 通过 dtc schema 校验（无 error/warning）
 - odin DTB 反编译复核：panel@0 占位节点、fusb301@25、otg-vbus 稳压器、
   connector 图形端点接线均正确
+- 安全版 DTB 自检：`usb-role-switch`=0、`usb-c-connector`=0、`dr_mode="peripheral"`
 
-## 五、刷入与测试步骤（概要）
+**QEMU 回归**（`odin-qemu/test-automount.sh`，见 `reports/017`）
+- vfat / NTFS / ext4 三种 U 盘**自动挂载成功**，挂载选项生效，user 身份可直接写
+- `systemctl --failed` = 0；两个 DTB 与双 label 配置正确落到镜像内
+- ⚠️ exFAT 无法在 QEMU 验证：QEMU 用的 `odin-qemu/Image` 是另一个内核，无 exfat 支持。
+  **镜像内核也跑不了 QEMU**（`.config` 无 `VIRTIO_PCI`/`VIRTIO_MMIO`）⇒ QEMU 只能验用户态
+
+**真机（只读 + dry-run，`reports/016`、`reports/017`）**
+- 硬件规格与 lk2nd 之后的完整启动链已摸清（9 跳）
+- `odin-usb-role.sh --dry-run` 在真机上跑通且零副作用
+- ⚠️ 实测 `find /sys -name role` 为空 ⇒ `echo device > /sys/class/usb_role/*/role`
+  这条手动回退手段在当前内核上**不可用**
+
+## 六、刷入与测试步骤
 
 1. **备份**：当前可启动的 boot 分区与 postmarketOS `/boot`。
-2. **编译 lk2nd**（含 odin dts）刷入 boot 分区；postmarketOS 安装时选
-   lk2nd 引导链。
-3. 用打上补丁的内核替换 `linux-postmarketos-qcom-msm8953`
-   （pmaports 配置片段已更新：`config-postmarketos-qcom-msm8953.aarch64`
-   见本目录，新增 7 个 CONFIG）。
-4. 将 `msm8953-smartisan-odin.dtb` 放入 `/boot/dtbs/qcom/`，
-   extlinux/lk2nd 会自动选中（不再落到 markw）。
-5. 屏幕观察顺序：panel driver 绑定 → DRM connector → fb0 → 背光；
-   USB 观察顺序：CC attach → role=host → VBUS 5V → 枚举 → sdX。
-6. 首次 USB host 测试建议使用带独立供电的 hub（若 OTG boost 行为
-   与预期不符，可先排除 VBUS 供电因素）。
+2. 刷 `lk2nd.img` → boot 分区（64M）；刷 `odin-debian-sparse.img` → userdata。
+   顺序不能反（lk2nd 负责挂载 userdata 找到 `/extlinux/extlinux.conf`）。
+3. **首刷默认进 `l0-safe`**：无 OTG，但 UDC 恒在，SSH 一定能拿到。
+4. 拿到 SSH 后确认整机（扩容、WiFi、基带、音频、振动、按键），再把 default 改成
+   `l0` 重启，验证 Type-C 角色切换与 OTG。
+5. 屏幕观察顺序：panel driver 绑定 → DRM connector → fb0 → 背光。
+   **屏幕能否点亮取决于 lk2nd 是否选中 odin 条目**（见 §七 已知限制第 1 条）。
+6. USB 观察顺序：CC attach → role=host → VBUS 5V → 枚举 → `/run/media/sdX`。
+7. 首次 USB host 测试建议用带独立供电的 hub（排除 VBUS 供电因素）。
 
-## 六、已知限制 / 后续工作
+## 七、已知限制 / 后续工作
 
+- **【首刷头号风险】lk2nd 的 DTB 选择**：QCDT 表里 `msm8953-smartisan-odin` 的
+  board-id 是 `<0x0b 0x01>`，`msm8953-xiaomi-markw` 是 `<0x1000b 0x01>`；
+  `VARIANT_MASK=0xff` ⇒ 两者 **variant_id 都是 0x0b**，高位 0x10 只是 major，
+  因此 lk2nd 可能把票投给 markw。
+  - 两个 label 都已改用**显式 `fdt`**，所以无论选中谁都能起（选中 markw 则无屏但 SSH 可用）。
+  - 但面板占位 compatible `smartisan,odin-panel` **只有选中 odin 才会被替换** ⇒
+    **若首刷后无屏，下一步是精简 lk2nd（只保留 odin 条目）强制命中。**
+  - 本包的两个 label **都不能用 `fdtdir`**：选中 markw 时会去找镜像里不存在的
+    `msm8953-xiaomi-markw.dtb` 而启动失败。
+- **面板名透传未实锤**：实测当前 pmOS 的 `/proc/cmdline` **没有** `mdss_mdp.panel=`，
+  但那台机器跑的是 pmOS 的 lk2nd（无 odin 条目），不能直接推断原厂 aboot 的行为。
+  需在刷入本包后查 `/proc/cmdline` 或 `fastboot getvar lk2nd:panel`。
+- **USB 角色手动回退缺口**：`/sys/class/usb_role/*/role` 实测不存在（6.17.7）。
+  本包的 6.19 内核上是否可用未验证；回退请优先改 `extlinux.conf` 的 default 或用 UART。
 - 触摸屏（FocalTech FTS @ i2c_3, reset GPIO64/IRQ65）未包含——主线无
   FTS 驱动，属独立移植任务。
 - QMP SuperSpeed PHY 主线无 msm8953 支持，先以 USB2 HighSpeed 工作
   （480Mbps 对 U 盘足够）。
-- 面板识别：原厂机制为 GPIO91/92 电平 strap 三分（反汇编实锤，reports/009），
-  本移植已复刻；DSI read-id 签名探测原厂从未使用（signature 全 0xFFFF）。
-- `fastboot oem panel` 的选择不跨重启持久化（r69006 批次如需每次生效，
-  目前需改默认值重编 lk2nd）。
 - 面板 AVDD 取 pm8953_l17@2.85V、IO 取 l6@1.8V，系按原厂电压与同类
   机型推断；如首屏异常优先核对这两路。
+- 内核缺 `CONFIG_FB_SIMPLE`：真机（markw DTB）上因 `90001000.framebuffer` 无驱动
+  而卡住 `gcc-msm8953` 的 `sync_state()`。odin DTB 没有 `chosen/framebuffer` 节点，
+  所以本包不受影响；但将来若要接 cont-splash，必须同步开这个选项。
+
+## 八、本次已锁定的决策（用户拍板）
+
+| # | 决策 | 选择 |
+|---|---|---|
+| 1 | 阶段 2（UTF-8） | **放弃 FAT32 中文，不做 `nls_utf8`**；以 exFAT / NTFS 为主力 |
+| 2 | 自动挂载方案 | **systemd mount unit**（不装 udisks2） |
+| 3 | 首刷策略 | **接受首刷期间没有 OTG**，`l0-safe` 作为 default |
+
+工作日志见 `WORKLOG.md`（每步时间戳 + 踩坑记录 + 待清理清单）。

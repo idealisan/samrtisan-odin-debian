@@ -1,0 +1,336 @@
+spawn ssh -tt -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR user@172.16.42.1 doas sh /tmp/pmr.sh 2>&1
+(user@172.16.42.1) Password: 
+doas (user@u2pro) password: 
+########## 1. CPU ##########
+--- /proc/cpuinfo(processor 0) ---
+processor	: 0
+BogoMIPS	: 38.40
+Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 cpuid
+CPU implementer	: 0x41
+CPU architecture: 8
+CPU variant	: 0x0
+CPU part	: 0xd03
+CPU revision	: 4
+
+processor	: 1
+BogoMIPS	: 38.40
+Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 cpuid
+CPU implementer	: 0x41
+CPU architecture: 8
+CPU variant	: 0x0
+CPU part	: 0xd03
+CPU revision	: 4
+
+processor	: 2
+BogoMIPS	: 38.40
+--- CPU 数/在线 ---
+8
+0-7
+--- cpufreq ---
+cpu0: 652800 844800 1036800 1228800 1420800 1612800 1804800 2016000 2208000 
+      cur=1804800
+
+cpu4:       cur=
+--- cache ---
+
+
+########## 2. 内存 ##########
+MemTotal:        3643160 kB
+MemFree:         1779160 kB
+MemAvailable:    2892740 kB
+Buffers:          254492 kB
+Cached:           634956 kB
+SwapCached:            0 kB
+--- zram ---
+5596250112
+Filename				Type		Size		Used		Priority
+/dev/zram0                              partition	5465084		23656		-2
+
+########## 3. 显示 / GPU ##########
+--- /sys/class/drm ---
+[0;0mversion[m
+/sys/class/drm/card*                     status     = 
+/sys/class/drm/card*                     enabled    = 
+/sys/class/drm/card*                     modes      = 
+/sys/class/drm/card*                     edid       = 
+--- card0 device ---
+
+--- backlight ---
+[1;36mbacklight[m
+backlight: max=4095 cur=200
+--- framebuffer ---
+[1;36mfbcon[m
+--- panel 驱动绑定 ---
+msm-mdss
+msm_dsi
+msm_dsi_phy
+--- DT 中的 panel ---
+xiaomi,markw-panel
+--- msm/iommu ---
+soc@0:iommu@1c48000
+soc@0:iommu@1e20000
+
+########## 4. 输入设备 ##########
+I: Bus=0019 Vendor=0001 Product=0001 Version=0100
+N: Name="gpio-keys"
+P: Phys=gpio-keys/input0
+S: Sysfs=/devices/platform/gpio-keys/input/input0
+U: Uniq=
+H: Handlers=kbd event0 
+B: PROP=0
+B: EV=3
+B: KEY=8000000000000 0
+
+I: Bus=0000 Vendor=0000 Product=0000 Version=0001
+N: Name="spmi_haptics"
+P: Phys=
+S: Sysfs=/devices/platform/soc@0/200f000.spmi/spmi-0/0-03/200f000.spmi:pmic@3:haptics@c000/input/input1
+U: Uniq=
+H: Handlers=event1 
+B: PROP=0
+B: EV=200001
+B: FF=107030000 0
+
+I: Bus=0000 Vendor=0000 Product=0000 Version=0000
+N: Name="pm8941_pwrkey"
+P: Phys=pm8941_pwrkey/input0
+S: Sysfs=/devices/platform/soc@0/200f000.spmi/spmi-0/0-00/200f000.spmi:pmic@0:pon@800/200f000.spmi:pmic@0:pon@800:pwrkey/input/input2
+U: Uniq=
+H: Handlers=kbd event2 
+B: PROP=0
+B: EV=3
+B: KEY=10000000000000 0
+
+I: Bus=0000 Vendor=0000 Product=0000 Version=0000
+N: Name="pm8941_resin"
+P: Phys=pm8941_resin/input0
+S: Sysfs=/devices/platform/soc@0/200f000.spmi/spmi-0/0-00/200f000.spmi:pmic@0:pon@800/200f000.spmi:pmic@0:pon@800:resin/input/input3
+U: Uniq=
+H: Handlers=kbd event3 
+B: PROP=0
+B: EV=3
+B: KEY=4000000000000 0
+
+I: Bus=0000 Vendor=0000 Product=0000 Version=0000
+N: Name="xiaomi-markw Headset Jack"
+P: Phys=ALSA
+S: Sysfs=/devices/platform/soc@0/c051000.sound-card/sound/card0/input4
+U: Uniq=
+H: Handlers=kbd event4 
+B: PROP=0
+B: EV=23
+B: KEY=40 0 0 0 0 10 0 1000000000 c000000000000 0
+B: SW=14
+
+
+########## 5. I2C 设备 ##########
+0-0023                         ltr559
+0-002e                         yas537
+0-0068                         bmi120
+1-0045                         aw2013
+3-002d                         s5k3l8
+4-0036                         ov5670
+i2c-0                          i2c-gpio
+i2c-1                          QUP I2C adapter
+i2c-2                          QUP I2C adapter
+i2c-3                          Qualcomm-CCI
+i2c-4                          Qualcomm-CCI
+
+########## 6. SPI 设备 ##########
+*                              /tmp/pmr.sh: line 30: can't open /sys/bus/spi/devices/*/compatible: no such file
+
+
+########## 7. IIO 传感器 ##########
+iio:device1      bmi120
+iio:device2      200f000.spmi:pmic@0:adc@3100
+iio:device3      200f000.spmi:pmic@2:adc@3100
+
+########## 8. 摄像头 (V4L2) ##########
+video0           msm_vfe0_video0
+video1           msm_vfe0_video1
+video2           msm_vfe0_video2
+video3           msm_vfe1_video0
+video4           msm_vfe1_video1
+video5           msm_vfe1_video2
+
+########## 9. 音频 ##########
+ 0 [xiaomimarkw    ]: xiaomi-markw - xiaomi-markw
+                      xiaomi-markw
+card0 comprC0D3 controlC0 pcmC0D0p pcmC0D1c pcmC0D2p pcmC0D4c pcmC0D4p timer 
+
+########## 10. LED / 振动 / 按键 ##########
+--leds--
+mmc0:: mmc1:: 
+--haptics--
+spmi-haptics
+--按键(gpio-keys/input)--
+--pon--
+pm8941-pwrkey
+qcom-pon
+
+########## 11. 电源 / 电池 / 充电 ##########
+--- qcom-battery ---
+POWER_SUPPLY_NAME=qcom-battery
+POWER_SUPPLY_STATUS=Discharging
+POWER_SUPPLY_HEALTH=Good
+POWER_SUPPLY_PRESENT=1
+POWER_SUPPLY_TECHNOLOGY=Li-ion
+POWER_SUPPLY_VOLTAGE_NOW=4405491
+POWER_SUPPLY_CURRENT_NOW=-3204
+POWER_SUPPLY_CONSTANT_CHARGE_CURRENT_MAX=1000000
+POWER_SUPPLY_CAPACITY=99
+POWER_SUPPLY_TEMP=275
+--- qcom-smbchg-usb ---
+POWER_SUPPLY_NAME=qcom-smbchg-usb
+POWER_SUPPLY_STATUS=Full
+POWER_SUPPLY_CHARGE_TYPE=N/A
+POWER_SUPPLY_HEALTH=Good
+POWER_SUPPLY_PRESENT=1
+POWER_SUPPLY_ONLINE=1
+POWER_SUPPLY_CONSTANT_CHARGE_CURRENT_MAX=1000000
+POWER_SUPPLY_INPUT_CURRENT_LIMIT=500000
+POWER_SUPPLY_USB_TYPE=Unknown SDP DCP [CDP]
+
+########## 12. 散热 ##########
+cooling_device0 thermal_zone0 thermal_zone1 thermal_zone10 thermal_zone2 thermal_zone3 thermal_zone4 thermal_zone5 thermal_zone6 thermal_zone7 thermal_zone8 thermal_zone9 
+thermal_zone0    type=cpu4-thermal         temp=40900
+thermal_zone1    type=cpu5-thermal         temp=41200
+thermal_zone10   type=pm8953-thermal       temp=44083
+thermal_zone2    type=cpu6-thermal         temp=40900
+thermal_zone3    type=cpu7-thermal         temp=41200
+thermal_zone4    type=cpu0-thermal         temp=40200
+thermal_zone5    type=cpu1-thermal         temp=39900
+thermal_zone6    type=cpu2-thermal         temp=40600
+thermal_zone7    type=cpu3-thermal         temp=40900
+thermal_zone8    type=gpu-thermal          temp=39600
+thermal_zone9    type=qcom-battery         temp=27500
+
+########## 13. 网络 ##########
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000\    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: usb0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT group default qlen 1000\    link/ether ce:77:6f:7e:ff:9e brd ff:ff:ff:ff:ff:ff
+3: rmnet_ipa0: <> mtu 2012 qdisc noop state DOWN mode DEFAULT group default qlen 1000\    link/[519] 
+4: ipa_lan0: <> mtu 2012 qdisc noop state DOWN mode DEFAULT group default qlen 1000\    link/[519] 
+6: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DORMANT group default qlen 1000\    link/ether 02:00:0d:1d:00:01 brd ff:ff:ff:ff:ff:ff
+7: br-c20670a3e786: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT group default \    link/ether 1a:25:77:ab:04:20 brd ff:ff:ff:ff:ff:ff
+8: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN mode DEFAULT group default \    link/ether ce:9c:0b:ef:08:9c brd ff:ff:ff:ff:ff:ff
+9: veth24ffa98@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master br-c20670a3e786 state UP mode DEFAULT group default \    link/ether ca:ac:7d:9b:7d:0b brd ff:ff:ff:ff:ff:ff link-netnsid 0
+10: veth478f0fa@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master br-c20670a3e786 state UP mode DEFAULT group default \    link/ether 4a:0c:1a:c6:be:1b brd ff:ff:ff:ff:ff:ff link-netnsid 1
+11: veth0d591fb@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master br-c20670a3e786 state UP mode DEFAULT group default \    link/ether 7a:22:23:e6:dc:89 brd ff:ff:ff:ff:ff:ff link-netnsid 2
+12: incusbr0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT group default qlen 1000\    link/ether 10:66:6a:de:d2:ae brd ff:ff:ff:ff:ff:ff
+14: vetha8b55b1d@if13: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master incusbr0 state UP mode DEFAULT group default qlen 1000\    link/ether 0e:cc:0c:82:1f:e1 brd ff:ff:ff:ff:ff:ff link-netnsid 3
+--- wireless ---
+/tmp/pmr.sh: line 57: iw: not found
+--- 蓝牙 ---
+[1;36mhci0[m
+/tmp/pmr.sh: line 58: btmgmt: not found
+
+########## 14. 调制解调器 / 远程处理器 ##########
+--qrtr--
+
+--remoteproc--
+remoteproc0      state=running firmware=mba.mbn
+remoteproc1      state=running firmware=adsp.mdt
+remoteproc2      state=running firmware=wcnss.mdt
+--msm-firmware-loader 挂载--
+/dev/mmcblk1p13 /run/msm-firmware-loader/mnt/dsp ext4 ro,nosuid,nodev,noexec,relatime 0 0
+/dev/mmcblk1p24 /run/msm-firmware-loader/mnt/persist ext4 ro,nosuid,nodev,noexec,relatime 0 0
+/dev/mmcblk1p52 /run/msm-firmware-loader/mnt/modem vfat ro,nosuid,nodev,noexec,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro 0 0
+--/dev 相关--
+ls: /dev/qrtr*: No such file or directory
+ls: /dev/wwan*: No such file or directory
+ls: /dev/mhi*: No such file or directory
+ls: /dev/rmtfs*: No such file or directory
+ls: /dev/smd*: No such file or directory
+--ofono/modem 服务--
+  run-msm\x2dfirmware\x2dloader-mnt-modem.mount                                                                                                                                                                       loaded active mounted   /run/msm-firmware-loader/mnt/modem
+  rmtfs.service                                                                                                                                                                                                       loaded active running   Qualcomm remotefs service
+  tqftpserv.service                                                                                                                                                                                                   loaded active running   QRTR TFTP services
+--进程--
+ 1941 root      0:00 /usr/bin/tqftpserv
+ 1944 root      0:00 /usr/bin/rmtfs -r -P -s
+
+########## 15. 其他外设(平台驱动绑定全表) ##########
+adreno                             1c00000.gpu module 
+alarmtimer                         alarmtimer.0.auto 
+armv8-pmu                          pmu 
+aw8738                             audio-amplifier module 
+bam-dma-engine                     7884000.dma-controller 7ac4000.dma-controller 
+btqcomsmd                          a204000.remoteproc:smd-edge:wcnss:bluetooth module 
+cpufreq-dt                         cpufreq-dt 
+dwc3-qcom                          7000000.usb 
+gcc-msm8953                        1800000.clock-controller 
+gpio-keys                          gpio-keys 
+i2c-gpio                           i2c-gpio 
+i2c-qcom-cci                       1b0c000.cci module 
+i2c_qup                            78b6000.i2c 78b7000.i2c 
+icc_smd_rpm                        icc_smd_rpm 
+ipa                                7900000.ipa module 
+msm-mdss                           1a00000.display-subsystem module 
+msm-restart                        4ab000.restart 
+msm8916-wcd-digital-codec          c0f0000.codec module 
+msm8953-pinctrl                    1000000.pinctrl 
+msm_dpu                            1a01000.display-controller module 
+msm_dsi                            1a94000.dsi module 
+msm_dsi_phy                        1a94400.phy module 
+msm_mdp                            module 
+pm8941-pwrkey                      200f000.spmi:pmic@0:pon@800:pwrkey 200f000.spmi:pmic@0:pon@800:resin 
+psci-cpuidle-domain                psci 
+q6afe-clock                        c200000.remoteproc:smd-edge:apr:service@4:clock-controller module 
+q6afe-dai                          c200000.remoteproc:smd-edge:apr:service@4:dais module 
+q6asm-dai                          c200000.remoteproc:smd-edge:apr:service@7:dais module 
+q6routing                          c200000.remoteproc:smd-edge:apr:service@8:routing module 
+q6voice-dai                        c200000.remoteproc:smd-edge:apr:service@9:dais module 
+qcom,pm8916-wcd-spmi-codec         200f000.spmi:pmic@1:audio-codec@f000 module 
+qcom,qfprom                        a4000.efuse 
+qcom,wled                          200f000.spmi:pmic@3:leds@d800 
+qcom-apcs-cc-msm8953               b011050.clock-controller 
+qcom-apq8016-sbc                   c051000.sound-card module 
+qcom-camss                         1b00020.camss module 
+qcom-clk-smd-rpm                   remoteproc:smd-edge:rpm-requests:clock-controller 
+qcom-cpr4pd                        b018000.power-controller 
+qcom-cpufreq-nvmem                 qcom-cpufreq-nvmem 
+qcom-iommu                         soc@0:iommu@1c48000 soc@0:iommu@1e20000 
+qcom-iommu-ctx                     1c48000.iommu-ctx 1c4a000.iommu-ctx 1e34000.iommu-ctx 1e35000.iommu-ctx 1e36000.iommu-ctx 1e38000.iommu-ctx 
+qcom-lab-ibb-regulator             200f000.spmi:pmic@3:labibb 
+qcom-memshare                      memshare module 
+qcom-pmi8994-fg                    200f000.spmi:pmic@2:fuel-gauge@4000 
+qcom-pon                           200f000.spmi:pmic@0:pon@800 module 
+qcom-q6v5-mss                      4080000.remoteproc module 
+qcom-qusb2-phy                     79000.phy 
+qcom-rpm-proc                      remoteproc 
+qcom-rpmpd                         remoteproc:smd-edge:rpm-requests:power-controller 
+qcom-smbchg                        200f000.spmi:pmic@2:smbchager@1000 
+qcom-smem                          86300000.smem 
+qcom-smsm                          smsm 
+qcom-socinfo                       module qcom-socinfo 
+qcom-spmi-gpio                     200f000.spmi:pmic@0:gpio@c000 200f000.spmi:pmic@2:gpio@c000 
+qcom-spmi-mpp                      200f000.spmi:pmic@2:mpps@a000 
+qcom-spmi-regulator                200f000.spmi:pmic@1:regulators 
+qcom-spmi-vadc                     200f000.spmi:pmic@0:adc@3100 200f000.spmi:pmic@2:adc@3100 module 
+qcom-tsens                         4a9000.thermal-sensor 
+qcom-venus                         module 
+qcom-venus-decoder                 module 
+qcom-venus-encoder                 module 
+qcom-wcnss-pil                     a204000.remoteproc module 
+qcom_apcs_ipc                      b011000.mailbox 
+qcom_hwspinlock                    1905000.hwlock 
+qcom_q6v5_pas                      c200000.remoteproc module 
+qcom_rmtfs_mem                     f2d00000.rmtfs module 
+qcom_rpm_smd_regulator             remoteproc:smd-edge:rpm-requests:regulators 
+qcom_scm                           firmware:scm 
+qcom_smp2p                         smp2p-adsp smp2p-modem smp2p-wcnss 
+qnoc-msm8953                       400000.interconnect 500000.interconnect 580000.interconnect 580000.interconnect:interconnect-snoc 
+ramoops                            9ff00000.ramoops 
+reg-fixed-voltage                  vph-pwr-regulator 
+rtc-pm8xxx                         200f000.spmi:pmic@0:rtc@6000 module 
+sdhci_msm                          7824900.mmc 7864900.mmc 
+serial8250                         serial8250 
+simple-pm-bus                      soc@0 
+spmi-haptics                       200f000.spmi:pmic@3:haptics@c000 module 
+spmi-temp-alarm                    200f000.spmi:pmic@0:temp-alarm@2400 module 
+spmi_pmic_arb                      200f000.spmi 
+wcn36xx                            a204000.remoteproc:smd-edge:wcnss:wifi module 
+expect: spawn id exp6 not open
+    while executing
+"expect eof"
+    (file "/tmp/pm_do.exp" line 15)

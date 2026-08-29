@@ -1,0 +1,530 @@
+spawn ssh -tt -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR user@172.16.42.1 doas sh /tmp/pmr.sh 2>&1
+(user@172.16.42.1) Password: 
+doas (user@u2pro) password: 
+########## J. 启动日志 journalctl (前180行) ##########
+[   25.192436] u2pro kernel: Booting Linux on physical CPU 0x0000000000 [0x410fd034]
+[   25.192640] u2pro kernel: Linux version 6.17.7-msm8953 (pmos@build) (aarch64-alpine-linux-musl-gcc (Alpine 15.2.0) 15.2.0, GNU ld (GNU Binutils) 2.45.1) #1-postmarketos-qcom-msm8953 SMP PREEMPT Mon Dec  8 00:32:03 UTC
+[   25.192750] u2pro kernel: KASLR disabled due to lack of seed
+[   25.192805] u2pro kernel: Machine model: Xiaomi Redmi 4 Prime
+[   25.192856] u2pro kernel: OF: reserved mem: 0x0000000086300000..0x00000000863fffff (1024 KiB) nomap non-reusable smem@86300000
+[   25.192907] u2pro kernel: OF: reserved mem: 0x0000000086400000..0x00000000867fffff (4096 KiB) nomap non-reusable reserved@86400000
+[   25.192967] u2pro kernel: OF: reserved mem: 0x0000000086c00000..0x000000008d5fffff (108544 KiB) nomap non-reusable mpss@86c00000
+[   25.193014] u2pro kernel: OF: reserved mem: 0x000000008d600000..0x000000008e6fffff (17408 KiB) nomap non-reusable adsp@8d600000
+[   25.193066] u2pro kernel: OF: reserved mem: 0x000000008e700000..0x000000008edfffff (7168 KiB) nomap non-reusable wcnss@8e700000
+[   25.193122] u2pro kernel: OF: reserved mem: 0x0000000090000000..0x0000000090000fff (4 KiB) nomap non-reusable dfps-data@90000000
+[   25.193169] u2pro kernel: OF: reserved mem: 0x0000000090001000..0x00000000905efbff (6075 KiB) nomap non-reusable cont-splash@90001000
+[   25.193215] u2pro kernel: OF: reserved mem: 0x0000000091400000..0x0000000091afffff (7168 KiB) nomap non-reusable venus@91400000
+[   25.193275] u2pro kernel: OF: reserved mem: 0x0000000092000000..0x00000000920fffff (1024 KiB) nomap non-reusable mba@92000000
+[   25.193323] u2pro kernel: OF: reserved mem: 0x0000000093000000..0x00000000931fffff (2048 KiB) nomap non-reusable gps@93000000
+[   25.193382] u2pro kernel: Reserved memory: created DMA memory pool at 0x0000000095000000, size 0 MiB
+[   25.193426] u2pro kernel: OF: reserved mem: initialized node zap@95000000, compatible id shared-dma-pool
+[   25.193472] u2pro kernel: OF: reserved mem: 0x0000000095000000..0x0000000095001fff (8 KiB) nomap non-reusable zap@95000000
+[   25.193517] u2pro kernel: OF: reserved mem: 0x00000000f2d00000..0x00000000f2e7ffff (1536 KiB) nomap non-reusable rmtfs@f2d00000
+[   25.193563] u2pro kernel: OF: reserved mem: 0x0000000084a00000..0x00000000862fffff (25600 KiB) nomap non-reusable qseecom@84a00000
+[   25.193607] u2pro kernel: OF: reserved mem: 0x000000009ff00000..0x000000009fffffff (1024 KiB) map non-reusable ramoops@9ff00000
+[   25.193651] u2pro kernel: NUMA: Faking a node at [mem 0x0000000010000000-0x00000000ffffffff]
+[   25.193705] u2pro kernel: NODE_DATA(0) allocated [mem 0xff85bb00-0xff85e23f]
+[   25.193759] u2pro kernel: Zone ranges:
+[   25.193805] u2pro kernel:   DMA      [mem 0x0000000010000000-0x00000000ffffffff]
+[   25.193849] u2pro kernel:   DMA32    empty
+[   25.193893] u2pro kernel:   Normal   empty
+[   25.193939] u2pro kernel: Movable zone start for each node
+[   25.193984] u2pro kernel: Early memory node ranges
+[   25.194030] u2pro kernel:   node   0: [mem 0x0000000010000000-0x00000000849fffff]
+[   25.194073] u2pro kernel:   node   0: [mem 0x0000000084a00000-0x00000000867fffff]
+[   25.194118] u2pro kernel:   node   0: [mem 0x0000000086800000-0x0000000086bfffff]
+[   25.194164] u2pro kernel:   node   0: [mem 0x0000000086c00000-0x000000008edfffff]
+[   25.194209] u2pro kernel:   node   0: [mem 0x000000008ee00000-0x000000008fffffff]
+[   25.194254] u2pro kernel:   node   0: [mem 0x0000000090000000-0x00000000905eefff]
+[   25.194298] u2pro kernel:   node   0: [mem 0x00000000905f0000-0x00000000913fffff]
+[   25.194343] u2pro kernel:   node   0: [mem 0x0000000091400000-0x0000000091afffff]
+[   25.194386] u2pro kernel:   node   0: [mem 0x0000000091b00000-0x0000000091ffffff]
+[   25.194431] u2pro kernel:   node   0: [mem 0x0000000092000000-0x00000000920fffff]
+[   25.194493] u2pro kernel:   node   0: [mem 0x0000000092100000-0x0000000092ffffff]
+[   25.194542] u2pro kernel:   node   0: [mem 0x0000000093000000-0x00000000931fffff]
+[   25.194602] u2pro kernel:   node   0: [mem 0x0000000093200000-0x0000000094ffffff]
+[   25.194662] u2pro kernel:   node   0: [mem 0x0000000095000000-0x0000000095001fff]
+[   25.194721] u2pro kernel:   node   0: [mem 0x0000000095002000-0x00000000f2cfffff]
+[   25.194766] u2pro kernel:   node   0: [mem 0x00000000f2d00000-0x00000000f2e7ffff]
+[   25.194811] u2pro kernel:   node   0: [mem 0x00000000f2e80000-0x00000000ffffffff]
+[   25.194866] u2pro kernel: Initmem setup node 0 [mem 0x0000000010000000-0x00000000ffffffff]
+[   25.194917] u2pro kernel: On node 0, zone DMA: 1 pages in unavailable ranges
+[   25.194966] u2pro kernel: cma: Reserved 32 MiB at 0x00000000f9c00000
+[   25.195010] u2pro kernel: psci: probing for conduit method from DT.
+[   25.195054] u2pro kernel: psci: PSCIv1.0 detected in firmware.
+[   25.195100] u2pro kernel: psci: Using standard PSCI v0.2 function IDs
+[   25.195154] u2pro kernel: psci: MIGRATE_INFO_TYPE not supported.
+[   25.195203] u2pro kernel: psci: SMC Calling Convention v1.0
+[   25.195247] u2pro kernel: psci: OSI mode supported.
+[   25.195290] u2pro kernel: psci: [Firmware Bug]: failed to set PC mode: -1
+[   25.195336] u2pro kernel: percpu: Embedded 34 pages/cpu s99160 r8192 d31912 u139264
+[   25.195391] u2pro kernel: pcpu-alloc: s99160 r8192 d31912 u139264 alloc=34*4096
+[   25.195461] u2pro kernel: pcpu-alloc: [0] 0 [0] 1 [0] 2 [0] 3 [0] 4 [0] 5 [0] 6 [0] 7 
+[   25.195508] u2pro kernel: Detected VIPT I-cache on CPU0
+[   25.195552] u2pro kernel: CPU features: detected: ARM erratum 845719
+[   25.195596] u2pro kernel: alternatives: applying boot alternatives
+[   25.195644] u2pro kernel: Kernel command line: quiet loglevel=2  pmos_boot_uuid=fc55a496-dbb8-4e08-a2ce-369102ed4f15 pmos_root_uuid=a5513363-8a7f-4b04-9df4-50fc6d89a172 pmos_rootfsopts=defaults
+[   25.195695] u2pro kernel: Unknown kernel command line parameters "pmos_boot_uuid=fc55a496-dbb8-4e08-a2ce-369102ed4f15 pmos_root_uuid=a5513363-8a7f-4b04-9df4-50fc6d89a172 pmos_rootfsopts=defaults", will be passed to user space.
+[   25.195741] u2pro kernel: printk: log buffer data + meta data: 131072 + 458752 = 589824 bytes
+[   25.195787] u2pro kernel: Dentry cache hash table entries: 524288 (order: 10, 4194304 bytes, linear)
+[   25.195831] u2pro kernel: Inode-cache hash table entries: 262144 (order: 9, 2097152 bytes, linear)
+[   25.195874] u2pro kernel: software IO TLB: SWIOTLB bounce buffer size adjusted to 3MB
+[   25.195918] u2pro kernel: software IO TLB: area num 8.
+[   25.195964] u2pro kernel: software IO TLB: SWIOTLB bounce buffer size roundup to 4MB
+[   25.196460] u2pro kernel: software IO TLB: mapped [mem 0x00000000f90f0000-0x00000000f94f0000] (4MB)
+[   25.196574] u2pro kernel: Fallback order for Node 0: 0 
+[   25.196641] u2pro kernel: Built 1 zonelists, mobility grouping on.  Total pages: 983039
+[   25.196686] u2pro kernel: Policy zone: DMA
+[   25.196732] u2pro kernel: mem auto-init: stack:off, heap alloc:off, heap free:off
+[   25.196775] u2pro kernel: SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=8, Nodes=1
+[   25.196819] u2pro kernel: ftrace: allocating 50061 entries in 196 pages
+[   25.196863] u2pro kernel: ftrace: allocated 196 pages with 3 groups
+[   25.196908] u2pro kernel: rcu: Preemptible hierarchical RCU implementation.
+[   25.196953] u2pro kernel: rcu:         RCU event tracing is enabled.
+[   25.196998] u2pro kernel:         Trampoline variant of Tasks RCU enabled.
+[   25.197044] u2pro kernel:         Rude variant of Tasks RCU enabled.
+[   25.197089] u2pro kernel:         Tracing variant of Tasks RCU enabled.
+[   25.197134] u2pro kernel: rcu: RCU calculated value of scheduler-enlistment delay is 25 jiffies.
+[   25.197179] u2pro kernel: RCU Tasks: Setting shift to 3 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=8.
+[   25.197226] u2pro kernel: RCU Tasks Rude: Setting shift to 3 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=8.
+[   25.197271] u2pro kernel: RCU Tasks Trace: Setting shift to 3 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=8.
+[   25.197317] u2pro kernel: NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[   25.197362] u2pro kernel: Root IRQ handler: gic_handle_irq
+[   25.197424] u2pro kernel: rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[   25.197468] u2pro kernel: arch_timer: cp15 and mmio timer(s) running at 19.20MHz (virt/virt).
+[   25.197514] u2pro kernel: clocksource: arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x46d987e47, max_idle_ns: 440795202767 ns
+[   25.197558] u2pro kernel: sched_clock: 56 bits at 19MHz, resolution 52ns, wraps every 4398046511078ns
+[   25.197602] u2pro kernel: Console: colour dummy device 80x25
+[   25.197651] u2pro kernel: printk: legacy console [tty0] enabled
+[   25.197705] u2pro kernel: Calibrating delay loop (skipped), value calculated using timer frequency.. 38.40 BogoMIPS (lpj=76800)
+[   25.197754] u2pro kernel: pid_max: default: 32768 minimum: 301
+[   25.197805] u2pro kernel: LSM: initializing lsm=capability
+[   25.197856] u2pro kernel: Mount-cache hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[   25.197906] u2pro kernel: Mountpoint-cache hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[   25.197966] u2pro kernel: rcu: Hierarchical SRCU implementation.
+[   25.198016] u2pro kernel: rcu:         Max phase no-delay instances is 1000.
+[   25.198066] u2pro kernel: Timer migration: 1 hierarchy levels; 8 children per group; 1 crossnode level
+[   25.198115] u2pro kernel: smp: Bringing up secondary CPUs ...
+[   25.198165] u2pro kernel: Detected VIPT I-cache on CPU1
+[   25.198215] u2pro kernel: CPU1: Booted secondary processor 0x0000000001 [0x410fd034]
+[   25.198264] u2pro kernel: Detected VIPT I-cache on CPU2
+[   25.198313] u2pro kernel: CPU2: Booted secondary processor 0x0000000002 [0x410fd034]
+[   25.198369] u2pro kernel: Detected VIPT I-cache on CPU3
+[   25.198426] u2pro kernel: CPU3: Booted secondary processor 0x0000000003 [0x410fd034]
+[   25.198499] u2pro kernel: Detected VIPT I-cache on CPU4
+[   25.198551] u2pro kernel: CPU4: Booted secondary processor 0x0000000100 [0x410fd034]
+[   25.198601] u2pro kernel: Detected VIPT I-cache on CPU5
+[   25.198653] u2pro kernel: CPU5: Booted secondary processor 0x0000000101 [0x410fd034]
+[   25.198703] u2pro kernel: Detected VIPT I-cache on CPU6
+[   25.198752] u2pro kernel: CPU6: Booted secondary processor 0x0000000102 [0x410fd034]
+[   25.198801] u2pro kernel: Detected VIPT I-cache on CPU7
+[   25.198851] u2pro kernel: CPU7: Booted secondary processor 0x0000000103 [0x410fd034]
+[   25.198908] u2pro kernel: smp: Brought up 1 node, 8 CPUs
+[   25.198974] u2pro kernel: SMP: Total of 8 processors activated.
+[   25.199029] u2pro kernel: CPU: All CPU(s) started at EL1
+[   25.199079] u2pro kernel: CPU features: detected: 32-bit EL0 Support
+[   25.199130] u2pro kernel: CPU features: detected: 32-bit EL1 Support
+[   25.199182] u2pro kernel: CPU features: detected: CRC32 instructions
+[   25.199236] u2pro kernel: CPU features: detected: PMUv3
+[   25.199292] u2pro kernel: alternatives: applying system-wide alternatives
+[   25.199359] u2pro kernel: Memory: 3590384K/3932156K available (16384K kernel code, 2630K rwdata, 5820K rodata, 2112K init, 416K bss, 301308K reserved, 32768K cma-reserved)
+[   25.199409] u2pro kernel: devtmpfs: initialized
+[   25.199459] u2pro kernel: clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
+[   25.199512] u2pro kernel: posixtimers hash table entries: 4096 (order: 4, 65536 bytes, linear)
+[   25.199564] u2pro kernel: futex hash table entries: 2048 (131072 bytes on 1 NUMA nodes, total 128 KiB, linear).
+[   25.199614] u2pro kernel: 25872 pages in range for non-PLT usage
+[   25.199664] u2pro kernel: 517392 pages in range for PLT usage
+[   25.199715] u2pro kernel: pinctrl core: initialized pinctrl subsystem
+[   25.199766] u2pro kernel: NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[   25.199826] u2pro kernel: DMA: preallocated 512 KiB GFP_KERNEL pool for atomic allocations
+[   25.199876] u2pro kernel: DMA: preallocated 512 KiB GFP_KERNEL|GFP_DMA pool for atomic allocations
+[   25.199926] u2pro kernel: DMA: preallocated 512 KiB GFP_KERNEL|GFP_DMA32 pool for atomic allocations
+[   25.199976] u2pro kernel: audit: initializing netlink subsys (disabled)
+[   25.200078] u2pro kernel: audit: type=2000 audit(0.040:1): state=initialized audit_enabled=0 res=1
+[   25.200133] u2pro kernel: thermal_sys: Registered thermal governor 'bang_bang'
+[   25.200182] u2pro kernel: thermal_sys: Registered thermal governor 'step_wise'
+[   25.200232] u2pro kernel: thermal_sys: Registered thermal governor 'user_space'
+[   25.200297] u2pro kernel: thermal_sys: Registered thermal governor 'power_allocator'
+[   25.200347] u2pro kernel: cpuidle: using governor menu
+[   25.200398] u2pro kernel: hw-breakpoint: found 6 breakpoint and 4 watchpoint registers.
+[   25.200447] u2pro kernel: ASID allocator initialised with 65536 entries
+[   25.200496] u2pro kernel: Serial: AMBA PL011 UART driver
+[   25.200546] u2pro kernel: pstore: Using crash dump compression: deflate
+[   25.200595] u2pro kernel: printk: legacy console [ramoops-1] enabled
+[   25.200648] u2pro kernel: pstore: Registered ramoops as persistent store backend
+[   25.200697] u2pro kernel: ramoops: using 0x100000@0x9ff00000, ecc: 0
+[   25.200755] u2pro kernel: /soc@0/clock-controller@1800000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/phy@1a94400
+[   25.200811] u2pro kernel: /soc@0/display-subsystem@1a00000/display-controller@1a01000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[   25.200864] u2pro kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0
+[   25.200916] u2pro kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/display-controller@1a01000
+[   25.200968] u2pro kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[   25.201019] u2pro kernel: /soc@0/display-subsystem@1a00000/phy@1a94400: Fixed dependency cycle(s) with /soc@0/clock-controller@1800000
+[   25.201069] u2pro kernel: /soc@0/camss@1b00020: Fixed dependency cycle(s) with /soc@0/cci@1b0c000/i2c-bus@1/camera-sensor@36
+[   25.201131] u2pro kernel: /soc@0/camss@1b00020: Fixed dependency cycle(s) with /soc@0/cci@1b0c000/i2c-bus@0/camera-sensor@2d
+[   25.201191] u2pro kernel: /soc@0/cci@1b0c000/i2c-bus@0/camera-sensor@2d: Fixed dependency cycle(s) with /soc@0/camss@1b00020
+[   25.201243] u2pro kernel: /soc@0/cci@1b0c000/i2c-bus@1/camera-sensor@36: Fixed dependency cycle(s) with /soc@0/camss@1b00020
+[   25.201296] u2pro kernel: /soc@0/spmi@200f000/pmic@2/smbchager@1000: Fixed dependency cycle(s) with /soc@0/usb@7000000
+[   25.201348] u2pro kernel: /soc@0/usb@7000000: Fixed dependency cycle(s) with /soc@0/spmi@200f000/pmic@2/smbchager@1000
+[   25.201400] u2pro kernel: /soc@0/clock-controller@b011050: Fixed dependency cycle(s) with /soc@0/clock-controller@b011050
+[   25.201451] u2pro kernel: /soc@0/clock-controller@1800000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/phy@1a94400
+[   25.201501] u2pro kernel: /soc@0/display-subsystem@1a00000: Fixed dependency cycle(s) with /soc@0/interconnect@500000
+[   25.201552] u2pro kernel: /soc@0/display-subsystem@1a00000: Fixed dependency cycle(s) with /soc@0/clock-controller@1800000
+[   25.201611] u2pro kernel: /soc@0/display-subsystem@1a00000/display-controller@1a01000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[   25.201663] u2pro kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0
+[   25.201715] u2pro kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/display-controller@1a01000
+[   25.201765] u2pro kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[   25.201815] u2pro kernel: /soc@0/display-subsystem@1a00000/phy@1a94400: Fixed dependency cycle(s) with /soc@0/clock-controller@1800000
+[   25.201865] u2pro kernel: /soc@0/camss@1b00020: Fixed dependency cycle(s) with /soc@0/cci@1b0c000/i2c-bus@1/camera-sensor@36
+[   25.201915] u2pro kernel: /soc@0/camss@1b00020: Fixed dependency cycle(s) with /soc@0/cci@1b0c000/i2c-bus@0/camera-sensor@2d
+[   25.201966] u2pro kernel: /soc@0/cci@1b0c000/i2c-bus@0/camera-sensor@2d: Fixed dependency cycle(s) with /soc@0/camss@1b00020
+[   25.202016] u2pro kernel: /soc@0/cci@1b0c000/i2c-bus@1/camera-sensor@36: Fixed dependency cycle(s) with /soc@0/camss@1b00020
+[   25.202066] u2pro kernel: /soc@0/spmi@200f000/pmic@2/smbchager@1000: Fixed dependency cycle(s) with /soc@0/usb@7000000
+[   25.202115] u2pro kernel: /soc@0/spmi@200f000/pmic@2/smbchager@1000: Fixed dependency cycle(s) with /soc@0/usb@7000000
+[   25.202162] u2pro kernel: /soc@0/usb@7000000: Fixed dependency cycle(s) with /soc@0/spmi@200f000/pmic@2/smbchager@1000
+[   25.202217] u2pro kernel: /soc@0/clock-controller@b011050: Fixed dependency cycle(s) with /soc@0/clock-controller@b011050
+[   25.202266] u2pro kernel: HugeTLB: registered 1.00 GiB page size, pre-allocated 0 pages
+[   25.202315] u2pro kernel: HugeTLB: 0 KiB vmemmap can be freed for a 1.00 GiB page
+[   25.202366] u2pro kernel: HugeTLB: registered 32.0 MiB page size, pre-allocated 0 pages
+[   25.202415] u2pro kernel: HugeTLB: 0 KiB vmemmap can be freed for a 32.0 MiB page
+[   25.202465] u2pro kernel: HugeTLB: registered 2.00 MiB page size, pre-allocated 0 pages
+[   25.202519] u2pro kernel: HugeTLB: 0 KiB vmemmap can be freed for a 2.00 MiB page
+[   25.202569] u2pro kernel: HugeTLB: registered 64.0 KiB page size, pre-allocated 0 pages
+[   25.202619] u2pro kernel: HugeTLB: 0 KiB vmemmap can be freed for a 64.0 KiB page
+[   25.202674] u2pro kernel: raid6: neonx8   gen()  1475 MB/s
+[   25.202724] u2pro kernel: raid6: neonx4   gen()  1462 MB/s
+[   25.202773] u2pro kernel: raid6: neonx2   gen()  1393 MB/s
+[   25.202824] u2pro kernel: raid6: neonx1   gen()  1205 MB/s
+[   25.202874] u2pro kernel: raid6: int64x8  gen()   736 MB/s
+[   25.202929] u2pro kernel: raid6: int64x4  gen()  1060 MB/s
+[   25.202980] u2pro kernel: raid6: int64x2  gen()   959 MB/s
+[   25.203031] u2pro kernel: raid6: int64x1  gen()   637 MB/s
+[   25.203081] u2pro kernel: raid6: using algorithm neonx8 gen() 1475 MB/s
+[   25.203137] u2pro kernel: raid6: .... xor() 1101 MB/s, rmw enabled
+[   25.203187] u2pro kernel: raid6: using neon recovery algorithm
+[   25.203238] u2pro kernel: iommu: Default domain type: Translated
+
+########## K. systemd-analyze ##########
+Startup finished in 24.345s (kernel) + 1min 36.732s (userspace) = 2min 1.078s 
+graphical.target reached after 1min 36.731s in userspace.
+--- blame ---
+1min 30.206s tinyproxy.service
+  1min 953ms systemd-time-wait-sync.service
+      7.739s msm-modem-uim-selection.service
+      7.445s NetworkManager-wait-online.service
+      4.300s docker.service
+      3.608s dev-mmcblk1p52.device
+      3.564s user@10000.service
+      2.597s dev-mapper-mmcblk1p57p2.device
+      2.302s dev-mmcblk1p24.device
+      2.024s dev-zram0.device
+      1.997s msm-firmware-loader.service
+      1.715s dev-mmcblk1p13.device
+      1.058s containerd.service
+      1.031s systemd-udev-trigger.service
+       446ms NetworkManager.service
+       333ms polkit.service
+       315ms iwd.service
+       199ms systemd-nsresourced.service
+       178ms systemd-vconsole-setup.service
+       174ms systemd-logind.service
+       174ms systemd-journald.service
+       167ms systemd-timesyncd.service
+       163ms systemd-hostnamed.service
+       156ms postmarketos-zram-swap.service
+       144ms systemd-udevd.service
+--- critical-chain ---
+The time when unit became active or started is printed after the "@" character.
+The time the unit took to start is printed after the "+" character.
+
+graphical.target @1min 36.731s
+└─multi-user.target @1min 36.730s
+  └─docker.service @13.959s +4.300s
+    └─network-online.target @13.943s
+      └─NetworkManager-wait-online.service @6.494s +7.445s
+        └─NetworkManager.service @6.039s +446ms
+          └─dbus.service @5.930s +94ms
+            └─basic.target @5.924s
+              └─sockets.target @5.924s
+                └─docker.socket @5.911s +13ms
+                  └─sysinit.target @5.906s
+                    └─systemd-vconsole-setup.service @5.718s +178ms
+                      └─systemd-journald.socket @681ms
+                        └─-.mount @542ms
+                          └─-.slice @542ms
+
+########## L. /boot 目录 ##########
+total 27869
+drwxr-xr-x    5 root     root          1024 Jun  6 21:23 .
+drwxr-xr-x   19 root     root          4096 Aug 28 21:08 ..
+-rw-r--r--    1 root     root       4927004 Dec  8  2025 System.map
+-rw-r--r--    1 root     root         65112 Jun  6 21:23 apq8053-lenovo-cd-18781y.dtb
+-rw-r--r--    1 root     root        208899 Dec  8  2025 config
+drwxr-xr-x    3 root     root          1024 Jun  6 15:03 dtbs
+drwxr-xr-x    2 root     root          1024 Jun  6 21:23 extlinux
+-rw-r--r--    1 root     root      10448229 Jun  6 21:23 initramfs
+-rw-r--r--    1 root     root        344080 Dec  4  2025 lk2nd.img
+drwx------    2 root     root         12288 Jun  6 19:06 lost+found
+-rw-r--r--    1 root     root         64186 Jun  6 21:23 msm8953-asus-ze520kl.dtb
+-rw-r--r--    1 root     root         64186 Jun  6 21:23 msm8953-asus-ze552kl.dtb
+-rw-r--r--    1 root     root         61916 Jun  6 21:23 msm8953-billion-rimob.dtb
+-rw-r--r--    1 root     root         64381 Jun  6 21:23 msm8953-huawei-milan.dtb
+-rw-r--r--    1 root     root         62029 Jun  6 21:23 msm8953-lenovo-kuntao.dtb
+-rw-r--r--    1 root     root         63467 Jun  6 21:23 msm8953-motorola-potter.dtb
+-rw-r--r--    1 root     root         66993 Jun  6 21:23 msm8953-xiaomi-daisy.dtb
+-rw-r--r--    1 root     root         67675 Jun  6 21:23 msm8953-xiaomi-markw.dtb
+-rw-r--r--    1 root     root         67000 Jun  6 21:23 msm8953-xiaomi-mido.dtb
+-rw-r--r--    1 root     root         66859 Jun  6 21:23 msm8953-xiaomi-tissot.dtb
+-rw-r--r--    1 root     root         66933 Jun  6 21:23 msm8953-xiaomi-vince.dtb
+-rw-r--r--    1 root     root         66679 Jun  6 21:23 msm8953-xiaomi-ysl.dtb
+-rw-r--r--    1 root     root         62431 Jun  6 21:23 sdm450-lenovo-tbx605f.dtb
+-rw-r--r--    1 root     root         61910 Jun  6 21:23 sdm450-motorola-ali.dtb
+-rw-r--r--    1 root     root         70715 Jun  6 21:23 sdm450-samsung-a6plte-r4.dtb
+-rw-r--r--    1 root     root         66042 Jun  6 21:23 sdm450-xiaomi-rosy.dtb
+-rw-r--r--    1 root     root         60874 Jun  6 21:23 sdm632-fairphone-fp3.dtb
+-rw-r--r--    1 root     root         58836 Jun  6 21:23 sdm632-motorola-ocean.dtb
+-rw-r--r--    1 root     root         61159 Jun  6 21:23 sdm632-xiaomi-onclite.dtb
+-rw-r--r--    1 root     root      11155236 Dec  8  2025 vmlinuz
+--- dtbs/qcom 顶层 ---
+apq8016-sbc-d3-camera-mezzanine.dtb
+apq8016-sbc-usb-host.dtb
+apq8016-sbc.dtb
+apq8016-schneider-hmibsc.dtb
+apq8039-t2.dtb
+apq8053-lenovo-cd-18781y.dtb
+apq8094-sony-xperia-kitakami-karin_windy.dtb
+apq8096-db820c.dtb
+apq8096-ifc6640.dtb
+ipq5018-rdp432-c2.dtb
+ipq5018-tplink-archer-ax55-v1.dtb
+ipq5332-rdp441.dtb
+ipq5332-rdp442.dtb
+ipq5332-rdp468.dtb
+ipq5332-rdp474.dtb
+ipq5424-rdp466.dtb
+ipq6018-cp01-c1.dtb
+ipq8074-hk01.dtb
+ipq8074-hk10-c1.dtb
+ipq8074-hk10-c2.dtb
+ipq9574-rdp418.dtb
+ipq9574-rdp433.dtb
+ipq9574-rdp449.dtb
+ipq9574-rdp453.dtb
+ipq9574-rdp454.dtb
+msm8216-samsung-fortuna3g.dtb
+msm8916-acer-a1-724.dtb
+msm8916-alcatel-idol347.dtb
+msm8916-asus-z00l.dtb
+msm8916-gplus-fl8005a.dtb
+--- 是否已有 odin dtb ---
+无 odin dtb
+
+########## M. 触摸屏/指纹/NFC 支持 ##########
+--- 内核 TOUCHSCREEN 配置 ---
+CONFIG_INPUT_TOUCHSCREEN=y
+CONFIG_TOUCHSCREEN_ATMEL_MXT=m
+CONFIG_TOUCHSCREEN_GOODIX=m
+CONFIG_TOUCHSCREEN_ILI210X=m
+CONFIG_TOUCHSCREEN_S6SY761=m
+CONFIG_TOUCHSCREEN_NOVATEK_NVT_TS=m
+CONFIG_TOUCHSCREEN_EDT_FT5X06=m
+CONFIG_TOUCHSCREEN_HIMAX_HX83112B=m
+--- 已注册 i2c 驱动 ---
+axp20x-i2c bd9571mwv bmi160_i2c dummy leds-aw2013 lm3697 ltr501 max732x max77620 max98927 ov5670 pca953x pca954x rohm-bd718x7 rtc-ds3232 s5k2xx sm5502 yas5xx 
+--- 内核 NFC / 指纹 ---
+CONFIG_NFC=m
+CONFIG_NFC_NCI=m
+CONFIG_NFC_HCI=m
+CONFIG_NFC_SHDLC=y
+CONFIG_NFC_PN544=m
+CONFIG_NFC_PN544_I2C=m
+CONFIG_NFC_NXP_NCI=m
+CONFIG_NFC_NXP_NCI_I2C=m
+CONFIG_NFC_S3FWRN5=m
+CONFIG_NFC_S3FWRN5_I2C=m
+CONFIG_HID_MULTITOUCH=m
+CONFIG_I2C_HID=y
+CONFIG_I2C_HID_OF=m
+CONFIG_I2C_HID_CORE=m
+--- 设备树里的 i2c 子节点 ---
+-- 78b6000.i2c --
+-- 78b7000.i2c --
+-- 78b8000.i2c --
+-- 78b9000.i2c --
+-- 78ba000.i2c --
+
+########## N. 传感器详情 ##########
+--- iio:device1 name=bmi120 ---
+in_accel_sampling_frequency
+in_accel_sampling_frequency_available
+in_accel_scale
+in_accel_scale_available
+in_accel_x_raw
+in_accel_y_raw
+in_accel_z_raw
+in_anglvel_sampling_frequency
+in_anglvel_sampling_frequency_available
+in_anglvel_scale
+in_anglvel_scale_available
+in_anglvel_x_raw
+--- iio:device2 name=200f000.spmi:pmic@0:adc@3100 ---
+in_temp8_input
+in_temp8_label
+in_temp8_raw
+in_voltage10_input
+in_voltage10_label
+in_voltage10_raw
+in_voltage12_label
+in_voltage12_raw
+in_voltage14_input
+in_voltage14_label
+in_voltage14_raw
+in_voltage15_input
+--- iio:device3 name=200f000.spmi:pmic@2:adc@3100 ---
+in_temp13_input
+in_temp13_label
+in_temp13_raw
+in_voltage0_input
+in_voltage0_label
+in_voltage0_raw
+in_voltage10_input
+in_voltage10_label
+in_voltage10_raw
+in_voltage14_input
+in_voltage14_label
+in_voltage14_raw
+
+########## O. 摄像头详情 ##########
+video0     msm_vfe0_video0
+video1     msm_vfe0_video1
+video2     msm_vfe0_video2
+video3     msm_vfe1_video0
+video4     msm_vfe1_video1
+video5     msm_vfe1_video2
+--- media 设备 ---
+[1;35m/dev/media0[m
+ls: /sys/class/media: No such file or directory
+--- libcamera ---
+(无 libcamera 工具)
+
+########## P. 音频详情 ##########
+ 0 [xiaomimarkw    ]: xiaomi-markw - xiaomi-markw
+                      xiaomi-markw
+--- pcm ---
+00-00: MultiMedia1 (*) :  : playback 1
+00-01: MultiMedia2 (*) :  : capture 1
+00-02: MultiMedia3 (*) :  : playback 1
+00-04: VoiceMMode1 (*) :  : playback 1 : capture 1
+--- amixer scontrols ---
+/tmp/pmr.sh: line 30: amixer: not found
+--- pipewire/wireplumber ---
+
+########## Q. 调制解调器 ##########
+--- qrtr 工具 ---
+qmi-firmware-update
+qmi-network
+qmicli
+qrtr-cfg
+qrtr-lookup
+rmtfs
+tqftpserv
+
+--- qrtr-lookup ---
+  Service Version Instance Node  Port
+       43       2       18    0     1 Subsystem control service
+       15       1        0    0    15 Test service
+       24       1        0    0    17 Thermal mitigation device service
+       23       1        0    0    18 Thermal sensors service
+       22       1        0    0    19 Time service
+       36       1        0    0    21 Persistent device configuration service
+       49       1        2    0    22 IPA control service
+       70       1        1    0    25 LTE service
+       54       1        0    0    26 <unknown>
+       41       1        1    0    27 RF radiated performance enhancement service
+       17       1        0    0    28 Specific absorption rate service
+       34       1        0    0    29 Coexistence service
+       55       1        2    0    38 QMI-SLIM service
+       50       1        0    0    39 UIMRMT service
+        9       2        0    0    40 Voice service
+        3       1        0    0    42 Network Access Service
+       12       1        0    0    43 Phonebook Management service
+       10       2        0    0    44 Card Application Toolkit service (v2)
+       47       1        0    0    45 Data Port Mapper service
+--- msm-modem 包内容 ---
+msm-modem-11-r0 contains:
+usr/libexec/msm-modem-uim-selection
+
+--- soc-qcom-msm8953-modem 内容 ---
+soc-qcom-msm8953-modem-18-r1 contains:
+etc/conf.d/q6voiced
+
+--- 相关服务文件 ---
+ModemManager.service.requires
+msm-firmware-loader-unpack.service
+msm-firmware-loader.service
+msm-modem-uim-selection.service
+rmtfs-dir.service
+rmtfs.service
+rmtfs.service.d
+tqftpserv.service
+
+########## R. 包数量与关键包 ##########
+475
+--- 内核/固件 ---
+device-mapper
+device-mapper-event-libs
+device-mapper-libs
+device-mapper-udev
+device-qcom-msm8953
+firmware-qcom-adreno-a530
+firmware-qcom-msm8953
+linux-pam
+linux-pam-systemd
+linux-postmarketos-qcom-msm8953
+lk2nd-msm8953
+msm-firmware-loader
+msm-firmware-loader-systemd
+soc-qcom-msm8953
+soc-qcom-msm8953-gpu
+soc-qcom-msm8953-modem
+soc-qcom-msm8953-ucm
+--- UI/桌面 ---
+postmarketos-ui-console
+--- 容器/虚拟化 ---
+containerd
+containerd-systemd
+docker
+docker-cli
+docker-cli-buildx
+docker-cli-compose
+docker-engine
+docker-systemd
+docker-zsh-completion
+incus
+incus-client
+
+########## S. 运行级别与目标 ##########
+graphical.target
+  UNIT                     LOAD   ACTIVE SUB    DESCRIPTION
+  basic.target             loaded active active Basic System
+  bluetooth.target         loaded active active Bluetooth Support
+  cryptsetup.target        loaded active active Local Encrypted Volumes
+  getty.target             loaded active active Login Prompts
+  graphical.target         loaded active active Graphical Interface
+  integritysetup.target    loaded active active Local Integrity Protected Volumes
+  local-fs-pre.target      loaded active active Preparation for Local File Systems
+  local-fs.target          loaded active active Local File Systems
+  machines.target          loaded active active Containers
+  multi-user.target        loaded active active Multi-User System
+  network-online.target    loaded active active Network is Online
+  network.target           loaded active active Network
+  paths.target             loaded active active Path Units
+  remote-cryptsetup.target loaded active active Remote Encrypted Volumes
+  remote-fs.target         loaded active active Remote File Systems
+  slices.target            loaded active active Slice Units
+  sockets.target           loaded active active Socket Units
+  sound.target             loaded active active Sound Card
+  swap.target              loaded active active Swaps
+expect: spawn id exp6 not open
+    while executing
+"expect eof"
+    (file "/tmp/pm_do.exp" line 15)

@@ -1,0 +1,75 @@
+spawn ssh -tt -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR user@172.16.42.1 doas sh /tmp/pmr.sh 2>&1
+(user@172.16.42.1) Password: 
+doas (user@u2pro) password: 
+=== framebuffer/simpledrm 内核配置 ===
+# CONFIG_FB_FOREIGN_ENDIAN is not set
+# CONFIG_FB_IBM_GXT4500 is not set
+# CONFIG_FB_METRONOME is not set
+# CONFIG_FB_MODE_HELPERS is not set
+# CONFIG_FB_OPENCORES is not set
+# CONFIG_FB_S1D13XXX is not set
+# CONFIG_FB_SIMPLE is not set
+# CONFIG_FB_SMSCUFX is not set
+# CONFIG_FB_SSD1307 is not set
+# CONFIG_FB_TILEBLITTING is not set
+# CONFIG_FB_UDL is not set
+# CONFIG_FB_VIRTUAL is not set
+CONFIG_DRM_FBDEV_EMULATION=y
+CONFIG_DRM_FBDEV_OVERALLOC=100
+CONFIG_FB=y
+CONFIG_FB_CORE=y
+CONFIG_FB_DEFERRED_IO=y
+CONFIG_FB_DEVICE=y
+CONFIG_FB_NOTIFY=y
+CONFIG_FB_SYSMEM_FOPS=y
+CONFIG_FB_SYSMEM_HELPERS=y
+CONFIG_FB_SYSMEM_HELPERS_DEFERRED=y
+CONFIG_FB_SYS_COPYAREA=y
+CONFIG_FB_SYS_FILLRECT=y
+CONFIG_FB_SYS_IMAGEBLIT=y
+CONFIG_OF_RESERVED_MEM=y
+
+=== i2c 设备是否有驱动绑定 ===
+0-0023                       name=ltr559       NO_DRIVER_BOUND
+0-002e                       name=yas537       NO_DRIVER_BOUND
+1-0045                       name=aw2013       NO_DRIVER_BOUND
+3-002d                       name=s5k3l8       NO_DRIVER_BOUND
+4-0036                       name=ov5670       NO_DRIVER_BOUND
+
+=== soc@0 下的 i2c 节点 ===
+cci@1b0c000 i2c@78b5000 i2c@78b6000 i2c@78b7000 i2c@78b8000 i2c@7af5000 i2c@7af6000 i2c@7af7000 i2c@7af8000 spi@78b7000 spi@7af5000 spi@7af6000 spi@7af7000 
+
+=== /dev/dri 与 framebuffer 设备 ===
+ls: /dev/dri: No such file or directory
+lrwxrwxrwx    1 root     root             0 Aug 29 10:18 90001000.framebuffer -> ../../../devices/platform/90001000.framebuffer
+
+=== 90001000.framebuffer 状态 ===
+[0;0mdriver_override[m                             [1;36mof_node[m                                     [1;36msubsystem[m                                   [0;0muevent[m
+[0;0mmodalias[m                                    [1;34mpower[m                                       [1;36msupplier:platform:1800000.clock-controller[m  [0;0mwaiting_for_supplier[m
+OF_NAME=framebuffer
+OF_FULLNAME=/chosen/framebuffer@90001000
+OF_COMPATIBLE_0=simple-framebuffer
+OF_COMPATIBLE_N=1
+MODALIAS=of:NframebufferT(null)Csimple-framebuffer
+
+=== 面板/显示 相关 DT 完整路径 ===
+[0;0m#address-cells[m              [0;0mclocks[m                      [1;34mdsi@1a96000[m                 [0;0minterrupts[m                  [1;34mphy@1a96400[m                 [0;0mreg-names[m
+[0;0m#interrupt-cells[m            [0;0mcompatible[m                  [0;0minterconnect-names[m          [0;0mname[m                        [0;0mpower-domains[m               [0;0mresets[m
+[0;0m#size-cells[m                 [1;34mdisplay-controller@1a01000[m  [0;0minterconnects[m               [0;0mphandle[m                     [0;0mranges[m                      [0;0mstatus[m
+[0;0mclock-names[m                 [1;34mdsi@1a94000[m                 [0;0minterrupt-controller[m        [1;34mphy@1a94400[m                 [0;0mreg[m
+--- dsi@1a94000 ---
+[0;0m#address-cells[m          [0;0massigned-clocks[m         [0;0mcompatible[m              [0;0mname[m                    [1;34mpanel@0[m                 [0;0mpinctrl-1[m               [0;0mpower-domains[m           [0;0mstatus[m
+[0;0m#size-cells[m             [0;0mclock-names[m             [0;0minterrupt-parent[m        [0;0moperating-points-v2[m     [0;0mphys[m                    [0;0mpinctrl-names[m           [0;0mreg[m                     [0;0mvdda-supply[m
+[0;0massigned-clock-parents[m  [0;0mclocks[m                  [0;0minterrupts[m              [1;34mopp-table[m               [0;0mpinctrl-0[m               [1;34mports[m                   [0;0mreg-names[m               [0;0mvddio-supply[m
+--- panel@0 属性 ---
+[0;0mbacklight[m    [0;0mcompatible[m   [0;0mname[m         [1;34mport[m         [0;0mreg[m          [0;0mreset-gpios[m  [0;0mvsn-supply[m   [0;0mvsp-supply[m
+
+=== 所有 reserved-memory 节点 ===
+#address-cells #size-cells adsp@8d600000 cont-splash@90001000 dfps-data@90000000 gps@93000000 mba@92000000 mpss@86c00000 name qseecom@84a00000 ramoops@9ff00000 ranges reserved@86400000 rmtfs@f2d00000 smem@86300000 venus@91400000 wcnss@8e700000 zap@95000000 
+
+=== SoC 外设总览(soc@0 子节点) ===
+#address-cells #size-cells camss@1b00020 cci@1b0c000 clock-controller@1800000 clock-controller@b011050 codec@c0f0000 compatible display-subsystem@1a00000 dma-controller@7884000 dma-controller@7ac4000 efuse@a4000 gpu@1c00000 hwlock@1905000 i2c@78b5000 i2c@78b6000 i2c@78b7000 i2c@78b8000 i2c@7af5000 i2c@7af6000 i2c@7af7000 i2c@7af8000 interconnect@400000 interconnect@500000 interconnect@580000 interrupt-controller@b000000 iommu@1c48000 iommu@1e20000 ipa@7900000 mailbox@b011000 mmc@7824900 mmc@7864900 name phy@79000 pinctrl@1000000 power-controller@b018000 ranges remoteproc@4080000 remoteproc@a204000 remoteproc@c200000 restart@4ab000 rng@e3000 serial@78af000 serial@7aef000 sound-card@c051000 spi@78b7000 spi@7af5000 spi@7af6000 spi@7af7000 spmi@200f000 sram@60000 syscon@1937000 syscon@193f044 thermal-sensor@4a9000 timer@b120000 usb@7000000 venus@1d00000 
+expect: spawn id exp6 not open
+    while executing
+"expect eof"
+    (file "/tmp/pm_do.exp" line 15)

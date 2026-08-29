@@ -1,0 +1,350 @@
+spawn ssh -tt -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR user@172.16.42.1 doas sh /tmp/pmr.sh 2>&1
+(user@172.16.42.1) Password: 
+doas (user@u2pro) password: 
+########## A. CPU 集群与频率 ##########
+--- policy0 related_cpus=0 1 2 3 4 5 6 7 ---
+  freqs: 652800 844800 1036800 1228800 1420800 1612800 1804800 2016000 2208000 
+
+  cur=2208000 min=652800 max=2208000 gov=schedutil
+  driver=cpufreq-dt
+--- cpu capacity ---
+1024 1024 1024 1024 1024 1024 1024 1024 
+
+########## B. 显示为何未起 ##########
+--- i2c 驱动注册表 ---
+axp20x-i2c bd9571mwv bmi160_i2c dummy leds-aw2013 lm3697 ltr501 max732x max77620 max98927 ov5670 pca953x pca954x rohm-bd718x7 rtc-ds3232 s5k2xx sm5502 yas5xx 
+--- platform 驱动中 panel/drm ---
+led-backlight
+msm-mdss
+msm_dsi
+msm_dsi_phy
+qcom,wled
+--- 显示子系统设备树 status ---
+/sys/firmware/devicetree/base/soc@0/display-subsystem@1a00000          okay
+/sys/firmware/devicetree/base/soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0 /tmp/pmr.sh: line 13: can't open /sys/firmware/devicetree/base/soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0/status: no such file
+
+/sys/firmware/devicetree/base/soc@0/display-subsystem@1a00000/display-controller@1a01000 /tmp/pmr.sh: line 13: can't open /sys/firmware/devicetree/base/soc@0/display-subsystem@1a00000/display-controller@1a01000/status: no such file
+
+--- panel@0 compatible ---
+xiaomi,markw-panel
+--- 内核 panel 配置 ---
+CONFIG_DRM=m
+CONFIG_DRM_MIPI_DSI=y
+CONFIG_DRM_KMS_HELPER=m
+CONFIG_DRM_CLIENT=y
+CONFIG_DRM_CLIENT_LIB=m
+CONFIG_DRM_CLIENT_SELECTION=m
+CONFIG_DRM_CLIENT_SETUP=y
+CONFIG_DRM_FBDEV_EMULATION=y
+CONFIG_DRM_FBDEV_OVERALLOC=100
+CONFIG_DRM_CLIENT_DEFAULT_FBDEV=y
+CONFIG_DRM_CLIENT_DEFAULT="fbdev"
+CONFIG_DRM_DISPLAY_DP_AUX_BUS=m
+CONFIG_DRM_DISPLAY_HELPER=m
+CONFIG_DRM_BRIDGE_CONNECTOR=y
+CONFIG_DRM_DISPLAY_DP_HELPER=y
+CONFIG_DRM_DISPLAY_DSC_HELPER=y
+CONFIG_DRM_DISPLAY_HDMI_AUDIO_HELPER=y
+CONFIG_DRM_DISPLAY_HDMI_CEC_HELPER=y
+CONFIG_DRM_DISPLAY_HDMI_HELPER=y
+CONFIG_DRM_DISPLAY_HDMI_STATE_HELPER=y
+CONFIG_DRM_EXEC=m
+CONFIG_DRM_GPUVM=m
+CONFIG_DRM_SCHED=m
+CONFIG_DRM_MSM=m
+CONFIG_DRM_MSM_GPU_STATE=y
+CONFIG_DRM_MSM_KMS=y
+CONFIG_DRM_MSM_KMS_FBDEV=y
+CONFIG_DRM_MSM_MDSS=y
+CONFIG_DRM_MSM_MDP5=y
+CONFIG_DRM_MSM_DPU=y
+CONFIG_DRM_MSM_DSI=y
+CONFIG_DRM_MSM_DSI_14NM_PHY=y
+CONFIG_DRM_PANEL=y
+CONFIG_DRM_PANEL_BOE_TV101WUM_LL2=m
+CONFIG_DRM_PANEL_LVDS=m
+CONFIG_DRM_PANEL_SAMSUNG_S6E3FA7=m
+CONFIG_DRM_PANEL_SAMSUNG_S6E3FA7_AMS604NL01=m
+CONFIG_DRM_PANEL_EDP=m
+CONFIG_DRM_PANEL_MSM8953_GENERATED=m
+CONFIG_DRM_PANEL_ASUS_ZE520KL_ILI7807B_BOE=m
+CONFIG_DRM_PANEL_ASUS_ZE520KL_R63350_TM=m
+CONFIG_DRM_PANEL_ASUS_ZE552KL_ILI7807B_CTC=m
+CONFIG_DRM_PANEL_ASUS_ZE552KL_NT35596_TXD=m
+CONFIG_DRM_PANEL_ASUS_ZE552KL_OTM1901A_LCE=m
+CONFIG_DRM_PANEL_ASUS_ZE552KL_R63350_TM=m
+CONFIG_DRM_PANEL_BILLION_RIMOB_NT35532_CS=m
+CONFIG_DRM_PANEL_BOE_BS052FHM_A00_6C01=m
+CONFIG_DRM_PANEL_CSOT_622_V0=m
+CONFIG_DRM_PANEL_FAIRPHONE_FP3_HX83112B=m
+CONFIG_DRM_PANEL_HIMAX_HX8399C_FHDPLUS=m
+CONFIG_DRM_PANEL_HUAWEI_CANNES_NT35596S_BOE=m
+CONFIG_DRM_PANEL_HUAWEI_CANNES_SD6FA1_JDI=m
+CONFIG_DRM_PANEL_HUAWEI_CANNES_TD4300_BOE=m
+CONFIG_DRM_PANEL_HUAWEI_CANNES_TD4300_LG=m
+CONFIG_DRM_PANEL_HUAWEI_CANNES_TD4300_TIANMA=m
+CONFIG_DRM_PANEL_HUAWEI_MILAN_BOE_OTM1906C=m
+CONFIG_DRM_PANEL_HUAWEI_MILAN_BOE_TD4322=m
+CONFIG_DRM_PANEL_HUAWEI_MILAN_BOE_TEST1906C=m
+CONFIG_DRM_PANEL_HUAWEI_MILAN_CTC_NT35596S=m
+CONFIG_DRM_PANEL_HUAWEI_MILAN_CTC_OTM1906C=m
+CONFIG_DRM_PANEL_HUAWEI_MILAN_JDI_R63452=m
+CONFIG_DRM_PANEL_HUAWEI_MILAN_TIANMA_FIC8736=m
+CONFIG_DRM_PANEL_HUAWEI_MILAN_TIANMA_FOCAL8716=m
+CONFIG_DRM_PANEL_HUAWEI_MILAN_TIANMA_OTM1906C=m
+CONFIG_DRM_PANEL_LENOVO_CD_18781Y_FT8201=m
+CONFIG_DRM_PANEL_LENOVO_CD_18781Y_HX83100A=m
+CONFIG_DRM_PANEL_LENOVO_CD_18781Y_JD9365=m
+CONFIG_DRM_PANEL_LENOVO_KUNTAO_549=m
+CONFIG_DRM_PANEL_MDSS_FT8716_FHD=m
+CONFIG_DRM_PANEL_MDSS_ILI7807_FHD=m
+CONFIG_DRM_PANEL_MDSS_ILI7807_FHDPLUS=m
+CONFIG_DRM_PANEL_MDSS_NT35596_EBBG=m
+CONFIG_DRM_PANEL_MDSS_OTM1911_FHD=m
+CONFIG_DRM_PANEL_MDSS_OTM1911_FHDPLUS=m
+CONFIG_DRM_PANEL_MDSS_R63350=m
+CONFIG_DRM_PANEL_MOTOROLA_ALI_BOE=m
+CONFIG_DRM_PANEL_MOTOROLA_ALI_TIANMA=m
+CONFIG_DRM_PANEL_OFILM_622_V0=m
+CONFIG_DRM_PANEL_TENOR_HX8399C_AUO=m
+CONFIG_DRM_PANEL_TENOR_ILI7807D_DJN_AUO=m
+CONFIG_DRM_PANEL_TENOR_ILI7807D_DJN=m
+CONFIG_DRM_PANEL_TIANMA_622_V0=m
+CONFIG_DRM_PANEL_TIANMA_TL052VDXP02=m
+CONFIG_DRM_PANEL_XIAOMI_AUO_R61322=m
+CONFIG_DRM_PANEL_XIAOMI_BOE_ILI9885=m
+CONFIG_DRM_PANEL_XIAOMI_EBBG_R63350=m
+CONFIG_DRM_PANEL_XIAOMI_NT35532=m
+CONFIG_DRM_PANEL_XIAOMI_NT36672_CSOT_FHDPLUS_E7=m
+CONFIG_DRM_PANEL_XIAOMI_NT36672_TIANMA_FHDPLUS_E7=m
+CONFIG_DRM_PANEL_XIAOMI_ONCLITE_HX8394F=m
+CONFIG_DRM_PANEL_XIAOMI_ONCLITE_ILI9881=m
+CONFIG_DRM_PANEL_XIAOMI_ONCLITE_OTM1901A=m
+CONFIG_DRM_PANEL_XIAOMI_OTM1911=m
+CONFIG_DRM_PANEL_XIAOMI_ROSY_FT8006M_BOE=m
+CONFIG_DRM_PANEL_XIAOMI_ROSY_FT8613_CSOT=m
+CONFIG_DRM_PANEL_XIAOMI_ROSY_FT8613_EBBG=m
+CONFIG_DRM_PANEL_XIAOMI_TD4310_EBBG_FHDPLUS_E7=m
+CONFIG_DRM_PANEL_XIAOMI_TD4310_FHDPLUS_E7_G55=m
+CONFIG_DRM_PANEL_XIAOMI_TD4310_FHDPLUS_E7=m
+CONFIG_DRM_PANEL_XIAOMI_TIANMA_NT35596=m
+CONFIG_DRM_PANEL_XIAOMI_TIANMA_R63350=m
+CONFIG_DRM_PANEL_XIAOMI_YSL_HX8394F=m
+CONFIG_DRM_PANEL_XIAOMI_YSL_ILI7807D=m
+CONFIG_DRM_PANEL_XIAOMI_YSL_ILI9881C=m
+CONFIG_DRM_BRIDGE=y
+CONFIG_DRM_PANEL_BRIDGE=y
+CONFIG_DRM_AUX_HPD_BRIDGE=m
+CONFIG_DRM_LONTIUM_LT8912B=m
+CONFIG_DRM_PANEL_ORIENTATION_QUIRKS=m
+--- 已加载的 drm 模块 ---
+btqcomsmd              12288  0
+btqca                  28672  1 btqcomsmd
+bluetooth             835584  3 btqca,btqcomsmd
+wcnss_ctrl             16384  2 wcn36xx,btqcomsmd
+snd_soc_msm8916_digital    57344  1
+snd_soc_msm8916_analog    49152  1
+msm                  1138688  0
+ubwc_config            20480  1 msm
+drm_client_lib         12288  1 msm
+mdt_loader             12288  5 qcom_wcnss_pil,msm,qcom_q6v5_pas,qcom_q6v5_mss,venus_core
+drm_gpuvm              36864  1 msm
+drm_exec               12288  2 msm,drm_gpuvm
+gpu_sched              57344  1 msm
+drm_display_helper    204800  1 msm
+cec                    49152  1 drm_display_helper
+drm_kms_helper        196608  3 msm,drm_display_helper,drm_client_lib
+drm                   651264  7 gpu_sched,drm_kms_helper,msm,drm_exec,drm_gpuvm,drm_display_helper,drm_client_lib
+drm_panel_orientation_quirks    12288  1 drm
+--- debugfs dri ---
+[0;0mbridges[m
+--- labibb (面板电源) ---
+/sys/devices/platform/soc@0/200f000.spmi/spmi-0/0-03/200f000.spmi:pmic@3:labibb
+
+########## C. SD 卡槽 / MMC ##########
+mmc1:0001            type=MMC
+brw-rw----    1 root     disk      179,   0 Aug 27 19:03 [1;35m/dev/mmcblk1[m
+brw-rw----    1 root     disk      179,  32 Aug 27 19:03 [1;35m/dev/mmcblk1boot0[m
+brw-rw----    1 root     disk      179,  64 Aug 27 19:03 [1;35m/dev/mmcblk1boot1[m
+brw-rw----    1 root     disk      179,   1 Aug 27 19:03 [1;35m/dev/mmcblk1p1[m
+brw-rw----    1 root     disk      179,  10 Aug 27 19:03 [1;35m/dev/mmcblk1p10[m
+brw-rw----    1 root     disk      179,  11 Aug 27 19:03 [1;35m/dev/mmcblk1p11[m
+brw-rw----    1 root     disk      179,  12 Aug 27 19:03 [1;35m/dev/mmcblk1p12[m
+brw-rw----    1 root     disk      179,  13 Aug 27 19:03 [1;35m/dev/mmcblk1p13[m
+brw-rw----    1 root     disk      179,  14 Aug 27 19:03 [1;35m/dev/mmcblk1p14[m
+brw-rw----    1 root     disk      179,  15 Aug 27 19:03 [1;35m/dev/mmcblk1p15[m
+brw-rw----    1 root     disk      179,  16 Aug 27 19:03 [1;35m/dev/mmcblk1p16[m
+brw-rw----    1 root     disk      179,  17 Aug 27 19:03 [1;35m/dev/mmcblk1p17[m
+brw-rw----    1 root     disk      179,  18 Aug 27 19:03 [1;35m/dev/mmcblk1p18[m
+brw-rw----    1 root     disk      179,  19 Aug 27 19:03 [1;35m/dev/mmcblk1p19[m
+brw-rw----    1 root     disk      179,   2 Aug 27 19:03 [1;35m/dev/mmcblk1p2[m
+brw-rw----    1 root     disk      179,  20 Aug 27 19:03 [1;35m/dev/mmcblk1p20[m
+brw-rw----    1 root     disk      179,  21 Aug 27 19:03 [1;35m/dev/mmcblk1p21[m
+brw-rw----    1 root     disk      179,  22 Aug 27 19:03 [1;35m/dev/mmcblk1p22[m
+brw-rw----    1 root     disk      179,  23 Aug 27 19:03 [1;35m/dev/mmcblk1p23[m
+brw-rw----    1 root     disk      179,  24 Aug 27 19:03 [1;35m/dev/mmcblk1p24[m
+brw-rw----    1 root     disk      179,  25 Aug 27 19:03 [1;35m/dev/mmcblk1p25[m
+brw-rw----    1 root     disk      179,  26 Aug 27 19:03 [1;35m/dev/mmcblk1p26[m
+brw-rw----    1 root     disk      179,  27 Aug 27 19:03 [1;35m/dev/mmcblk1p27[m
+brw-rw----    1 root     disk      179,  28 Aug 27 19:03 [1;35m/dev/mmcblk1p28[m
+brw-rw----    1 root     disk      179,  29 Aug 27 19:03 [1;35m/dev/mmcblk1p29[m
+brw-rw----    1 root     disk      179,   3 Aug 27 19:03 [1;35m/dev/mmcblk1p3[m
+brw-rw----    1 root     disk      179,  30 Aug 27 19:03 [1;35m/dev/mmcblk1p30[m
+brw-rw----    1 root     disk      179,  31 Aug 27 19:03 [1;35m/dev/mmcblk1p31[m
+brw-rw----    1 root     disk      259,   0 Aug 27 19:03 [1;35m/dev/mmcblk1p32[m
+brw-rw----    1 root     disk      259,   1 Aug 27 19:03 [1;35m/dev/mmcblk1p33[m
+brw-rw----    1 root     disk      259,   2 Aug 27 19:03 [1;35m/dev/mmcblk1p34[m
+brw-rw----    1 root     disk      259,   3 Aug 27 19:03 [1;35m/dev/mmcblk1p35[m
+brw-rw----    1 root     disk      259,   4 Aug 27 19:03 [1;35m/dev/mmcblk1p36[m
+brw-rw----    1 root     disk      259,   5 Aug 27 19:03 [1;35m/dev/mmcblk1p37[m
+brw-rw----    1 root     disk      259,   6 Aug 27 19:03 [1;35m/dev/mmcblk1p38[m
+brw-rw----    1 root     disk      259,   7 Aug 27 19:03 [1;35m/dev/mmcblk1p39[m
+brw-rw----    1 root     disk      179,   4 Aug 27 19:03 [1;35m/dev/mmcblk1p4[m
+brw-rw----    1 root     disk      259,   8 Aug 27 19:03 [1;35m/dev/mmcblk1p40[m
+brw-rw----    1 root     disk      259,   9 Aug 27 19:03 [1;35m/dev/mmcblk1p41[m
+brw-rw----    1 root     disk      259,  10 Aug 27 19:03 [1;35m/dev/mmcblk1p42[m
+brw-rw----    1 root     disk      259,  11 Aug 27 19:03 [1;35m/dev/mmcblk1p43[m
+brw-rw----    1 root     disk      259,  12 Aug 27 19:03 [1;35m/dev/mmcblk1p44[m
+brw-rw----    1 root     disk      259,  13 Aug 27 19:03 [1;35m/dev/mmcblk1p45[m
+brw-rw----    1 root     disk      259,  14 Aug 27 19:03 [1;35m/dev/mmcblk1p46[m
+brw-rw----    1 root     disk      259,  15 Aug 27 19:03 [1;35m/dev/mmcblk1p47[m
+brw-rw----    1 root     disk      259,  16 Aug 27 19:03 [1;35m/dev/mmcblk1p48[m
+brw-rw----    1 root     disk      259,  17 Aug 27 19:03 [1;35m/dev/mmcblk1p49[m
+brw-rw----    1 root     disk      179,   5 Aug 27 19:03 [1;35m/dev/mmcblk1p5[m
+brw-rw----    1 root     disk      259,  18 Aug 27 19:03 [1;35m/dev/mmcblk1p50[m
+brw-rw----    1 root     disk      259,  19 Aug 27 19:03 [1;35m/dev/mmcblk1p51[m
+brw-rw----    1 root     disk      259,  20 Aug 27 19:03 [1;35m/dev/mmcblk1p52[m
+brw-rw----    1 root     disk      259,  21 Aug 27 19:03 [1;35m/dev/mmcblk1p53[m
+brw-rw----    1 root     disk      259,  22 Aug 27 19:03 [1;35m/dev/mmcblk1p54[m
+brw-rw----    1 root     disk      259,  23 Aug 27 19:03 [1;35m/dev/mmcblk1p55[m
+brw-rw----    1 root     disk      259,  24 Aug 27 19:03 [1;35m/dev/mmcblk1p56[m
+brw-rw----    1 root     disk      259,  25 Aug 27 19:03 [1;35m/dev/mmcblk1p57[m
+brw-rw----    1 root     disk      179,   6 Aug 27 19:03 [1;35m/dev/mmcblk1p6[m
+brw-rw----    1 root     disk      179,   7 Aug 27 19:03 [1;35m/dev/mmcblk1p7[m
+brw-rw----    1 root     disk      179,   8 Aug 27 19:03 [1;35m/dev/mmcblk1p8[m
+brw-rw----    1 root     disk      179,   9 Aug 27 19:03 [1;35m/dev/mmcblk1p9[m
+crw-------    1 root     root      243,   0 Aug 27 19:03 [1;35m/dev/mmcblk1rpmb[m
+--- sdhci 7824900(eMMC) ---
+[1;34mmmc0[m
+
+########## D. QRTR / Modem ##########
+ls: /sys/bus/qrtr/devices/: No such file or directory
+ls: /sys/bus/qrtr/drivers: No such file or directory 
+--- qmi/modem 相关包 ---
+libqmi
+libqrtr-glib
+msm-firmware-loader
+msm-firmware-loader-systemd
+msm-modem
+msm-modem-systemd
+msm-modem-uim-selection
+qmi-utils
+qrtr
+qrtr-libs
+rmtfs
+rmtfs-systemd
+rmtfs-udev
+soc-qcom-msm8953-modem
+tqftpserv
+tqftpserv-systemd
+--- 服务 ---
+● ModemManager.service                          not-found inactive dead    ModemManager.service
+  msm-firmware-loader-unpack.service            loaded    active   exited  Unpack dynamically loaded firmware
+  msm-firmware-loader.service                   loaded    active   exited  Load firmware that is located on dedicated partitions of qcom devices
+  msm-modem-uim-selection.service               loaded    inactive dead    MSM Modem UIM Slot Selection
+  rmtfs.service                                 loaded    active   running Qualcomm remotefs service
+  tqftpserv.service                             loaded    active   running QRTR TFTP services
+--- qrtr 节点 ---
+
+########## E. 无线 ##########
+--- wlan0 phy ---
+[1;36mphy0[m
+phy: phy0
+DRIVER=wcn36xx
+OF_NAME=wifi
+OF_FULLNAME=/soc@0/remoteproc@a204000/smd-edge/wcnss/wifi
+OF_COMPATIBLE_0=qcom,wcnss-wlan
+OF_COMPATIBLE_N=1
+--- wcn36xx 信息 ---
+filename:       /lib/modules/6.17.7-msm8953/kernel/drivers/net/wireless/ath/wcn36xx/wcn36xx.ko
+firmware:       wlan/prima/WCNSS_qcom_wlan_nv.bin
+author:         Eugene Krasnikov k.eugene.e@gmail.com
+license:        Dual BSD/GPL
+description:    Qualcomm Atheros WCN3660/3680 wireless driver
+alias:          of:N*T*Cqcom,wcnss-wlanC*
+alias:          of:N*T*Cqcom,wcnss-wlan
+depends:        mac80211,wcnss_ctrl,cfg80211
+--- NetworkManager ---
+DEVICE           TYPE      STATE                   CONNECTION      
+wlan0            wifi      connected               TP-LINK_CNN_5G  
+usb0             ethernet  connected               USB Networking  
+incusbr0         bridge    connected (externally)  incusbr0        
+br-c20670a3e786  bridge    connected (externally)  br-c20670a3e786 
+lo               loopback  connected (externally)  lo              
+docker0          bridge    connected (externally)  docker0         
+veth0d591fb      ethernet  unmanaged               --              
+veth24ffa98      ethernet  unmanaged               --              
+veth478f0fa      ethernet  unmanaged               --              
+--- 蓝牙 ---
+device
+power
+reset
+rfkill0
+subsystem
+uevent
+[1;36mdevice[m     [1;34mpower[m      [0;0mreset[m      [1;34mrfkill0[m    [1;36msubsystem[m  [0;0muevent[m
+
+########## F. 身份/板级 ##########
+--- qcom,board-id 原始字节 ---
+ 00 01 00 0b 00 00 00 01
+--- qcom,msm-id 原始字节 ---
+ 00 00 01 25 00 00 00 00
+--- DT 全部顶层属性(值) ---
+qcom,board-id             0b000100 01000000
+qcom,msm-id               25010000 00000000
+chassis-type              646e6168 00746573
+--- lk2nd chosen ---
+[0;0m#address-cells[m        [0;0mbootargs[m              [0;0mlinux,initrd-end[m      [0;0mlk2nd,project[m         [0;0mname[m
+[0;0m#size-cells[m           [1;34mframebuffer@90001000[m  [0;0mlinux,initrd-start[m    [0;0mlk2nd,version[m         [0;0mranges[m
+--- framebuffer 节点 ---
+  clocks                02000000 81000000 02000000 82000000
+ 02000000 8a000000 02000000 87000000
+  compatible            706d6973 662d656c 656d6172 66667562
+ 00007265
+  format                38673872 00003862
+  height                80070000
+  name                  6d617266 66756265 00726566
+  power-domains         02000000 02000000
+  reg                   00000000 00100090 00000000 00ec5e00
+  stride                a80c0000
+  width                 38040000
+--- cmdline(内核看到) ---
+quiet loglevel=2  pmos_boot_uuid=fc55a496-dbb8-4e08-a2ce-369102ed4f15 pmos_root_uuid=a5513363-8a7f-4b04-9df4-50fc6d89a172 pmos_rootfsopts=defaults
+
+--- 出厂序列号 ---
+   6   7   d   b   f   e   b   9  \0
+
+########## G. 已装软件包全表 ##########
+abseil-cpp-raw-logging-internal abseil-cpp-strings abseil-cpp-strings-internal acl acl-libs agetty alpine-baselayout alpine-baselayout-data alpine-keys alpine-release alsa-lib alsa-plugins-pulse apk-tools apk-tools-zsh-completion attr audit-libs autossh avahi-libs bash blkid boot-deploy brightnessctl brightnessctl-udev brotli-libs btrfs-progs btrfs-progs-udev buffyboard busybox busybox-binsh busybox-extras busybox-suid bzip2 c-ares ca-certificates ca-certificates-bundle cairo cdparanoia-libs cfdisk chrony containerd containerd-systemd cowsql cryptsetup cryptsetup-libs curl curl-zsh-completion dbus dbus-daemon-launch-helper dbus-libs dbus-systemd device-mapper device-mapper-event-libs device-mapper-libs device-mapper-udev device-qcom-msm8953 devicepkg-utils dmesg dnsmasq-common dnsmasq-dnssec-dbus dnsmasq-systemd doas doas-sudo-shim docker docker-cli docker-cli-buildx docker-cli-compose docker-engine docker-systemd docker-zsh-completion dosfstools duktape-libs e2fsprogs e2fsprogs-extra e2fsprogs-libs f2fs-tools f2fs-tools-libs fftw-single-libs file findmnt firmware-qcom-adreno-a530 firmware-qcom-msm8953 flock font-droid font-droid-nonlatin font-terminus font-twemoji fontconfig freetype fribidi fstrim gcompat gdbm giflib git git-init-template git-zsh-completion glib glib-lang gmp gnutls gojq gojq-zsh-completion graphene graphite2 gst-plugin-pipewire gst-plugins-base gst-plugins-base-lang gstreamer gstreamer-lang gstreamer-ptp-helper harfbuzz haveged hexdump htop hwdata-pci incus incus-client inih iproute2 iproute2-minimal iproute2-ss iproute2-tc iptables iskey iwd iwd-systemd jansson java-cacerts java-common json-c kbd kbd-misc kmod kmod-libs kmod-zsh-completion kpartx lame-libs lang lcms2 less libaio libapk libapparmor libasyncns libattr libblkid libbsd libbz2 libcamera libcamera-ipa libcap-ng libcap2 libcom_err libcrypto3 libcurl libdrm libeconf libedit libelf libevdev libevent libexpat libfdisk libffi libflac libgcc libgcrypt libgomp libgpg-error libgudev libice libidn2 libinput-libs libinput-udev libintl libjpeg-turbo liblastlog2 libltdl libmagic libmbim libmd libmicrohttpd libmm-glib libmnl libmount libncursesw libndp libnftnl libnm libogg libpanelw libpciaccess libpisp libpng libpsl libpulse libqmi libqrtr-glib libseccomp libsm libsmartcols libsndfile libssl3 libstdc++ libtasn1 libtheora libucontext libunistring libunwind libuuid libuv libvorbis libx11 libxau libxcb libxdmcp libxext libxft libxi libxml2 libxmu libxrender libxshmfence libxt libxtables libxtst libxv libxxf86vm libxxhash lilv-libs linux-pam linux-pam-systemd linux-postmarketos-qcom-msm8953 lk2nd-msm8953 llvm21-libs logger losetup lsblk lscpu lua5.4-libs lvm2-libs lxc lxc-libs lxc-systemd lz4 lz4-libs lzo mcookie merge-usr mesa mesa-dri-gallium mesa-egl mesa-gbm mesa-gl mesa-gles mkbootimg-osm0sis mount mpdecimal mpg123-libs msm-firmware-loader msm-firmware-loader-systemd msm-modem msm-modem-systemd msm-modem-uim-selection mtdev multipath-tools multipath-tools-udev musl musl-locales musl-locales-lang musl-obstack musl-utils nano ncurses-terminfo-base netcat-openbsd nettle networkmanager networkmanager-cli networkmanager-dnsmasq networkmanager-lang networkmanager-systemd networkmanager-tui networkmanager-wifi networkmanager-wwan newt newt-lang nftables nftables-systemd nftables-vim nghttp2-libs nspr nss openjdk21 openjdk21-demos openjdk21-doc openjdk21-jdk openjdk21-jmods openjdk21-jre openjdk21-jre-headless openssh-client-common openssh-client-default openssh-keygen openssh-nftrules openssh-server-common openssh-server-pam openssh-server-pam-systemd opus orc p11-kit p11-kit-trust pango parted partx pbsplash pcre2 pipewire pipewire-lang pipewire-libs pipewire-systemd pipewire-udev pixman pkgconf polkit polkit-lang polkit-libs polkit-systemd popt postmarketos-artwork-icons postmarketos-base postmarketos-base-mesa postmarketos-base-nftables postmarketos-base-nofde postmarketos-base-ssh postmarketos-base-systemd postmarketos-base-ui postmarketos-base-ui-audio-backend-pulseaudio postmarketos-base-ui-networkmanager postmarketos-base-ui-networkmanager-usb-tethering postmarketos-base-ui-wifi-iwd postmarketos-baselayout postmarketos-bootsplash postmarketos-bootsplash-systemd postmarketos-config-nftables postmarketos-config-nftables-docker postmarketos-config-nftables-networkmanager postmarketos-initramfs postmarketos-keys postmarketos-mkinitfs postmarketos-mvcfg postmarketos-release postmarketos-ui-console postmarketos-zram postmarketos-zram-systemd pulseaudio pulseaudio-alsa pulseaudio-lang pulseaudio-utils pulseaudio-wireplumber pulseaudio-zsh-completion py3-ruamel.yaml py3-ruamel.yaml-pyc py3-ruamel.yaml.clib pyc python3 python3-pyc python3-pycache-pyc0 q6voiced q6voiced-systemd qbootctl qbootctl-systemd qmi-utils qrtr qrtr-libs raft-cowsql readline rmtfs rmtfs-systemd rmtfs-udev roc-toolkit-libs rsync rsync-zsh-completion rtkit rtkit-systemd runc runuser scanelf screen serd-libs setarch setpriv sfdisk shadow shadow-libs shadow-subids skalibs-libs slang sleep-inhibitor sleep-inhibitor-pyc sleep-inhibitor-systemd soc-qcom-msm8953 soc-qcom-msm8953-gpu soc-qcom-msm8953-modem soc-qcom-msm8953-ucm sord-libs soxr speexdsp spirv-tools sqlite-libs squashfs-tools sratom ssl_client swclock-offset swclock-offset-systemd systemd systemd-journald systemd-journald-zsh-completion systemd-lang systemd-libs systemd-logind systemd-logind-zsh-completion systemd-networkd-zsh-completion systemd-resolved-zsh-completion systemd-services systemd-timesyncd systemd-timesyncd-zsh-completion systemd-udevd systemd-udevd-zsh-completion systemd-zsh-completion tar tdb-libs tini-static tinyalsa-libs tinyproxy tmux tmux-zsh-completion tqftpserv tqftpserv-systemd treescan tzdata umount unudhcpd userspace-rcu util-linux util-linux-login util-linux-misc utmps-libs uuidgen v2ray vim vim-common wayland-libs-client wayland-libs-cursor wayland-libs-egl webrtc-audio-processing-1 webrtc-audio-processing-2 wipefs wireless-regdb wireless-tools wireless-tools-libs wireplumber wireplumber-lang wireplumber-libs wireplumber-systemd wireplumber-zsh-completion xdg-utils xprop xset xxd xz xz-libs yaml zix-libs zlib zsh zstd-libs 
+
+########## H. GPU ##########
+[1;36mdriver[m                                      [0;0mmodalias[m                                    [1;36msupplier:platform:1800000.clock-controller[m  [0;0muevent[m
+[0;0mdriver_override[m                             [1;36mof_node[m                                     [1;36msupplier:platform:400000.interconnect[m
+[1;36miommu[m                                       [1;34mpower[m                                       [1;36msupplier:platform:500000.interconnect[m
+[1;36miommu_group[m                                 [1;36msubsystem[m                                   [1;36msupplier:platform:soc@0:iommu@1c48000[m
+--- adreno ---
+autofs binder btrfs-control cpu_dma_latency device-mapper fuse hwbinder loop-control rfkill snapshot udmabuf uinput vndbinder 
+ls: /dev/kgsl*: No such file or directory
+--- venus ---
+[1;36mvideo0[m  [1;36mvideo1[m  [1;36mvideo2[m  [1;36mvideo3[m  [1;36mvideo4[m  [1;36mvideo5[m
+
+########## I. 串口/控制台 ##########
+[0;0mbind[m    [0;0muevent[m  [0;0munbind[m
+ls: /dev/ttyMSM*: No such file or directory
+ls: /dev/ttyHSL*: No such file or directory
+tty0                 -WU (EC  p  )    4:1
+ramoops-1            -W- (E   p a)
+expect: spawn id exp6 not open
+    while executing
+"expect eof"
+    (file "/tmp/pm_do.exp" line 15)
