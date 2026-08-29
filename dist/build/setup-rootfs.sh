@@ -146,7 +146,17 @@ chroot $R systemd-machine-id-setup 2>/dev/null || true
 # --- WiFi management (equivalent to postmarketOS: NetworkManager + wpa) ---
 sed -i 's/ main$/ main contrib non-free non-free-firmware/' $R/etc/apt/sources.list
 chroot $R apt-get update -qq
-chroot $R apt-get install -y -qq network-manager wpasupplicant iw wireless-tools rfkill firmware-atheros
+# 网络工具：按"正常 Debian 服务器"的标准装齐（ping/curl/dig/tcpdump/iperf 等）。
+# systemd-resolved 是为了 DNS 容错：实测某些路由器广播的 DNS 并不应答，
+# 有 resolved 才会按顺序尝试后续服务器（这次实机就撞上了这个坑）。
+# systemd-timesyncd 解决无 RTC 导致的时钟错乱 —— 时钟差几个月时 apt 会直接
+# 拒绝 Release 文件（"Release file ... is not valid yet"）。
+chroot $R apt-get install -y -qq \
+	network-manager wpasupplicant iw wireless-tools rfkill firmware-atheros \
+	iputils-ping curl wget bind9-dnsutils net-tools traceroute tcpdump \
+	iperf3 ethtool mtr-tiny \
+	systemd-resolved systemd-timesyncd \
+	nftables 2>&1 | tail -5 || echo "[setup-rootfs] WARN: 部分网络包装不上，继续"
 chroot $R systemctl enable NetworkManager.service
 chroot $R systemctl enable wpa_supplicant.service 2>/dev/null || true
 
@@ -165,6 +175,19 @@ NMC
 chroot $R systemctl disable NetworkManager-wait-online.service 2>/dev/null || true
 # 本设备无蜂窝基带，ModemManager 只徒增启动开销并会扫描串口
 chroot $R systemctl mask ModemManager.service 2>/dev/null || true
+
+# --- WiFi 校准数据（persist 分区 → /lib/firmware） ---
+# wcn36xx 要的 WCNSS_qcom_wlan_nv.bin 是每台机器不同的射频校准数据，
+# 原厂放在 persist 分区，任何 Debian 包都不提供，也不该进版本库。
+# 由 odin-wlan-nv.service 开机现取。
+install -D -m 0755 "$HERE/rootfs/usr/local/sbin/odin-wlan-nv.sh" \
+	"$R/usr/local/sbin/odin-wlan-nv.sh"
+install -D -m 0644 "$HERE/rootfs/etc/systemd/system/odin-wlan-nv.service" \
+	"$R/etc/systemd/system/odin-wlan-nv.service"
+chroot $R systemctl enable odin-wlan-nv.service 2>&1 | tail -2 || true
+# wcn36xx / qcom_wcnss_pil 是模块，靠 udev 在 platform 设备出现时加载，
+# 这里显式列进 modules-load 更稳（不依赖时序）
+echo -e "wcn36xx\nqcom_wcnss_pil" > "$R/etc/modules-load.d/odin-wlan.conf"
 
 # --- enable ssh ---
 chroot $R systemctl enable ssh.service

@@ -844,3 +844,43 @@ tools/prepare-public-repo.sh /tmp/odin-clean ~/.config/odin-port/replacements.tx
 - **Release 资产尚未发布**：`dist/` 里的 Debian 镜像还是 8/29 12:46 批次，缺 0008/背光/GPU/
   DHCP 四项修复。等 `tools/build-all.sh` 重建出与真机等价的新镜像后，再一次性发布 v0.1，
   含 lk2nd 两个版本 + 4 个 DTB + 新镜像 + MANIFEST。现在发只会发布一个必然黑屏的镜像。
+
+---
+
+## 贰拾 [2026-08-30 00:06] GitHub Actions 构建流水线
+
+### 触发条件（按用户要求）
+只挂 `release: [prereleased, released]`。
+**不要用 `published`** —— GitHub 发布 prerelease 时同时发 `published` 与 `prereleased`，
+实测一次发布触发了两个 run（33261492532 / 33261492105）。prereleased 覆盖预发布、
+released 覆盖正式版，两者不重叠。
+
+### 五个 job
+`dtb` / `lk2nd` / `kernel` / `rootfs(needs kernel+dtb)` / `publish(全部产物挂 Release)`
+
+### ★ 关键更正：lk2nd 的上游不是 msm8953-mainline
+我们的补丁路径是 `lk2nd/device/dts/msm8953/...`，而 msm8953-mainline/lk2nd 的设备树在
+`dts/`、设备表在 `dts/rules.mk` —— 完全对不上。
+真实上游是 **msm8916-mainline/lk2nd tag 19.0**（postmarketOS 用的就是这个版本，
+设备上 `lk2nd:version : 21.0-r0-postmarketos` 即由此打包）。
+- 构建目标：`make TOOLCHAIN_PREFIX=arm-none-eabi- PROJECT=lk2nd-msm8953`
+- 产物：`build-lk2nd-msm8953/lk2nd.img`
+- 本地源码在 `/Volumes/caseSensitiveBar/refs/lk2nd`（非 git 仓库，是从 pmaports 解出来的）
+
+新增 `lk2nd/0004`：从 QCDT 设备表去掉 `msm8953-xiaomi-markw` 与 `sdm450-xiaomi-rosy`，
+强制 lk2nd 命中 odin。这一步原先是手改 rules.mk 做的，CI 里无法复现，固化为补丁。
+
+### 首轮 CI 三个 job 全败（rc1），根因
+1. **dtb/kernel：`upload-pack: not our ref af739964a952`**
+   钉的 SHA 是本地 `odin-wip` 的 HEAD —— 它已经含我们的 0007 补丁，不是上游提交。
+   应钉上游基线 `05f7e89ab9731565d8a62e3b5d1ec206485eeb0b`（Linux 6.19，master）。
+2. **lk2nd：`LK2ND_VER: 19.0` 在 YAML 里是浮点数**，GitHub 传进来成了 `19`，
+   下载 URL 404 → `gzip: stdin: not in gzip format`。已加引号。
+3. **`git fetch --depth 1 origin <sha>` 只对 ref tip 有效**：基线一旦被 master 甩开就被拒。
+   新增 `tools/ci/fetch-kernel.sh` 三级回退（按 SHA 直取 → `--shallow-since=<基线前一天>`
+   → 整支 master），每级结束校验 HEAD == 目标 SHA。钉不住宁可失败，
+   也不悄悄编一个"上游最新版"——那样就失去可复现的意义了。
+
+### 待跟进
+- rc2（run 33262051573）是修完后的第一轮，结果待看
+- `kernel` 与 `rootfs` 两个 job 从未跑通过，属首次验证

@@ -72,13 +72,18 @@ retry() {
 }
 
 # ---------------------------------------------------------------- SSH 封装
-_ssh_opts() {
+# 注意：scp 的端口选项是 -P（大写），ssh 的是 -p（小写）。两者不能共用一套选项，
+# 否则 scp 会把 `-p 22` 里的 -p 当成"保留时间戳"、把 22 当成文件名。
+_ssh_common() {
   printf '%s ' \
     -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
     -o ConnectTimeout=8 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 \
     -o PreferredAuthentications=password -o PubkeyAuthentication=no \
-    -o LogLevel=ERROR -o Ciphers=aes128-ctr -p "$SSH_PORT"
+    -o LogLevel=ERROR
 }
+
+_ssh_opts() { _ssh_common; printf '%s ' -p "$SSH_PORT"; }
+_scp_opts() { _ssh_common; printf '%s ' -P "$SSH_PORT"; }
 
 # odin_ssh <命令...>  —— 在真机上跑一条命令（非交互）
 odin_ssh() { sshpass -p "$SSH_PASS" ssh $(_ssh_opts) "$SSH_USER@$DEVICE_IP" "$@"; }
@@ -98,13 +103,13 @@ odin_sudo() {
 
 # odin_scp_get <远端路径> <本地路径>
 odin_scp_get() {
-  sshpass -p "$SSH_PASS" scp $(_ssh_opts) -r \
+  sshpass -p "$SSH_PASS" scp $(_scp_opts) -r \
     "$SSH_USER@$DEVICE_IP:$1" "$2" >/dev/null 2>&1
 }
 
 # odin_scp_put <本地路径> <远端路径>
 odin_scp_put() {
-  sshpass -p "$SSH_PASS" scp $(_ssh_opts) -r \
+  sshpass -p "$SSH_PASS" scp $(_scp_opts) -r \
     "$1" "$SSH_USER@$DEVICE_IP:$2" >/dev/null 2>&1
 }
 
