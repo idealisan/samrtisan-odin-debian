@@ -18,21 +18,16 @@ REPO=$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../.." && pwd)
 OUT=${1:?用法: build-dtb.sh <输出目录>}
 KDIR=${KDIR:-/tmp/linux-msm8953}
 KERNEL_REPO=${KERNEL_REPO:-https://github.com/msm8953-mainline/linux.git}
-KERNEL_SHA=${KERNEL_SHA:-af739964a9522753d2d8173908baf20e6eaac975}
+# 上游基线：Linux 6.19。注意不是本地 odin-wip 的 HEAD（那个已经含我们的补丁），
+# 而是它下面的第一个上游提交 —— 补丁由本脚本打，源码必须是干净的。
+KERNEL_SHA=${KERNEL_SHA:-05f7e89ab9731565d8a62e3b5d1ec206485eeb0b}
 
 mkdir -p "$OUT"
 say() { printf '[dtb] %s\n' "$*"; }
 
 # ---------------------------------------------------------------- 内核源码
-if [ ! -f "$KDIR/arch/arm64/boot/dts/qcom/msm8953.dtsi" ]; then
-  say "拉取内核源码 @ ${KERNEL_SHA:0:12}"
-  rm -rf "$KDIR"; mkdir -p "$KDIR"
-  git init -q "$KDIR"
-  git -C "$KDIR" remote add origin "$KERNEL_REPO"
-  git -C "$KDIR" fetch -q --depth 1 origin "$KERNEL_SHA"
-  git -C "$KDIR" checkout -q FETCH_HEAD
-  say "内核源码就绪"
-fi
+"$REPO/tools/ci/fetch-kernel.sh" "$KDIR"
+say "内核源码就绪"
 
 # ---------------------------------------------------------------- 设备树补丁
 # DTB 只依赖 0007（设备树）；0001-0006/0008 是驱动，编 DTB 用不到，
@@ -46,7 +41,7 @@ else
 fi
 
 # ---------------------------------------------------------------- 编译
-say "编译四个 DTB（内核树: $KDIR）"
+say "编译四个 DTB（内核树: ${KDIR}）"
 KDIR="$KDIR" "$REPO/dts/build-dtb.sh"
 
 for f in "$REPO"/dts/*.dtb; do

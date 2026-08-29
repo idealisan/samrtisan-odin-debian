@@ -16,7 +16,9 @@ REPO=$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../.." && pwd)
 OUT=${1:?用法: build-kernel.sh <输出目录>}
 KDIR=${KDIR:-/tmp/linux-msm8953}
 KERNEL_REPO=${KERNEL_REPO:-https://github.com/msm8953-mainline/linux.git}
-KERNEL_SHA=${KERNEL_SHA:-af739964a9522753d2d8173908baf20e6eaac975}
+# 上游基线：Linux 6.19（我们本地 odin-wip 分支就是从这里切出去的）。
+# 补丁由本脚本打，源码必须是干净的上游。
+KERNEL_SHA=${KERNEL_SHA:-05f7e89ab9731565d8a62e3b5d1ec206485eeb0b}
 CROSS=${CROSS:-aarch64-linux-gnu-}
 JOBS=${JOBS:-$(nproc)}
 
@@ -24,14 +26,7 @@ mkdir -p "$OUT"
 say() { printf '[kernel] %s\n' "$*"; }
 
 # ---------------------------------------------------------------- 源码
-if [ ! -f "$KDIR/Makefile" ]; then
-  say "拉取内核源码 @ ${KERNEL_SHA:0:12}"
-  rm -rf "$KDIR"; mkdir -p "$KDIR"
-  git init -q "$KDIR"
-  git -C "$KDIR" remote add origin "$KERNEL_REPO"
-  git -C "$KDIR" fetch -q --depth 1 origin "$KERNEL_SHA"
-  git -C "$KDIR" checkout -q FETCH_HEAD
-fi
+"$REPO/tools/ci/fetch-kernel.sh" "$KDIR"
 cd "$KDIR"
 say "内核树: $KDIR ($(git rev-parse --short HEAD 2>/dev/null || echo '?'))"
 
