@@ -72,7 +72,14 @@ udc_now() { ls /sys/class/udc 2>/dev/null | head -n1; }
 
 # ---------------------------------------------------------------- device 分支
 dnsmasq_running() {
-	[ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null
+	# 不能只看 pidfile：pid 可能被别的进程占用，会误判成"已在运行"而永远不启动
+	local p
+	[ -s "$PIDFILE" ] || return 1
+	p=$(cat "$PIDFILE" 2>/dev/null)
+	[ -n "$p" ] || return 1
+	# 确认这个 pid 确实是服务于 usb0 的 dnsmasq
+	tr '\000' ' ' < "/proc/$p/cmdline" 2>/dev/null | grep -q -- "--interface=usb0" || return 1
+	kill -0 "$p" 2>/dev/null
 }
 
 apply_device() {
@@ -137,10 +144,22 @@ apply_device() {
 	ip link set usb0 up 2>/dev/null
 	ip addr add ${HOST_IP}/24 dev usb0 2>/dev/null   # 已存在时报错无妨
 
+	# 等 usb0 真正拿到地址再启 dnsmasq：刚 add 完地址还处于 tentative，过早绑定
+	# 会让 dnsmasq 起来后又退出（开机时"started (pid N)"但 pgrep 查不到就是这个原因）
+	local w=0
+	while [ "$w" -lt 10 ]; do
+		ip -4 -o addr show usb0 2>/dev/null | grep -q "${HOST_IP}" && break
+		sleep 1; w=$((w+1))
+	done
+	if [ "$w" -ge 10 ]; then
+		log "device: usb0 未拿到 ${HOST_IP}，仍尝试启动 dnsmasq（看门狗会重试）"
+	fi
+
 	if dnsmasq_running; then
+		log "device: dnsmasq already running, skip"
 		return 0
 	fi
-	[ -s "$PIDFILE" ] && rm -f "$PIDFILE" 2>/dev/null
+	rm -f "$PIDFILE" 2>/dev/null
 	# 注意两点（都是真机踩出来的）：
 	#   1) 必须 --conf-file=/dev/null：系统 /etc/dnsmasq.d/zz-gadget-exclude.conf
 	#      里有 bind-dynamic，与命令行的 --bind-interfaces 冲突，

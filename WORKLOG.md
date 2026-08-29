@@ -460,6 +460,84 @@ sshpass -p user ssh ... user@172.16.42.1 'echo user | sudo -S systemctl reboot'
     `CONFIG_NTFS3_FS=y` 内建（`modules.builtin` 里有 ntfs3）；`CONFIG_BLK_DEV_SD=y`。
     exfat 挂载时由内核 `request_module("fs-exfat")` 自动加载，无需额外处理。
 
+### 拾壹、面板驱动正确性审查（用户要求：仔细核对移植是否正确）—— 结论：移植正确
+
+做法：从仓库里原厂 DTB 的反编译 `evidence/stock.dts` 精确提取
+`qcom,mdss_dsi_ft8716_1080p_video` 节点（行 11215–11280）的
+`qcom,mdss-dsi-on-command`（1622 字节），按 qcom 命令格式
+`dtype,last,vc,ack,wait,dlen_hi,dlen_lo,payload` 解码为 125 条命令，
+与 `drivers/gpu/drm/panel/panel-ft8716.c` 的 `ft8716_panel_on()` 逐条比对 payload：
+
+```
+原厂 125 条  vs  驱动 123 条    不一致 = 2
+[123] 原厂: 05 11 00  ← exit_sleep_mode
+[124] 原厂: 05 29 00  ← set_display_on
+```
+差的这 2 条驱动用标准 DCS API（`mipi_dsi_dcs_exit_sleep_mode` / `set_display_on`），
+语义等价；**前 123 条逐字节完全一致** ✅
+（脚本：/tmp/extract2.py、/tmp/cmp_panel.py；原始数据：/tmp/panel_cmp/）
+
+### 拾贰、IPv6 固定地址 —— 零配置兜底通道（已实机验证）
+
+- 新增 `odin-usb6-addr.service`（已 enable）：开机后给 usb0 加固定链路本地地址
+  **`fe80::1`**（保留内核自动生成那个，不覆盖）。sshd 默认监听 `[::]:22`。
+- 实测：PC 只有 169.254 自分配地址时，`ssh user@fe80::1%enXX` **照样连得上** ✅
+- 注意：ssh 必须带 `-o PreferredAuthentications=password -o PubkeyAuthentication=no`，
+  否则 ssh 先试 publickey 卡住，sshpass 传入的密码不会被使用（踩过一次）。
+
+### 拾叁、★ 死锁打破：PC 开机自动拿到 IP（已实机验证）
+
+**死锁**：手机一重启 PC 就拿不到 IP ⇒ SSH 不通 ⇒ 无法部署修复 ⇒ 死循环。
+**破局**：用拾贰的 IPv6 通道连进去完成部署。
+
+**最终修复（在 fe2904d 基础上再补两处健壮性问题）**：
+1. dnsmasq 在 usb0 刚 `addr add` 完就绑定 —— 地址还处于 tentative，导致 dnsmasq
+   起来后**又退出**（表现：日志有 "dnsmasq started (pid N)"，但 pgrep 查不到进程）。
+   修：启动前轮询等待 usb0 真的出现 172.16.42.1，最多 10s。
+2. `dnsmasq_running()` 原先只判断 pidfile 里的 pid 是否存在 —— pid 被别的进程复用时
+   会误判成"已在运行"从而永远不启动。修：额外校验 `/proc/<pid>/cmdline` 含 `--interface=usb0`。
+3. `rm -f "$PIDFILE"` 改为无条件清理（原来 `-s` 判断，空 pidfile 会残留）。
+
+**实机验证（重启后，PC 全程零配置）**：
+```
+en27 自动拿到 172.16.42.6
+SSH(v4) 172.16.42.1 通，hostname=odin，uptime 1 分钟（刚重启）
+dnsmasq pid 281 开机自启成功，监听 usb0，range 172.16.42.2–172.16.42.10
+日志：bound UDC=7000000.usb → usb0=172.16.42.1/24 → dnsmasq started (pid 281)
+```
+⇒ **以后重启手机再也不用碰 PC 的网络设置。**
+（PC 侧拿到 .4/.6 会变，但不影响使用——SSH 连的是手机侧固定的 172.16.42.1。）
+（dnsmasq 日志时间戳显示 Apr 27 是手机系统时钟未同步，非故障。）
+
+### 拾肆、当前未解：面板初始化 -EINVAL（屏幕仍未亮）
+
+```
+ft8716 1a94000.dsi.0: Failed to initialize panel: -22
+[drm:mdp5_irq_error_handler] *ERROR* errors: 04000000
+msm_mdp 1a01000.display-controller: no GPU device was found
+Unbalanced enable for IRQ 39   (WARNING，来自 wled_ovp_work 过压处理)
+已修好的：/sys/class/backlight/backlight 出现；/dev/dri/{card0,renderD128}、fb0 出现
+```
+
+- 失败点：`ft8716_prepare()` → `variant->on()`。on() 里只有两个**有日志**的失败点
+  （exit_sleep / display_on），但日志里没有这两条 ⇒ 是 123 条序列中某条被
+  `dsi_dcs_write_seq` 宏**静默 return**（该宏不打印日志）⇒ 本质是 **DSI 主机拒收命令**。
+- 已排除：供电没问题（`regulator_bulk_enable` vddio/vdd/lab/ibb 全部成功之后才失败）。
+
+**高嫌疑：DTS 漏了启用 GPU**
+- `msm8953.dtsi` 里 `gpu: gpu@1c00000` 默认 `status = "disabled"`；
+  配套 `zap_shader_region: zap@81800000`、`gpu_zap_shader: zap-shader` 都在 dtsi 里。
+- **odin.dts 里完全没有 `&gpu { status = "okay"; }`** ⇒ 实机 `GPU 设备不存在`、`/dev/kgsl*` 无。
+- 对比 markw：DTB 里有完整 `gpu@1c00000` + zap-shader + `firmware-name = "qcom/msm8953/xiaomi/markw/a506_zap.mdt"`。
+- 另：镜像里**没有任何 GPU 固件**，只装了 `firmware-atheros`。a506_zap.mdt 属 postmarketOS
+  专有包（从原厂 ROM 提取），Debian 与容器里都没有 ⇒ 需从原厂 ROM 取（`refs/`、`Pro_user_V4.2.5/`）。
+
+**下一步**
+1. odin.dts 补 `&gpu { status = "okay"; }`（无需固件也能先验证 GPU 是否影响 DSI 命令）
+2. 从原厂 ROM 找 a506_zap.mdt（`/firmware/image/`、`/vendor/firmware/`）
+3. 若与 GPU 无关，继续查 DSI 主机拒收命令的原因（`MIPI_DSI_MODE_LPM` 标志 / host 时序）
+4. 顺带：wled OVP 过压（ovp 现为 29600，备用更保守值 19600）引发的 `Unbalanced enable for IRQ 39`
+
 ### 待清理清单（最后统一做，中途不删）
 - `/Volumes/caseSensitiveBar/.dtbbuild/`（DTB 标定临时目录，仓库外）
 - 容器内 `/tmp/dtbbuild`、`/tmp/dtbcal`、`/tmp/asf.sh`
