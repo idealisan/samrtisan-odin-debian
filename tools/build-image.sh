@@ -23,6 +23,10 @@ LABEL=${4:-pmOS_root}
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 SPARSE="${OUT%.img}-sparse.img"
 
+# GitHub Release 单个资产上限 2147483648 字节（且是"小于"）。超了要等 publish job
+# 报 HTTP 422 才发现，排查要跨 job，不如在这里就挡住。
+ASSET_LIMIT=2147483648
+
 say()  { echo "[build] $*"; }
 fail() { echo "[build] FATAL: $*" >&2; exit 1; }
 
@@ -104,6 +108,12 @@ say "e2fsck pass done"
 rm -f "$SPARSE"
 img2simg "$OUT" "$SPARSE"
 say "img2simg done: $(du -h "$SPARSE" | cut -f1)"
+
+for f in "$OUT" "$SPARSE"; do
+  s=$(stat -c%s "$f")
+  [ "$s" -lt "$ASSET_LIMIT" ] \
+    || fail "$f 有 $s 字节，达到/超过 GitHub 单资产上限 $ASSET_LIMIT 字节，缩小 BLOCKS 重编"
+done
 
 # ---------------------------------------------------------------- 5. 回读校验
 rc=0

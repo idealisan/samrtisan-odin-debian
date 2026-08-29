@@ -107,7 +107,12 @@ bash "$REPO/dist/build/apply-staging-fixes.sh" "$ROOT"
 
 # ---------------------------------------------------------------- 5. 导出镜像
 say "build-image.sh（保守特性集 + 导出 + 回读校验）"
-bash "$REPO/tools/build-image.sh" "$ROOT" "$OUT/odin-debian.img" 524288 pmOS_root
+# 491520 blocks = 1.875 GiB。不能写 524288（正好 2 GiB）：
+# GitHub Release 的单个资产上限是 2147483648 字节，而且是"小于"不是"小于等于"，
+# 2 GiB 的 raw 镜像一上传就是
+#   HTTP 422: Validation Failed ... size must be less than 2147483648
+# 留 128 MiB 余量。当前 rootfs 约 859 MiB，文件系统内仍有约 1 GiB 空闲。
+bash "$REPO/tools/build-image.sh" "$ROOT" "$OUT/odin-debian.img" 491520 pmOS_root
 
 say "产物："
 ls -la "$OUT"
