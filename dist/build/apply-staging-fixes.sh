@@ -199,6 +199,16 @@ TIMER
 chmod 0644 "$R/etc/systemd/system/odin-usb-gadget.service" \
            "$R/etc/systemd/system/odin-usb-gadget.timer" 2>/dev/null
 
+# 系统 dnsmasq 必须停用：它用 bind-dynamic 绑通配地址，会占住 UDP 67，
+# 导致 odin-usb-role.sh 里的 gadget dnsmasq 起不来 ⇒ PC 拿不到 IP，只能靠
+# 169.254 自分配地址、再手工配静态 IP（真机踩过）。
+# 手机上没有别的用途（DNS 缓存对单机无意义），直接 disable。
+if [ -e "$R/lib/systemd/system/dnsmasq.service" ] || [ -e "$R/etc/systemd/system/dnsmasq.service" ]; then
+	rm -f "$R/etc/systemd/system/multi-user.target.wants/dnsmasq.service"
+	ln -sfn /dev/null "$R/etc/systemd/system/dnsmasq.service"
+	say "dnsmasq: 系统实例已 mask（把 UDP 67 让给 gadget 的 dnsmasq）"
+fi
+
 # 服务未被 mask（=真机镜像）才启用看门狗；QEMU 镜像里它是 /dev/null 符号链接
 if [ ! -L "$R/etc/systemd/system/odin-usb-gadget.service" ]; then
 	mkdir -p "$R/etc/systemd/system/timers.target.wants"

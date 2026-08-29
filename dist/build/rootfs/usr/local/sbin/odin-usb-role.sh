@@ -126,11 +126,26 @@ apply_device() {
 		return 0
 	fi
 	[ -s "$PIDFILE" ] && rm -f "$PIDFILE" 2>/dev/null
+	# 注意两点（都是真机踩出来的）：
+	#   1) 必须 --conf-file=/dev/null：系统 /etc/dnsmasq.d/zz-gadget-exclude.conf
+	#      里有 bind-dynamic，与命令行的 --bind-interfaces 冲突，
+	#      dnsmasq 会直接 "cannot set --bind-interfaces and --bind-dynamic" 退出。
+	#   2) 系统 dnsmasq 会占住 UDP 67（bind-dynamic 绑通配地址），导致这里起不来。
+	#      手机上没有别的用途，已在镜像里 disable 掉系统 dnsmasq。
 	dnsmasq --no-daemon --pid-file="$PIDFILE" --interface=usb0 \
+		--conf-file=/dev/null \
 		--bind-interfaces --dhcp-range=${CLIENT_IP},${CLIENT_IP},12h \
 		--dhcp-option=option:router --no-resolv --no-hosts \
 		--log-facility=/var/log/odin-dnsmasq.log &
-	log "device: usb0=${HOST_IP}/24 dnsmasq started (pid $!)"
+	dnsmasq_pid=$!
+	sleep 1
+	if kill -0 "$dnsmasq_pid" 2>/dev/null; then
+		log "device: usb0=${HOST_IP}/24 dnsmasq started (pid $dnsmasq_pid)"
+	else
+		log "device: dnsmasq FAILED to start; last log:"
+		tail -3 /var/log/odin-dnsmasq.log 2>/dev/null | sed 's/^/    /' | tee -a "$LOG"
+		log "device: hint: 检查 67 端口是否被别的 dnsmasq 占用"
+	fi
 	return 0
 }
 
