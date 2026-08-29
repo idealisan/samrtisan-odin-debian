@@ -509,46 +509,65 @@ dnsmasq pid 281 开机自启成功，监听 usb0，range 172.16.42.2–172.16.42
 （PC 侧拿到 .4/.6 会变，但不影响使用——SSH 连的是手机侧固定的 172.16.42.1。）
 （dnsmasq 日志时间戳显示 Apr 27 是手机系统时钟未同步，非故障。）
 
-### 拾肆、★ 解决了：启用 GPU 后面板初始化成功（屏幕链路通了）
+### 拾肆、⚠️ 更正：启用 GPU 是正确修复，但**没有解决面板 -EINVAL**
 
-**根因就是 DTS 漏启用 GPU。**
+**更正此前判断**：上面那次"面板初始化成功"是**误判** —— 当时开着 `drm.debug`，
+dmesg 环形缓冲被 vblank 日志刷爆，早期的 `Failed to initialize panel` 已被冲掉，
+于是 grep 到"0 次失败"。**去掉 drm.debug 后干净日志显示：面板 -EINVAL 一直存在**，
+与 GPU 无关（此前 GPU disabled 时同样失败）。
 
-msm8953.dtsi 里 `gpu: gpu@1c00000` 默认 `status = "disabled"`，
-而 odin.dts 此前完全没有 `&gpu { status = "okay"; }`。补上之后实机：
+**启用 GPU 本身仍是对的**（markw 的 DTB 有完整 gpu 节点，odin.dts 漏了 ⇒ 已补，adreno 已绑定）。
 
+**当前干净日志（去掉 drm.debug 后）**：
 ```
-1c00000.gpu driver=adreno                       ✅ GPU 驱动绑定
-msm_mdp 1a01000.display-controller: bound 1c00000.gpu (ops a3xx_ops)   ✅
-ft8716: Failed to initialize panel: -22          ← 消失 ✅
-card0-DSI-1  status=connected  enabled=enabled    ✅ 面板已连上并使能
-backlight    max=4095 cur=204                    ✅ 背光点亮
-fb0 = 1080x1920 @32bpp；vtcon1(frame buffer) bind=1  ✅ fbcon 已绑定
-/dev/dri: card0 renderD128 by-path
-vblank 计数持续增长（983→10130）                  ✅ CRTC 在跑
+[27.330957] msm_mdp: bound 1a94000.dsi (ops dsi_ops)
+[27.334418] adreno 1c00000.gpu: supply vdd not found, using dummy regulator
+[27.338690] adreno 1c00000.gpu: supply vddcx not found, using dummy regulator
+[27.351643] msm_mdp: bound 1c00000.gpu (ops a3xx_ops)
+[27.403052] Direct firmware load for qcom/a530_pm4.fw failed with error -2   ← GPU 微码缺
+[27.408603] [adreno_request_fw] *ERROR* failed to load a530_pm4.fw
+[27.449170] ft8716 1a94000.dsi.0: Failed to initialize panel: -22            ← 仍未解决
+[27.474164] [mdp5_irq_error_handler] *ERROR* errors: 04000000
+[27.491132] fb0: sys_imageblit: framebuffer is not in virtual address space  ← 另一个问题
 
-日志：adreno 1c00000.gpu: supply vddcx not found, using dummy regulator（无害）
-     Direct firmware load for qcom/a530_pm4.fw failed with error -2（GPU 微码缺）
+DSI enabled=enabled status=connected dpms=On；backlight=4095/4095；fbcon bind=1
+GPU firmware 错误数=2（a530 微码缺）
 ```
 
-⇒ **msm_drm 的显示管线依赖 GPU 节点；少了它，DSI 主机在 panel prepare 阶段拒收
-DCS 命令（静默 -EINVAL），面板就永远初始化不了。**
+**定位进度（判据逐个排除）**：
+DSI 主机 `drivers/gpu/drm/msm/dsi/dsi_host.c:1710 dsi_host_transfer()`:
+```c
+if (!msg || !msm_host->power_on) return -EINVAL;   ← 静默，不打印
+```
+实机 grep 各判据结果（全部 0 次 ⇒ 失败来自上面这个静默分支，或另一个未打印的路径：
+```
+packet size is too big     : 0
+cmd cannot fit into BLLP   : 0
+Power on failed            : 0
+failed to prepare host     : 0
+create packet failed       : 0
+cmd dma tx failed          : 0
+```
+注：`dsi_manager.c:244` 有注释 "Enable before preparing the panel, disable after unpreparing"，`dsi_mgr_bridge_power_on()` 末尾会 `msm_dsi_host_enable_irq()` 后才返回 ⇒ 理论上
+`power_on` 在 panel prepare 时为 true，但实机时序显示 panel prepare(27.449) 在
+host enable 之前(27.474 才出 error irq) ⇒ **bridge 链顺序仍需确认（谁先 pre_enable）。
+`drm_panel_bridge` 在 msm 中的挂载点尚未找到（grep msm/ 无 `drm_panel_bridge`）。
 
-**当前状态**：面板已上电使能、背光点亮，但**没有画面内容**（fb0 全 0 = 黑屏）。
-用户观察到的"背光亮→黑屏→背光灭"正符合此状态（黑屏因无用户空间渲染，
-背光灭是 console blank / 无活动）。
+**下一步（已明确）**
+1. **重编 `panel_ft8716.ko` 加打印**，定位具体失败的第 N 条命令（驱动树已完整构建过，`make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- M=drivers/gpu/drm/panel modules）
+2. 补 GPU 微码 `qcom/a530_pm4.fw` / `a530_pfp.fw`（Debian 无 firmware-misc-nonfree 候选，需从 pmOS 的 firmware-qcom-adreno-a530 或原厂 ROM 取
+3. 查 `fb0: sys_imageblit: framebuffer is not in virtual address space（影响 fbcon 显示）
+4. 若 bridge 顺序有问题，可尝试把初始化命令从 `prepare` 移到 `enable`
 
-**验证像素管道**：执行 `dd if=/dev/urandom of=/dev/fb0 bs=1M count=8`
-（写入成功，8.0MB / 56.2MB/s），请用户目视确认屏幕是否出现噪点。
-- 有噪点 ⇒ 链路完全正常，只需补用户空间显示（compositor 或 fbcon 控制台）
-- 仍全黑 ⇒ 需继续查 DSI 视频模式配置
+**教训（方法层面）**
+- 用 `drm.debug` 抓日志前，先确认要抓的类别不会刷爆缓冲；否则早期错误被覆盖，会得到假结论（本次已踩两次：一次误判成功，一次误判 GPU 是根因）
+- 任何"日志里没这个错误"的结论，都要先验证环形缓冲是否完整（`dmesg | head -3` 看最早记录的时间戳）
+- `dd` 直接写 `/dev/fb0` 不一定刷到硬件（msm 的 fbdev 需要 damage 触发），不能作为"像素管道不通"的证据
+- `default-brightness = <200>` 相对 `max 4095` 只有 5%，看起来像没开背光 ⇒ 已改 2048（50%）
+- ssh 需带 `-o PreferredAuthentications=password -o PubkeyAuthentication=no`，否则 sshpass 的密码用不上
+- zsh 里变量不做单词分割，`$SSHO` 会被当成单个参数 ⇒ 要么写完整选项，要么用脚本文件
 
-**待办**
-1. GPU 微码固件 `qcom/a530_pm4.fw` / `a530_pfp.fw` 未装（Debian 无
-   firmware-misc-nonfree 候选，pmOS 的 firmware-qcom-adreno-a530 才有）⇒ 待补
-2. cmdline 目前只有 `console=ttyMSM0,115200n8`（串口），fb 上没有控制台输出；
-   若要开机即见画面，可加 `console=tty0`（注意最后一个 console= 为主控制台）
-3. `drm.debug=0x1ff` 已临时写入 extlinux（备份 .bak-dbg）——**验证完要去掉**，
-   否则 dmesg 被 vblank 刷爆、早期日志被冲掉（已踩：导致 GPU 固件错误被覆盖）
+### 拾伍、当前未解：面板初始化 -EINVAL（屏幕仍未亮）
 
 ### 拾肆、当前未解：面板初始化 -EINVAL（屏幕仍未亮）
 
