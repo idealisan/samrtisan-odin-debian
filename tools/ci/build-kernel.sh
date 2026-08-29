@@ -47,13 +47,23 @@ make ARCH=arm64 CROSS_COMPILE="$CROSS" olddefconfig >/dev/null
 
 # ---------------------------------------------------------------- 编译
 say "编译 Image + modules（$JOBS 线程，这一步在 CI 上要跑几十分钟）"
+# ccache：内核 Makefile 里的 CC 是由 CROSS_COMPILE 拼出来的，必须显式覆盖才能走缓存。
+# 装了 ccache 就用，没装（本地开发机上常见）就退回裸编译器，行为不变。
+if command -v ccache >/dev/null 2>&1; then
+  CC="ccache ${CROSS}gcc"
+  say "ccache: 启用（$(ccache --version | head -1)）"
+else
+  CC="${CROSS}gcc"
+fi
 # tee 双写：既实时进 CI 日志（编译出错时能看到过程），也留一份文件
 # pipefail 已在顶部开启，make 的退出码能穿过管道
-if ! make -j"$JOBS" ARCH=arm64 CROSS_COMPILE="$CROSS" Image modules 2>&1 \
+if ! make -j"$JOBS" ARCH=arm64 CROSS_COMPILE="$CROSS" CC="$CC" Image modules 2>&1 \
      | tee /tmp/odin-kernel-build.log; then
   echo "内核构建失败，日志见上面（同一份也留在 /tmp/odin-kernel-build.log）" >&2
   exit 1
 fi
+# 打印命中率：全 0 说明缓存键或 CC 没生效，别当成"缓存做过了"
+if command -v ccache >/dev/null 2>&1; then ccache -s; fi
 
 # ---------------------------------------------------------------- 产物
 cp arch/arm64/boot/Image "$OUT/vmlinuz"

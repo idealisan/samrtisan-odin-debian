@@ -76,11 +76,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: 取 ccache 缓存
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          # 内核源码 SHA + 补丁内容共同决定缓存键：任一方变了缓存自然失效。
+          # 不能为了命中率牺牲正确性，所以 hashFiles('patches/*.patch') 必须留在 key 里。
+          key: kernel-ccache-${{ env.KERNEL_SHA }}-${{ hashFiles('patches/*.patch') }}
+          restore-keys: |
+            kernel-ccache-${{ env.KERNEL_SHA }}-
+            kernel-ccache-
       - name: 安装交叉编译工具链
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq gcc-aarch64-linux-gnu bc bison flex \
-            libssl-dev libelf-dev kmod cpio rsync patch
+            libssl-dev libelf-dev kmod cpio rsync patch ccache
+          ccache --set-config=max_size=2G
+          ccache --set-config=compression=true
+          ccache -z
       - name: 编译内核与模块
         run: bash tools/ci/build-kernel.sh out/kernel
       - uses: actions/upload-artifact@v4
