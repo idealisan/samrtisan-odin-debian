@@ -3,8 +3,8 @@ set -e
 export DEBIAN_FRONTEND=noninteractive
 R=/mnt/debian
 
-# --- user & sudo ---
-chroot $R useradd -m -s /bin/bash -G sudo user
+# --- user & sudo (幂等：重跑时用户已存在则跳过) ---
+chroot $R id -u user >/dev/null 2>&1 || chroot $R useradd -m -s /bin/bash -G sudo user
 echo "user:user" | chroot $R chpasswd
 echo "root:*" | chroot $R chpasswd -e   # lock root password login
 
@@ -31,55 +31,87 @@ mkdir -p $R/run/sshd
 # --- serial console getty ---
 chroot $R systemctl enable serial-getty@ttyMSM0.service
 
-# --- usb gadget + network service ---
-cat > $R/usr/local/sbin/odin-usb-gadget.sh << 'GADGET'
-#!/bin/bash
-set -e
-CFG=/sys/kernel/config/usb_gadget/odin
-modprobe configfs 2>/dev/null || true
-mount -t configfs none /sys/kernel/config 2>/dev/null || true
-mkdir -p $CFG/functions/ncm.usb0 $CFG/configs/c.1
-echo 0x18d1 > $CFG/idVendor
-echo 0x4ee1 > $CFG/idProduct
-echo "ODIN Debian" > $CFG/configs/c.1/strings/0x409/configuration 2>/dev/null || {
-    mkdir -p $CFG/configs/c.1/strings/0x409; echo "ODIN Debian" > $CFG/configs/c.1/strings/0x409/configuration; }
-ln -sf $CFG/functions/ncm.usb0 $CFG/configs/c.1/f1
-UDC=$(ls /sys/class/udc | head -n1)
-[ -n "$UDC" ] && echo "$UDC" > $CFG/UDC
-sleep 1
-ip link set usb0 up
-ip addr add 172.16.42.1/24 dev usb0 2>/dev/null || true
-# hand out one address to the host, pmOS-style
-dnsmasq --no-daemon --pid-file=/run/odin-dnsmasq.pid --interface=usb0 \
-    --bind-interfaces --dhcp-range=172.16.42.2,172.16.42.2,12h \
-    --dhcp-option=option:router --no-resolv --no-hosts --log-facility=/var/log/odin-dnsmasq.log &
-GADGET
-chmod +x $R/usr/local/sbin/odin-usb-gadget.sh
+# --- usb 角色切换（device=usb0+dnsmasq / host=OTG） ---
+# 注意（reports/014、015）：旧版是 set -e 的一次性 gadget 脚本，开机那一刻 UDC
+# 不在就永久 failed，之后再插线也不会恢复 ⇒ SSH 救援通道丢失。
+# 现在统一走 odin-usb-role.sh：幂等、先空后名、任何分支 exit 0，外加 30s 看门狗。
+# 脚本本体与 udev 规则的源在 dist/build/rootfs/（改那里，别改这里）。
+HERE="$(cd "$(dirname "$0")" && pwd)"
+install -D -m 0755 "$HERE/rootfs/usr/local/sbin/odin-usb-role.sh" \
+	"$R/usr/local/sbin/odin-usb-role.sh"
+install -D -m 0644 "$HERE/rootfs/etc/udev/rules.d/99-odin-usb-role.rules" \
+	"$R/etc/udev/rules.d/99-odin-usb-role.rules"
+install -D -m 0755 "$HERE/rootfs/usr/local/sbin/odin-mount-opts.sh" \
+	"$R/usr/local/sbin/odin-mount-opts.sh"
+install -D -m 0644 "$HERE/rootfs/etc/udev/rules.d/99-odin-automount.rules" \
+	"$R/etc/udev/rules.d/99-odin-automount.rules"
+install -D -m 0644 "$HERE/rootfs/extlinux/extlinux.conf" "$R/extlinux/extlinux.conf"
+for d in msm8953-smartisan-odin msm8953-smartisan-odin-norolesw; do
+	[ -f "$HERE/../../dts/$d.dtb" ] && \
+		install -D -m 0644 "$HERE/../../dts/$d.dtb" "$R/boot/dtbs/qcom/$d.dtb"
+done
+
 cat > $R/etc/systemd/system/odin-usb-gadget.service << 'UNIT'
 [Unit]
-Description=ODIN USB NCM gadget (172.16.42.1) + dnsmasq
+Description=ODIN USB role switch (device=usb0+dnsmasq / host=OTG)
 After=systemd-modules-load.service
 Before=network.target sshd.service
 [Service]
-Type=forking
-ExecStart=/usr/local/sbin/odin-usb-gadget.sh
+Type=oneshot
 RemainAfterExit=yes
+# 脚本内部保证任何分支都 exit 0；失败只留日志，由 .timer 看门狗重试
+ExecStart=/usr/local/sbin/odin-usb-role.sh
 [Install]
 WantedBy=multi-user.target
 UNIT
-chroot $R systemctl enable odin-usb-gadget.service
+cat > $R/etc/systemd/system/odin-usb-gadget.timer << 'TIMER'
+[Unit]
+Description=ODIN USB role watchdog (self-healing every 30s)
+[Timer]
+OnBootSec=10s
+OnUnitActiveSec=30s
+AccuracySec=1s
+[Install]
+WantedBy=timers.target
+TIMER
+chroot $R systemctl enable odin-usb-gadget.service odin-usb-gadget.timer
 
 # --- first-boot resize to fill userdata ---
+# 关键（reports/013）：成败都要落标记并自禁用。旧版用 `脚本 && touch marker`，
+# 一旦 resize2fs 失败就既不落标记也不 disable，导致每次开机都挂一个 failed 单元。
 cat > $R/usr/local/sbin/odin-firstboot-resize.sh << 'RESIZE'
 #!/bin/bash
+# 一次性把根分区扩到 userdata 实际大小；结果只记日志，不以退出码影响 unit 语义
+LOG=/var/log/odin-resize.log
 ROOTDEV=$(findmnt -n -o SOURCE /)
+
 case "$ROOTDEV" in
-  /dev/dm-*|/dev/mapper/*) exit 0 ;;
+  /dev/dm-*|/dev/mapper/*)
+    echo "$(date -Is) skip: mapped device $ROOTDEV" >> "$LOG"; exit 0 ;;
 esac
-growpart "$(dirname "$ROOTDEV" | sed 's|/dev$||;s|^$|/dev|')/$(basename "$ROOTDEV" | sed -E "s/p?[0-9]+$//")" \
-         "$(basename "$ROOTDEV" | grep -oE "[0-9]+$")" >/dev/null 2>&1 || true
-resize2fs "$ROOTDEV"
-systemctl disable odin-firstboot-resize.service
+
+DISK=$(dirname "$ROOTDEV" | sed 's|/dev$||;s|^$|/dev|')/$(basename "$ROOTDEV" | sed -E "s/p?[0-9]+$//")
+PART=$(basename "$ROOTDEV" | grep -oE "[0-9]+$")
+
+{
+  echo "=== $(date -Is) resize start: dev=$ROOTDEV disk=$DISK part=$PART ==="
+  echo "--- before ---"
+  df -h /
+} >> "$LOG" 2>&1
+
+growpart "$DISK" "$PART" >> "$LOG" 2>&1 \
+  || echo "$(date -Is) growpart skipped/failed rc=$?" >> "$LOG"
+
+resize2fs "$ROOTDEV" >> "$LOG" 2>&1
+rc=$?
+{
+  echo "$(date -Is) resize2fs rc=$rc"
+  echo "--- after ---"
+  df -h /
+  echo "=== resize end ==="
+} >> "$LOG" 2>&1
+
+exit 0
 RESIZE
 chmod +x $R/usr/local/sbin/odin-firstboot-resize.sh
 cat > $R/etc/systemd/system/odin-firstboot-resize.service << 'UNIT2'
@@ -87,12 +119,21 @@ cat > $R/etc/systemd/system/odin-firstboot-resize.service << 'UNIT2'
 Description=Grow root filesystem to fill userdata (one-shot)
 After=local-fs.target
 ConditionPathExists=!/var/lib/odin-resize-done
+
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c '/usr/local/sbin/odin-firstboot-resize.sh && touch /var/lib/odin-resize-done'
+TimeoutStartSec=300
+# 无论扩容成败都落标记并自禁用：失败只留日志，不留每开机都 failed 的单元
+ExecStart=/bin/sh -c '/usr/local/sbin/odin-firstboot-resize.sh; \
+  systemctl disable odin-firstboot-resize.service; \
+  touch /var/lib/odin-resize-done; exit 0'
+RemainAfterExit=yes
+
 [Install]
 WantedBy=multi-user.target
 UNIT2
+# 发布镜像里绝不能带这个标记，否则 ConditionPathExists 会永久跳过扩容
+rm -f $R/var/lib/odin-resize-done
 chroot $R systemctl enable odin-firstboot-resize.service
 
 # --- locale & misc ---
@@ -106,6 +147,22 @@ chroot $R apt-get update -qq
 chroot $R apt-get install -y -qq network-manager wpasupplicant iw wireless-tools rfkill firmware-atheros
 chroot $R systemctl enable NetworkManager.service
 chroot $R systemctl enable wpa_supplicant.service 2>/dev/null || true
+
+# --- USB 救援通道保护（reports/013 的 P0-2） ---
+# /etc/network/interfaces 不存在 ⇒ Debian 默认 [ifupdown] managed=false 保护不到
+# usb0 ⇒ NM 会按普通以太网自动连接并清掉 gadget 配置的 172.16.42.1，
+# 无屏设备将只剩 UART 可用。unmanaged-devices 是 NM 官方机制，最小侵入。
+mkdir -p $R/etc/NetworkManager/conf.d
+cat > $R/etc/NetworkManager/conf.d/99-odin-usb0.conf << 'NMC'
+# usb0 由 odin-usb-gadget.service 静态配置（172.16.42.1 + dnsmasq 给 PC 172.16.42.2）。
+# 必须排除在 NetworkManager 之外，否则 NM 接管后会清掉该地址，导致 USB 网络/SSH 通道失效。
+[keyfile]
+unmanaged-devices=interface-name:usb0
+NMC
+# 首启已有扩容/日志压力，别再被 network-online 的 90s 超时拖慢
+chroot $R systemctl disable NetworkManager-wait-online.service 2>/dev/null || true
+# 本设备无蜂窝基带，ModemManager 只徒增启动开销并会扫描串口
+chroot $R systemctl mask ModemManager.service 2>/dev/null || true
 
 # --- enable ssh ---
 chroot $R systemctl enable ssh.service

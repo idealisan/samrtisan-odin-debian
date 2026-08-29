@@ -1,0 +1,15 @@
+# ODIN — USB 角色切换的用户态触发器
+#
+# 内核在角色变化时会产生 uevent，但**不会**替你重新绑定 configfs gadget
+# （drivers/usb/gadget/configfs.c：UDC 回来后必须重新写一次 $CFG/UDC）。
+# 没有这些规则 ⇒ "拔掉再插回来 USB 网络不会恢复"（reports/014 场景 3）。
+#
+# 注意：udev 的 RUN 有 60s 超时上限，脚本内的 UDC 等待窗口默认 20s，
+# 长等待交给 odin-usb-gadget.timer 看门狗（每 30s 一次）。
+
+# UDC 增删是主触发器
+SUBSYSTEM=="udc", ACTION=="add",    RUN+="/usr/local/sbin/odin-usb-role.sh"
+SUBSYSTEM=="udc", ACTION=="remove", RUN+="/usr/local/sbin/odin-usb-role.sh"
+
+# Type-C data_role 变化为辅触发器
+SUBSYSTEM=="typec", ACTION=="change", RUN+="/usr/local/sbin/odin-usb-role.sh"

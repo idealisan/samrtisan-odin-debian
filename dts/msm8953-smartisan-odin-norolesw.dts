@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * Smartisan U2 Pro (ODIN) — "no role switch" 安全版设备树
+ *
+ * 用途：首刷期间的保命变体。行为对齐 postmarketOS 通用 msm8953 镜像
+ *   （dr_mode = "peripheral"、不注册 USB 角色切换），使 UDC 恒定存在，
+ *   USB 网络 / SSH 救援通道不依赖 Type-C 角色判定结果。
+ *
+ * 代价：彻底放弃 OTG host（接 U 盘不可用）。
+ *   拿到 SSH、确认整机可用后，把 /extlinux/extlinux.conf 的 default
+ *   从 l0-safe 切回 l0（完整版 DTB）即可恢复全部功能。
+ *
+ * 与完整版的差异（相对 msm8953-smartisan-odin.dts）：
+ *   1) &usb3_dwc3 删除 usb-role-switch 属性
+ *   2) &usb3_dwc3 删除 ports（与 usb-c-connector 相连的 OF graph 端点）
+ *   3) &usb3_dwc3 的 dr_mode 由 "otg" 改为 "peripheral"
+ *   4) fusb301 删除 connector 子节点（不再驱动角色切换）
+ *
+ * 参考：reports/015 §二（阶段 0）、reports/014（USB 救援通道加固）
+ */
+
+/dts-v1/;
+
+#include "msm8953-smartisan-odin.dts"
+
+&usb3_dwc3 {
+	/* 注意：属性必须写在 /delete-node/ 之前，否则 dtc 报
+	 * "Properties must precede subnodes" */
+	dr_mode = "peripheral";
+	/delete-property/ usb-role-switch;
+	/delete-node/ ports;
+};
+
+&i2c_6 {
+	typec-controller@25 {
+		/delete-node/ connector;
+	};
+};

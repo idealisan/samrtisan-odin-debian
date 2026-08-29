@@ -1,2 +1,9 @@
 .DS_Store
 *.img.tmp
+
+# 工具私有状态
+.codebuddy/
+
+# QEMU 回归用的临时测试盘（由 odin-qemu/test-automount.sh 现场生成，不必入库）
+odin-qemu/test-*.img
+odin-qemu/testdisk.img

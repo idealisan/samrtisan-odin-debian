@@ -1,0 +1,78 @@
+#!/bin/bash
+# 编译 ODIN 设备树（完整版 + 安全版）
+#
+# 用法: dts/build-dtb.sh
+#
+# 说明：
+#   - 源码目录为宿主的 linux-msm8953（主线 6.19），预处理用它的 gcc -E，
+#     编译用 dtc。内核自带的 scripts/dtc/dtc 是 aarch64-musl 二进制，
+#     在 macOS 宿主和 debian 容器里都跑不起来，所以这里用系统 dtc。
+#   - 已标定：容器 dtc 1.6.1（去掉 -Wno-interrupt_map）与宿主 dtc 1.7.2
+#     编译 msm8953-smartisan-odin.dts 均**逐字节复现**仓库既有 dtb
+#     （md5 e0ecc4ad23d02bce50997bdb011aa993），故管线可信。
+#   - 容器内执行时内核树路径为 /work/linux-msm8953。
+set -euo pipefail
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
+# 内核源码树位置（可用环境变量覆盖）
+KDIR="${KDIR:-/Volumes/caseSensitiveBar/linux-msm8953}"
+[ -d "$KDIR" ] || KDIR="/work/linux-msm8953"
+[ -d "$KDIR" ] || { echo "找不到内核源码树: $KDIR" >&2; exit 1; }
+
+DTC_BIN="$(command -v dtc || true)"
+[ -n "$DTC_BIN" ] || { echo "需要 dtc (apt install device-tree-compiler / brew install dtc)" >&2; exit 1; }
+DTC_VER="$("$DTC_BIN" --version | awk '{print $NF}')"
+
+# dtc 1.6.x 不认识 interrupt_map 这个检查项
+EXTRA_W=""
+case "$DTC_VER" in
+	1.7.*|1.8.*) EXTRA_W="-Wno-interrupt_map" ;;
+esac
+
+DTS_DIR="$KDIR/arch/arm64/boot/dts/qcom"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+build_one() {
+	local src="$1" out="$2" name
+	name="$(basename "$out")"
+
+	# 1) 预处理（#include 相对宿主 dts 目录解析）
+	gcc -E -nostdinc \
+		-I "$KDIR/scripts/dtc/include-prefixes" \
+		-I "$DTS_DIR" \
+		-undef -D__DTS__ -x assembler-with-cpp \
+		-o "$TMP/pre.dts" "$src"
+
+	# 2) 编译
+	"$DTC_BIN" -o "$out" -b 0 \
+		-i"$DTS_DIR/" \
+		-i"$KDIR/scripts/dtc/include-prefixes" \
+		-Wno-unique_unit_address -Wno-unit_address_vs_reg \
+		-Wno-avoid_unnecessary_addr_size -Wno-alias_paths \
+		-Wno-graph_child_address -Wno-simple_bus_reg \
+		$EXTRA_W \
+		"$TMP/pre.dts" 2> >(grep -viE 'interrupt_provider|smp2p' >&2)
+
+	echo "  $name  $(stat -c %s "$out" 2>/dev/null || stat -f %z "$out") 字节"
+}
+
+echo "内核树: $KDIR"
+echo "dtc:    $DTC_BIN (v$DTC_VER)"
+echo
+
+echo "[1/2] 完整版 msm8953-smartisan-odin.dtb"
+build_one "$DTS_DIR/msm8953-smartisan-odin.dts" "$HERE/msm8953-smartisan-odin.dtb"
+
+echo "[2/2] 安全版 msm8953-smartisan-odin-norolesw.dtb"
+build_one "$HERE/msm8953-smartisan-odin-norolesw.dts" "$HERE/msm8953-smartisan-odin-norolesw.dtb"
+
+echo
+echo "完成。安全版差异自检："
+if command -v dtc >/dev/null; then
+	dtc -I dtb -O dts -o "$TMP/safe.dts" "$HERE/msm8953-smartisan-odin-norolesw.dtb" 2>/dev/null
+	printf "  usb-role-switch : %s (期望 0)\n" "$(grep -c 'usb-role-switch' "$TMP/safe.dts")"
+	printf "  usb-c-connector : %s (期望 0)\n" "$(grep -c 'usb-c-connector' "$TMP/safe.dts")"
+	printf "  dr_mode         : %s\n" "$(grep -o 'dr_mode = \"[a-z]*\"' "$TMP/safe.dts")"
+fi

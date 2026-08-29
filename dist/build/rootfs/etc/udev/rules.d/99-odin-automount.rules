@@ -1,0 +1,22 @@
+# ODIN — USB 外置存储自动挂载（systemd mount unit 方案，不引 udisks2）
+#
+# 设计依据与实测前提（reports/015 §3.2 + 本次核验，详见 WORKLOG）：
+#   1. bookworm 的 systemd 252 里，**PID 1 不读任何 SYSTEMD_MOUNT_* 属性**；
+#      仅仅 TAG+="systemd" 不会挂载任何东西，必须显式调用 systemd-mount。
+#   2. systemd-mount **不读** SYSTEMD_MOUNT_OPTIONS 环境变量（实测挂出来是默认
+#      选项），必须用 `--options=` 显式传 ⇒ 选项计算收进 odin-automount.sh。
+#   3. --no-block 让 systemd-mount 立刻返回，不阻塞 udev 事件（RUN 有超时上限）；
+#      --collect 在设备消失后回收 .mount 单元，等价于自动卸载，
+#      因此不需要额外的 remove 规则。
+#
+# 匹配范围：USB 总线上带文件系统的块设备。
+#   **不要求 ID_PART_ENTRY_NUMBER**：实测不少 U 盘是"整盘一个文件系统、无分区表"
+#   的形态，加上分区号限制会把它们全部排除。有分区表的盘同样适用（整盘自身
+#   ID_FS_USAGE 不是 filesystem，不会被挂；各分区各自挂载）。
+#   内部 eMMC / SD 的 ID_BUS 不是 usb，天然排除（也在脚本里二次确认）。
+#
+# 真正的挂载动作在 odin-automount.sh 里，udev 只负责触发。
+
+SUBSYSTEM=="block", ACTION=="add", ENV{ID_BUS}=="usb", \
+  ENV{ID_FS_USAGE}=="filesystem", ENV{ID_FS_TYPE}!="", \
+  RUN+="/usr/local/sbin/odin-automount.sh $devnode %k"
