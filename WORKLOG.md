@@ -604,3 +604,74 @@ Unbalanced enable for IRQ 39   (WARNING，来自 wled_ovp_work 过压处理)
 - 容器内 `/mnt/src`、`/mnt/src-qemu`（旧镜像只读挂载取证点，仍挂着 loop）
 - 容器内 `/mnt/chk`（本次核查挂载点，仍挂着 `dist/odin-debian.img`）
 - 宿主 `/tmp/odin-*.log`、`/tmp/odin-md5.txt`
+
+
+### 拾陆、★ 成功：屏幕点亮 + DHCP 稳定（两个长期问题都解决）
+
+**A. 屏幕不亮 —— 根因：面板初始化命令发得太早**
+
+drivers/gpu/drm/msm/dsi/dsi_host.c:1710 dsi_host_transfer() 开头：
+    if (!msg || !msm_host->power_on) return -EINVAL;     ← 静默，不打印任何日志
+
+而 panel-ft8716.c 的 drm_panel_funcs 原来只有 prepare/unprepare/get_modes（**没有 enable**），
+初始化 DCS 命令全在 prepare 发。实机时序证明 panel prepare 发生在 DSI 主机上电之前 ⇒ 每条命令
+-EINVAL，所以日志里只有一句 "Failed to initialize panel: -22"，极具迷惑性。
+
+关键时序（已去掉 drm.debug 的干净日志）：
+    [27.822154] bound 1c00000.gpu (ops a3xx_ops)
+    [27.879968] [adreno_request_fw] failed to load a530_pm4.fw
+    [27.919011] FT8716 DBG: cmd[0] len=2 reg=0x00 ret=-22    ← 第一条就失败
+    [27.945115] [mdp5_irq_error_handler] errors: 04000000      ← 之后主机才 enable
+
+修复（已提交 patches/0008-drm-panel-ft8716-send-init-sequence-in-enable-not-prepare.patch）：
+  - on() 移到新增的 ft8716_enable()；off() 移到 ft8716_disable()
+  - prepare 只保留上电 + reset
+  - 定位手段：临时给 dsi_dcs_write_seq 宏加打印（已 revert，实测 FT8716 DBG 残留 = 0）
+
+**B. DHCP 不稳定 —— 双重根因**
+1. **MAC 固定失效（我脚本的 bug）**：
+   旧代码 `[ -f host_addr ] || echo $MAC > host_addr`，但 configfs 的 host_addr/dev_addr 文件
+   **总是存在**（内核填随机值）⇒ 判断恒真 ⇒ 永远跳过写入 ⇒ 每次重启新 MAC。
+   且绑定 UDC 后这两个属性不可写（Permission denied）。
+   改为 usb0 出现后 `ip link set usb0 address`（实测生效：02:00:0d:1d:00:02）。
+
+2. **地址池被旧租约占满**：每次新 MAC 一条 12h 租约，九个地址（.2~.10）耗尽 ⇒ 新客户端
+   "no address available"。
+
+修复（采纳用户思路：永远只连一台电脑，不按 MAC 区分）：
+  - 地址池改为**单地址** 172.16.42.2~172.16.42.2（任何 MAC 都分到同一个 IP）
+  - 每次重建 gadget 前 `rm -f /var/lib/misc/dnsmasq.leases`
+  - 租约 12h → 1h
+
+**C. 最终实机状态（存档：evidence/device-probe/STATE-DISPLAY-OK.txt）**
+```
+Failed to initialize panel = 0
+DSI enabled=enabled status=connected dpms=On
+backlight = 4095/4095
+fb0 = 1080,1920   fbcon bind=1
+GPU = adreno（a530 微码仍缺，不影响显示）
+usb0 MAC = 02:00:0d:1d:00:02
+usb0 IP  = 172.16.42.1/24
+dhcp-range=172.16.42.2,172.16.42.2,1h
+DHCPACK(usb0) 172.16.42.2 <pc-hostname>     ← PC 自动拿到固定 IP
+cmdline: console=ttyMSM0,115200n8 ... console=tty0     ← 控制台上屏
+/ = 111G，已用 916M
+```
+
+**D. 这轮用到的两个关键技巧（可复用）**
+- **IPv6 链路本地兜底通道**：当 IPv4 DHCP 挂了，手机仍可用 `ssh user@fe80::<EUI64>%enXX` 连上。
+  实际地址不是 fe80::1（我加的固定地址服务没生效），而是由 MAC 推导的 EUI-64：
+  MAC 02:00:0d:1d:00:02 ⇒ fe80::67ff:fedb:feba。
+  发现方法：`ping6 -c 2 ff02::1%<iface>` 看谁回应。
+- **定位"静默失败"的通用手段**：给判据处的宏/函数临时加打印，重编**单个模块**（`make M=drivers/... modules`），
+  scp 到设备覆盖 .ko + depmod，重启看日志；定位完 revert 重编干净版。
+
+### 待办（下一轮）
+1. GPU 微码固件 `qcom/a530_pm4.fw` / `a530_pfp.fw` 仍未装（Debian 无 firmware-misc-nonfree 候选，pmOS 的 firmware-qcom-adreno-a530 才有）
+2. `fb0: sys_imageblit: framebuffer is not in virtual address space`（影响 fbcon 显示质量）
+3. 修复 odin-usb6-addr.service（fe80::1 固定地址没生效，改用 EUI-64 发现即可，或修服务让它真的加上）
+4. 待最终清理：仓库根目录的空文件 power_on（我的 shell 误操作产物）
+5. 尚未刷入：dist/ 镜像未重刷到手机（当前手机系统是之前刷的 + 增量部署的模块与配置）；
+   若要从零复现，需用 fastboot 重刷 dist/lk2nd.img + dist/odin-debian-sparse.img
+6. 考虑把 dist/lk2nd.img 换成精简版（去掉 markw）：需要刷 boot 分区（有风险，需确认）
+

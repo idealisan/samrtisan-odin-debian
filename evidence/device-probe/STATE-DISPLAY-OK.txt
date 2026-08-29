@@ -1,0 +1,38 @@
+=== 系统 ===
+  hostname = odin   uptime = up 2 minutes
+
+=== 内核与引导 ===
+6.19.0-postmarketos-qcom-msm8953
+  cmdline: console=ttyMSM0,115200n8 earlycon=msm_serial_dm,0x78af000 root=/dev/disk/by-label/pmOS_root rootwait rw console=tty0
+
+=== USB 网络 / DHCP ===
+  usb0 MAC = 02:00:0d:1d:00:02
+  usb0 IP  = 172.16.42.1/24
+  dnsmasq: 1 个进程
+dhcp-range=172.16.42.2,172.16.42.2,1h
+  租约文件: 68 bytes
+  最近 DHCPACK:
+Apr 27 19:49:15 dnsmasq-dhcp[292]: DHCPACK(usb0) 172.16.42.3 46:4d:27:c9:9c:e2 <pc-hostname>
+Apr 27 19:49:22 dnsmasq-dhcp[298]: DHCPACK(usb0) 172.16.42.2 52:20:49:13:b1:4a <pc-hostname>
+
+=== 显示(屏幕) ===
+  Failed to initialize panel = 0
+  DSI: enabled=enabled status=connected dpms=On
+  backlight = 4095/4095
+  fb0 = 1080,1920   fbcon bind=1
+  /dev/dri: by-path card0 renderD128 
+
+=== GPU ===
+  driver = adreno
+  GPU 固件错误数 = 1
+
+=== 面板驱动模块 ===
+panel_ft8716           32768  0
+drm                   671744  9 gpu_sched,drm_kms_helper,msm,drm_exec,drm_gpuvm,drm_display_helper,panel_ft8716,drm_client_lib
+
+=== 存储 ===
+Filesystem       Size  Used Avail Use% Mounted on
+/dev/mmcblk0p57  111G  916M  105G   1% /
+/dev/mmcblk0p57  111G  916M  105G   1% /
+
+=== 关键服务 ===
