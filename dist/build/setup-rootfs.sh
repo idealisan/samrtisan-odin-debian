@@ -156,7 +156,7 @@ chroot $R apt-get install -y -qq \
 	iputils-ping curl wget bind9-dnsutils net-tools traceroute tcpdump \
 	iperf3 ethtool mtr-tiny \
 	systemd-resolved systemd-timesyncd \
-	nftables 2>&1 | tail -5 || echo "[setup-rootfs] WARN: 部分网络包装不上，继续"
+	nftables 2>&1 || echo "[setup-rootfs] WARN: 部分网络包装不上，继续"
 chroot $R systemctl enable NetworkManager.service
 chroot $R systemctl enable wpa_supplicant.service 2>/dev/null || true
 

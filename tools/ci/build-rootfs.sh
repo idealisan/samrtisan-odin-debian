@@ -32,12 +32,14 @@ say() { printf '[rootfs] %s\n' "$*"; }
 if [ ! -d "$ROOT/etc" ]; then
   say "debootstrap $SUITE / arm64 → $ROOT"
   rm -rf "$ROOT"; mkdir -p "$ROOT"
-  debootstrap --arch arm64 --variant=minbase \
+  # tee 双写：既实时进 CI 日志，也留一份文件。
+  # 必须写成 `if ! ... | tee` 而不是靠 set -e：后者会在管道失败的瞬间直接退出，
+  # 下面那句"debootstrap 失败"永远打印不出来。
+  if ! debootstrap --arch arm64 --variant=minbase \
     --include=busybox-static,udev,ssh,sudo,systemd,iproute2,dnsmasq,parted,e2fsprogs \
     "$SUITE" "$ROOT" http://deb.debian.org/debian \
-    2>&1 | tee /tmp/odin-debootstrap.log
-  if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-    echo "debootstrap 失败，日志见上面" >&2
+    2>&1 | tee /tmp/odin-debootstrap.log; then
+    echo "debootstrap 失败，日志见上面（同一份也留在 /tmp/odin-debootstrap.log）" >&2
     exit 1
   fi
 fi
