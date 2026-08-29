@@ -1,0 +1,63 @@
+## 采集时间: 2026-04-27T20:09:00+00:00
+## 这是 **精简版 lk2nd（去掉 markw）+ 我们的 Debian** 首次成功运行的快照
+
+### 身份
+hostname : odin
+uname    : Linux odin 6.19.0-postmarketos-qcom-msm8953 #1 SMP PREEMPT Fri Aug 21 16:04:14 UTC 2026 aarch64 GNU/Linux
+model    : Smartisan U2 Pro (ODIN)
+compat   : smartisan,odin qcom,msm8953 
+panel@0  : smartisan,odin-ft8716 smartisan,odin-panel 
+lk2nd    : unknown-20260829 / lk2nd-msm8953
+
+### 引导配置
+default l0-safe
+menu title ODIN Debian (mainline 6.19)
+timeout 30
+label l0
+    kernel /boot/vmlinuz
+    initrd /boot/initramfs.cpio.gz
+    fdt /boot/dtbs/qcom/msm8953-smartisan-odin.dtb
+    append console=ttyMSM0,115200n8 earlycon=msm_serial_dm,0x78af000 root=/dev/disk/by-label/pmOS_root rootwait rw
+label l0-safe
+    kernel /boot/vmlinuz
+    initrd /boot/initramfs.cpio.gz
+    fdt /boot/dtbs/qcom/msm8953-smartisan-odin-norolesw.dtb
+    append console=ttyMSM0,115200n8 earlycon=msm_serial_dm,0x78af000 root=/dev/disk/by-label/pmOS_root rootwait rw
+
+### 磁盘
+NAME           SIZE FSTYPE LABEL     MOUNTPOINTS
+mmcblk0      116.5G                  
+|-mmcblk0p1      1K                  
+|-mmcblk0p2      8K                  
+|-mmcblk0p3    512K                  
+|-mmcblk0p4    512K                  
+|-mmcblk0p5    512K                  
+|-mmcblk0p6    512K                  
+Filesystem       Size  Used Avail Use% Mounted on
+/dev/mmcblk0p57  111G  651M  105G   1% /
+
+### USB / 网络
+udc   : 7000000.usb
+usb0  : 2: usb0    inet 172.16.42.1/24 scope global usb0\       valid_lft forever preferred_lft forever
+gadget: active
+
+### 显示（当前未点亮）
+drm      : version 
+/dev/dri : 无
+backlight: 
+--- 驱动绑定 ---
+  1a00000.display-subsystem            msm-mdss
+  1a01000.display-controller           msm_mdp
+  1a94000.dsi                          msm_dsi
+  1a94400.phy                          msm_dsi_phy
+
+### failed
+  UNIT LOAD ACTIVE SUB DESCRIPTION
+0 loaded units listed.
+
+### 缺失工具
+  ping       缺失
+  modprobe   缺失
+  ip         /usr/bin/ip
+  iw         缺失
+  nmcli      /usr/bin/nmcli

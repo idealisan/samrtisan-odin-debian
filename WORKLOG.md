@@ -235,6 +235,125 @@ Writing  'userdata'                        OKAY [147.606s]
 2. `fastboot boot` 试启动，或换 `l0`/`l0-safe`、或改用 markw DTB 试
 3. 若都不行，用 pmbootstrap 重装 pmOS 回到已知可用状态
 
+**19:08 用户已手工进 fastboot，并改为直连（不再走 Type-C Hub）**
+- `fastboot devices` → `<emmc-serial>  fastboot` ✅
+- USB 拓扑：`"USB Product Name" = "Android"` / Serial `<emmc-serial>`，Hub 已消失 ✅
+- 结论：**当前处于状态 B**，可以按 018 手册继续
+
+**19:10 精简 lk2nd 的可行性推导（源码级，不是猜测）**
+
+`dev_tree.h:81-112` 的匹配位序（数字=bit 位，越大优先级越高）：
+```
+VARIANT_MINOR_BEST/EXACT      9/10
+VARIANT_MAJOR_BEST/EXACT     11/12
+SUBTYPE_DEFAULT_MATCH        25
+SUBTYPE_EXACT_MATCH          26   ← 关键
+VARIANT_MATCH                27
+SOC_MATCH                    28
+```
+`dev_tree.c:599-608` 比较规则：先比 `dt_match_val`（位图整体当整数比），**相等时再比 major，major 大的赢**。
+
+因为 `BIT(26) > BIT(25) + BIT(12)`，**带 SUBTYPE_EXACT 的条目必然压过只有 MAJOR_EXACT 的**。
+
+遍历全部 31 条 QCDT 条目，`msm-id=0x125 & (variant & 0xff)=0x0b & subtype=0x01` 的**只有两个**：
+- `msm8953-xiaomi-markw` (`<0x1000b 0x01>`，major=0x10 → SUBTYPE_EXACT + MAJOR_EXACT)
+- `msm8953-smartisan-odin` (`<0x0b 0x01>`，major=0x00 → SUBTYPE_EXACT + MAJOR_BEST)
+
+⇒ **删掉 markw 后，odin 成为唯一带 SUBTYPE_EXACT 的候选，稳赢。**
+（对照：xiaomi-common 是 `<0x1000b 0x00>` → 只有 SUBTYPE_DEFAULT，注定输给 odin；
+sdm450-xiaomi-rosy / sdm632-qrd-sku4 虽也是 0x0b/0x01 但 msm-id 分别是 0x152/0x15d，SOC 不匹配直接排除。）
+
+**19:13 精简 lk2nd 构建成功**
+- 改 `lk2nd/device/dts/msm8953/rules.mk`：整行移除 `msm8953-xiaomi-markw.dtb` 与
+  `sdm450-xiaomi-rosy.dtb`，说明注释写在 **ADTBS 块之前**
+- **踩坑**：Makefile 里**不能把注释插进 `\` 续行中间** —— 第一次改写把注释放进续行块，
+  报 `rules.mk:28: recipe commences before first target`（注释行打断了续行链，
+  后续以 tab 开头的行被当成 recipe）。改成块外注释后正常。原文件已备份为 `rules.mk.orig`
+- 构建：`make TOOLCHAIN_PREFIX=arm-none-eabi- PROJECT=lk2nd-msm8953`（容器已装该工具链）
+- 产物 `dist/lk2nd-nomarkw.img`：364560 B（原 366608，小 2 KB），md5 `b6e475252976e267bc8b6d7766f9c9f9`
+  - **27 个 appended DTB**（原 29）
+  - `strings | grep xiaomi-markw` → **0 处**（已清除）✅
+  - `strings | grep smartisan-odin` → 2 处（保留）✅
+
+**19:14 用 `fastboot boot` 从内存启动验证（未写分区，boot 分区仍是 pmOS 的 lk2nd）**
+- 命令 `fastboot boot dist/lk2nd-nomarkw.img` 已下发
+- 结果：**又是状态 D** —— 不在 fastboot、USB 上无手机、无 USB 网卡、SSH 全不通
+- 用户观察：**背光亮着、黑屏**
+
+**关键判断（重要）**
+- 两次失败用的是**同一个 Debian 镜像**，lk2nd 分别是 pmOS 原版(21.0) 与 精简版 ⇒
+  **问题不在 lk2nd，在 Debian 6.19 + odin DTB 这一侧**
+- 背光亮说明手机有电、lk2nd/内核走到了点亮背光这一步（比上次的完全无响应进了一步）
+- 无 USB 网卡 ⇒ 内核里 UDC 没起来（dwc3 未成功 probe）⇒ 与我们"安全版 DTB 是
+  dr_mode=peripheral、UDC 应恒在"的预期不符
+- **当前瓶颈：没有串口输出，无法定位内核卡在哪一步。** 继续盲试只会反复消耗按键。
+
+**待验证的两个假设（等进 fastboot 后做对照测试）**
+- H1 硬件其实更接近 markw（lk2nd 判 markw、board-id 0x1000b/01），odin DTB 不匹配
+  ⇒ 对照：用 **Debian 内核 + markw DTB** 构造 boot.img 做 `fastboot boot`
+- H2 odin 安全版 DTB 本身有问题（我删 ports/role-switch 的改动引入）
+  ⇒ 对照：用 **Debian 内核 + odin 完整版 DTB**（未删改）做 `fastboot boot`
+
+### 玖、★ 重大突破：Debian 系统已在真机跑起来，且 lk2nd 命中 odin
+
+**19:14 `fastboot boot dist/lk2nd-nomarkw.img`（内存启动精简版 lk2nd）**
+- 现象：USB 网卡枚举了（en20），但 PC 只拿到 169.254 自分配地址
+- 分析：gadget 是 **initramfs 的 `usb_up()`** 配的（只配地址、**不开 dnsmasq**）
+  ⇒ 系统当时还没走到 systemd 的 gadget 服务
+- 用户手动给 PC 配固定 IP → **SSH 成功登录** ✅
+
+**19:31 登录后核心诊断 —— 两个目标全部达成**
+```
+hostname  : odin                                ← 我们的镜像（不再是 pmOS 的 u2pro）
+uname     : 6.19.0-postmarketos-qcom-msm8953
+model     : Smartisan U2 Pro (ODIN)             ← 加载的是 odin DTB ✅
+compat    : smartisan,odin qcom,msm8953
+★ panel@0 : smartisan,odin-ft8716 smartisan,odin-panel
+            ↑ lk2nd 把占位替换成真实面板 FT8716 ⇒ 精简 markw 生效，odin 命中 ✅
+lk2nd,version : unknown-20260829                ← 本次构建的精简版（version 未注入）
+
+UDC       : 7000000.usb ✅
+usb0      : 172.16.42.1/24 ✅
+gadget    : active ✅
+扩容      : /dev/mmcblk0p57  111G  651M  105G  1%   ← 2GiB→111G 成功 ✅
+failed    : 0 个 ✅
+```
+**结论：reports/018 的推导被实机证实 —— 删掉 markw 后 odin 成为唯一
+SUBTYPE_EXACT_MATCH 候选，必然命中；面板识别链路（aboot 透传 → lk2nd 替换
+占位 compatible）在真机上完整工作。**
+
+**剩余问题：屏幕仍未点亮**
+```
+/sys/class/drm/ : 只有 version      ← 没有 card0
+/dev/dri        : 不存在
+/sys/class/backlight/ : 空
+但驱动都绑定了：
+  1a00000.display-subsystem → msm-mdss
+  1a01000.display-controller → msm_mdp
+  1a94000.dsi   → msm_dsi
+  1a94400.phy   → msm_dsi_phy
+  panel_ft8716  : 已加载但 0 users（没绑到设备）
+/sys/bus/platform/devices/ 里只有 1a94000.dsi，**没有 panel 设备**
+/sys/kernel/debug/devices_deferred : 空（没有设备 deferred）
+dmesg: gcc-msm8953 sync_state() pending due to 1a00000.display-subsystem
+```
+→ 初步判断：**panel platform device 没有被创建**（panel@0 是 dsi 的子节点，
+不是 simple-bus，不会自动变成 platform device），需要 msm_dsi 在 probe 时
+自己解析子节点找 panel；而 panel 驱动是模块(=m)，加载时机可能晚于 msm_dsi probe。
+
+**下一步待试（按风险从低到高）**
+1. 重新触发 msm_dsi probe：`echo 1a94000.dsi > .../msm_dsi/unbind; echo ... > bind`
+   （此时 panel_ft8716 已注册，重 probe 可能就接上了）—— **零风险，先试**
+2. 装 kmod（modprobe 不存在）+ iputils-ping（用户已发现 ping 缺失）
+3. 把面板驱动改为内建(=y)重编内核
+4. 若都不行，考虑 panel 是否应改成通过 ports/endpoint 连接
+
+**顺带发现的两个包缺失（待办）**
+- `kmod` 未装 ⇒ `modprobe` 不存在 ⇒ 模块自动加载机制失效
+- `iputils-ping` 未装 ⇒ `ping` 不可用
+
+### 捌、精简 lk2nd（已完成构建，已被实机验证命中 odin）
+
 - **12:50 T14 完成** — FLASH.md 已更新（双 label、显式 fdt 的来由、外置存储矩阵、
   自愈看门狗、role 回退缺口）。README 已更新（§四刷机包与用户态组件、§五已验证内容、
   §六刷入步骤、§七已知限制、§八决策）。reports/017 实施报告已写。
