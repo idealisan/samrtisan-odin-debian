@@ -223,21 +223,37 @@ sudo sed -i 's/^default .*/default l0/' /extlinux/extlinux.conf && sudo reboot
 
 ## 九、从头刷入（原生 fastboot → SSH 可用）
 
-`flash/` 下的阶段脚本串起完整流程，每个阶段可单独重跑，失败不必从头再来：
+刷机流程在 `flash/flash-all.sh` 一个脚本里，分成带编号的阶段，**任何阶段失败都可以
+`--from <阶段>` 单独重跑**，不必从头再来：
+
+```sh
+flash/flash-all.sh                 # 从头跑（00 → 90）
+flash/flash-all.sh --from 40       # 从刷 userdata 那步继续
+flash/flash-all.sh --dry-run       # 只打印将执行的动作，不真刷
+```
 
 | 阶段 | 做什么 |
 |---|---|
-| `10-backup.sh` | 全量备份真机根文件系统（默认在手机上打包，再 HTTP 拉回） |
-| `20-fastboot` | 轮询等待设备进入原生 fastboot |
-| `30-flash-boot` | `fastboot flash boot <lk2nd>` |
-| `40-flash-data` | `fastboot flash userdata`（sparse 优先，失败回退 raw） |
-| `50-boot` | `fastboot reboot`，等 PC 上出现 USB NCM 网卡 |
-| `60-usbnet` | 等 PC 拿到 172.16.42.2（DHCP 优先，超时静态兜底） |
-| `70-ssh` | 等 22 端口可达 |
-| `80-verify` | 跑验收项（内核 / 面板 / 背光 / DRM / usb0 / dnsmasq / 扩容） |
+| `00 precheck` | 本机依赖、镜像是否齐全、按 Release 清单校验 SHA256、判断设备当前状态 |
+| `10 backup` | 经 SSH 全量备份真机根文件系统（手机本地打包 + HTTP 拉回，可断点续传） |
+| `20 fastboot` | 进入原生 fastboot |
+| `30 boot` | `fastboot flash boot lk2nd-nomarkw.img` |
+| `40 data` | `fastboot flash userdata odin-debian-sparse.img`（失败自动回退 raw 版） |
+| `50 reboot` | `fastboot reboot`，等 PC 上出现 USB NCM 网卡 |
+| `60 usbnet` | 等 PC 拿到 172.16.42.2（DHCP 优先，超时用静态地址兜底） |
+| `70 ssh` | 等 22 端口可达（首启含文件系统扩容，会比较慢） |
+| `80 verify` | 跑验收项：hostname / 内核 / DSI 连接 / 背光 / 面板初始化失败数 / usb0 / wlan0 / 扩容 / sshd |
 
 公共函数在 `flash/lib/common.sh`（日志、重试、超时、SSH/fastboot 封装）。状态机与
 失败循环策略见 `reports/018-真机刷入循环操作手册.md`。
+
+> **★ 20 阶段是怎么远程进 fastboot 的**（整条流程能无人值守的关键）
+> 真机上没有 adbd，`/sys/kernel/reboot/mode` 又只收 cold/warm/hard，从系统内部
+> 没法直接进 fastboot。但实测证实：**lk2nd 找不到 `/extlinux/extlinux.conf` 时会
+> 自动停在 fastboot**。所以脚本把配置改个名再重启，就落到 fastboot 了；刷完之后
+> 新系统自带 `/extlinux/extlinux.conf`，lk2nd 正常引导。
+> 若这条不通（比如 lk2nd 本身坏了），脚本会提示人工按【音量减 + 电源键】，
+> 然后 `--from 30` 继续。
 
 > **两条实测教训，写在 `common.sh` 里了**：
 > 1. 大批量数据别用 `ssh cat` 直传 —— 设备端 tar 边读边往外吐会让 USB NCM stall
