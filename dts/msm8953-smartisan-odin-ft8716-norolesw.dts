@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * 安全版（USB 固定 device 模式）+ 面板写死 FT8716
+ * 组合 msm8953-smartisan-odin-norolesw.dts 与面板写死，详见同系列文件头注释。
+ */
+
+/dts-v1/;
+
+#include "msm8953-smartisan-odin-norolesw.dts"
+
+&mdss_dsi0 {
+	panel@0 {
+		compatible = "smartisan,odin-ft8716";
+	};
+};

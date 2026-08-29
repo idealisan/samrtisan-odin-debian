@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * Smartisan U2 Pro (ODIN) — 面板写死为 FT8716 的变体
+ *
+ * 用途：在 boot 分区仍是**未精简**的 lk2nd（没有去掉 markw，因而不会把
+ * panel@0 的占位 compatible 替换成真实面板）时，靠 DTB 自身直接指定面板，
+ * 让内核能匹配到 panel-ft8716 驱动，从而点亮屏幕。
+ *
+ * 背景（2026-08-29 实机）：
+ *   - lk2nd 选中 markw 条目时，panel@0 的 compatible 保持占位
+ *     "smartisan,odin-panel"，内核无任何驱动匹配 ⇒ 无屏
+ *   - lk2nd 精简后（去掉 markw）选中 odin，会替换成 "smartisan,odin-ft8716"
+ *   - 本变体把这一步提前写死，代价是失去多面板自动识别（已知本机即 FT8716）
+ *
+ * 一旦 boot 分区刷入精简版 lk2nd，应切回自动识别版：
+ *   msm8953-smartisan-odin.dtb / msm8953-smartisan-odin-norolesw.dtb
+ */
+
+/dts-v1/;
+
+#include "msm8953-smartisan-odin.dts"
+
+&mdss_dsi0 {
+	panel@0 {
+		compatible = "smartisan,odin-ft8716";
+	};
+};
