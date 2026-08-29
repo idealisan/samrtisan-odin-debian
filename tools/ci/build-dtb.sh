@@ -23,6 +23,9 @@ KERNEL_REPO=${KERNEL_REPO:-https://github.com/msm8953-mainline/linux.git}
 KERNEL_SHA=${KERNEL_SHA:-05f7e89ab9731565d8a62e3b5d1ec206485eeb0b}
 
 mkdir -p "$OUT"
+# 必须转绝对路径：下面会 cd 进内核树，届时 "out/kernel" 这种相对路径就指到别处去了
+# （CI 上表现为编译 22 分钟成功、最后 cp 时 "No such file or directory"）
+OUT=$(cd "$OUT" && pwd)
 say() { printf '[dtb] %s\n' "$*"; }
 
 # ---------------------------------------------------------------- 内核源码

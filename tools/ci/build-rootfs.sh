@@ -22,6 +22,9 @@ ROOT=${ROOT:-/tmp/odin-rootfs}
 SUITE=${SUITE:-bookworm}
 
 mkdir -p "$OUT"
+# 必须转绝对路径：下面会 cd 进内核树，届时 "out/kernel" 这种相对路径就指到别处去了
+# （CI 上表现为编译 22 分钟成功、最后 cp 时 "No such file or directory"）
+OUT=$(cd "$OUT" && pwd)
 say() { printf '[rootfs] %s\n' "$*"; }
 [ -f "$KOUT/vmlinuz" ] || { echo "缺内核产物: $KOUT/vmlinuz（先跑 build-kernel.sh）" >&2; exit 1; }
 
@@ -32,8 +35,11 @@ if [ ! -d "$ROOT/etc" ]; then
   debootstrap --arch arm64 --variant=minbase \
     --include=busybox-static,udev,ssh,sudo,systemd,iproute2,dnsmasq,parted,e2fsprogs \
     "$SUITE" "$ROOT" http://deb.debian.org/debian \
-    >/tmp/odin-debootstrap.log 2>&1 \
-    || { echo "debootstrap 失败：" >&2; tail -20 /tmp/odin-debootstrap.log >&2; exit 1; }
+    2>&1 | tee /tmp/odin-debootstrap.log
+  if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+    echo "debootstrap 失败，日志见上面" >&2
+    exit 1
+  fi
 fi
 say "rootfs 就绪: $ROOT"
 
@@ -75,7 +81,7 @@ say "  initramfs: $(stat -c%s "$ROOT/boot/initramfs.cpio.gz") 字节"
 
 # ---------------------------------------------------------------- 4. 系统配置
 say "setup-rootfs.sh（用户 / 网络 / 服务）"
-ODIN_ROOTFS="$ROOT" "$REPO/dist/build/setup-rootfs.sh" 2>&1 | tail -3
+ODIN_ROOTFS="$ROOT" "$REPO/dist/build/setup-rootfs.sh"
 
 say "apply-staging-fixes.sh（增量修复 + overlay + DTB + extlinux）"
 # 用 CI 刚编出来的 DTB，而不是仓库里（可能过期的）那份
@@ -83,11 +89,11 @@ if [ -d "$DOUT" ]; then
   mkdir -p "$ROOT/boot/dtbs/qcom"
   cp -f "$DOUT"/*.dtb "$ROOT/boot/dtbs/qcom/"
 fi
-"$REPO/dist/build/apply-staging-fixes.sh" "$ROOT" 2>&1 | tail -3
+"$REPO/dist/build/apply-staging-fixes.sh" "$ROOT"
 
 # ---------------------------------------------------------------- 5. 导出镜像
 say "build-image.sh（保守特性集 + 导出 + 回读校验）"
-"$REPO/tools/build-image.sh" "$ROOT" "$OUT/odin-debian.img" 524288 pmOS_root 2>&1 | tail -25
+"$REPO/tools/build-image.sh" "$ROOT" "$OUT/odin-debian.img" 524288 pmOS_root
 
 say "产物："
 ls -la "$OUT"

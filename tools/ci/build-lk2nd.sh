@@ -28,6 +28,9 @@ LK2ND_VER=${LK2ND_VER:-23.1}
 SRC=${SRC:-/tmp/lk2nd-src}
 
 mkdir -p "$OUT"
+# 必须转绝对路径：下面会 cd 进内核树，届时 "out/kernel" 这种相对路径就指到别处去了
+# （CI 上表现为编译 22 分钟成功、最后 cp 时 "No such file or directory"）
+OUT=$(cd "$OUT" && pwd)
 say() { printf '[lk2nd] %s\n' "$*"; }
 
 # ---------------------------------------------------------------- 源码
@@ -51,9 +54,11 @@ apply_patch() {
 }
 
 build() {
-  make -j"$(nproc)" -C "$SRC" TOOLCHAIN_PREFIX=arm-none-eabi- PROJECT=lk2nd-msm8953 \
-    >/tmp/lk2nd-build.log 2>&1 \
-    || { echo "构建失败，日志尾部：" >&2; tail -30 /tmp/lk2nd-build.log >&2; exit 1; }
+  if ! make -j"$(nproc)" -C "$SRC" TOOLCHAIN_PREFIX=arm-none-eabi- \
+        PROJECT=lk2nd-msm8953 2>&1 | tee /tmp/lk2nd-build.log; then
+    echo "lk2nd 构建失败，日志见上面" >&2
+    exit 1
+  fi
 }
 
 # ------------------------------------------------- 1) 完整版（0001-0003）

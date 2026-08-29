@@ -23,6 +23,9 @@ CROSS=${CROSS:-aarch64-linux-gnu-}
 JOBS=${JOBS:-$(nproc)}
 
 mkdir -p "$OUT"
+# 必须转绝对路径：下面会 cd 进内核树，届时 "out/kernel" 这种相对路径就指到别处去了
+# （CI 上表现为编译 22 分钟成功、最后 cp 时 "No such file or directory"）
+OUT=$(cd "$OUT" && pwd)
 say() { printf '[kernel] %s\n' "$*"; }
 
 # ---------------------------------------------------------------- 源码
@@ -44,9 +47,13 @@ make ARCH=arm64 CROSS_COMPILE="$CROSS" olddefconfig >/dev/null
 
 # ---------------------------------------------------------------- 编译
 say "编译 Image + modules（$JOBS 线程，这一步在 CI 上要跑几十分钟）"
-make -j"$JOBS" ARCH=arm64 CROSS_COMPILE="$CROSS" Image modules \
-  >/tmp/odin-kernel-build.log 2>&1 \
-  || { echo "构建失败，日志尾部：" >&2; tail -40 /tmp/odin-kernel-build.log >&2; exit 1; }
+# tee 双写：既实时进 CI 日志（编译出错时能看到过程），也留一份文件
+# pipefail 已在顶部开启，make 的退出码能穿过管道
+if ! make -j"$JOBS" ARCH=arm64 CROSS_COMPILE="$CROSS" Image modules 2>&1 \
+     | tee /tmp/odin-kernel-build.log; then
+  echo "内核构建失败，日志见上面（同一份也留在 /tmp/odin-kernel-build.log）" >&2
+  exit 1
+fi
 
 # ---------------------------------------------------------------- 产物
 cp arch/arm64/boot/Image "$OUT/vmlinuz"
