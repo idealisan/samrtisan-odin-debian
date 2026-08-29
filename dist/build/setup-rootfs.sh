@@ -176,15 +176,19 @@ chroot $R systemctl disable NetworkManager-wait-online.service 2>/dev/null || tr
 # 本设备无蜂窝基带，ModemManager 只徒增启动开销并会扫描串口
 chroot $R systemctl mask ModemManager.service 2>/dev/null || true
 
-# --- WiFi 校准数据（persist 分区 → /lib/firmware） ---
-# wcn36xx 要的 WCNSS_qcom_wlan_nv.bin 是每台机器不同的射频校准数据，
-# 原厂放在 persist 分区，任何 Debian 包都不提供，也不该进版本库。
-# 由 odin-wlan-nv.service 开机现取。
-install -D -m 0755 "$HERE/rootfs/usr/local/sbin/odin-wlan-nv.sh" \
-	"$R/usr/local/sbin/odin-wlan-nv.sh"
-install -D -m 0644 "$HERE/rootfs/etc/systemd/system/odin-wlan-nv.service" \
-	"$R/etc/systemd/system/odin-wlan-nv.service"
-chroot $R systemctl enable odin-wlan-nv.service 2>&1 | tail -2 || true
+# --- WiFi 固件与校准数据（原厂分区 → /lib/firmware） ---
+# wcn36xx 要两样东西，都不在任何 Debian 包里，也不该进版本库：
+#   1. WCNSS 固件 wcnss.mdt + .b00/.b01/... ← modem 分区的 /image/
+#   2. 板级射频校准数据 WCNSS_qcom_wlan_nv.bin ← persist 分区
+# （实测：modem:/image/wcnss.* 与此前手工预置的固件十个文件 md5 全等，
+#   所以"开机现取"与"预置"完全等价，还省掉了往仓库塞二进制）
+# 由 odin-wlan-fw.service 开机现取。
+install -D -m 0755 "$HERE/rootfs/usr/local/sbin/odin-wlan-fw.sh" \
+	"$R/usr/local/sbin/odin-wlan-fw.sh"
+install -D -m 0644 "$HERE/rootfs/etc/systemd/system/odin-wlan-fw.service" \
+	"$R/etc/systemd/system/odin-wlan-fw.service"
+mkdir -p "$R/etc/modules-load.d"
+chroot $R systemctl enable odin-wlan-fw.service 2>&1 | tail -2 || true
 # wcn36xx / qcom_wcnss_pil 是模块，靠 udev 在 platform 设备出现时加载，
 # 这里显式列进 modules-load 更稳（不依赖时序）
 # 目录不是必然存在：/etc/modules-load.d 是 kmod 提供的，而 debootstrap

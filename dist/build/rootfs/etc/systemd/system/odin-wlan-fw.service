@@ -1,13 +1,13 @@
 [Unit]
-Description=Provision WCNSS WLAN calibration data from the persist partition
-Documentation=file:/usr/local/sbin/odin-wlan-nv.sh
+Description=Provision WCNSS WiFi firmware and calibration data from factory partitions
+Documentation=file:/usr/local/sbin/odin-wlan-fw.sh
 After=local-fs.target systemd-modules-load.service
 Before=NetworkManager.service
 
 [Service]
 Type=oneshot
 # 取不到最坏只是没有 WiFi，绝不能因为这一步把启动拖住或搞挂
-ExecStart=/usr/local/sbin/odin-wlan-nv.sh
+ExecStart=/usr/local/sbin/odin-wlan-fw.sh
 RemainAfterExit=yes
 
 [Install]

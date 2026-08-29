@@ -101,17 +101,21 @@ odin_sudo() {
   odin_sudo_raw 2>&1 | grep -v '^\[sudo\] password for '
 }
 
-# odin_scp_get <远端路径> <本地路径>
-odin_scp_get() {
-  sshpass -p "$SSH_PASS" scp $(_scp_opts) -r \
-    "$SSH_USER@$DEVICE_IP:$1" "$2" >/dev/null 2>&1
+# 传文件时失败要看得见原因：原先把 stderr 也吞了，出问题时屏幕上只有一句
+# "失败"，却不知道是超时、认证还是路径错（实测踩过一次）。
+_scp() { # _scp <方向: get|put> <参数...>
+  local dir=$1; shift
+  local out rc
+  out=$(sshpass -p "$SSH_PASS" scp $(_scp_opts) -r "$@" 2>&1); rc=$?
+  [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/    scp: /'
+  return $rc
 }
 
+# odin_scp_get <远端路径> <本地路径>
+odin_scp_get() { _scp get "$SSH_USER@$DEVICE_IP:$1" "$2"; }
+
 # odin_scp_put <本地路径> <远端路径>
-odin_scp_put() {
-  sshpass -p "$SSH_PASS" scp $(_scp_opts) -r \
-    "$1" "$SSH_USER@$DEVICE_IP:$2" >/dev/null 2>&1
-}
+odin_scp_put() { _scp put "$1" "$SSH_USER@$DEVICE_IP:$2"; }
 
 # device_alive —— SSH 可登录即认为设备在运行 Debian
 device_alive() {
