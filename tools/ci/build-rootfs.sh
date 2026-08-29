@@ -62,18 +62,28 @@ depmod -b "$ROOT" "$KVER"
 say "造 initramfs"
 ISTAGE=$(mktemp -d)
 cp -a "$REPO/dist/build/initramfs/." "$ISTAGE/"
+
+# 骨架目录必须在这里重建，不能指望仓库里那份：
+#   · git 不跟踪空目录，dev/ proc/ sys/ mnt/ 这些本来就不在版本库里
+#   · bin/ 里有 busybox（1.8MB 二进制）和一批指向它的符号链接，prepare-public-repo.sh
+#     会把 busybox 当大 blob 摘掉、把符号链接按 file(1) 的判定也当二进制摘掉，
+#     于是公开仓库（CI 拉的就是它）里整个 bin/ 都不存在
+mkdir -p "$ISTAGE"/{bin,dev,etc,lib,mnt,proc,run,sbin,sys/kernel,tmp,usr/bin,usr/sbin}
+
 BB=$ROOT/bin/busybox
 [ -x "$BB" ] || { echo "rootfs 里没有 /bin/busybox" >&2; exit 1; }
 install -m 0755 "$BB" "$ISTAGE/bin/busybox"
+
+# applet 名单同理不能靠 ls bin/ 得到（见上），走一份文本文件
 while read -r applet; do
+  [ -n "$applet" ] || continue
   [ -e "$ISTAGE/bin/$applet" ] && rm -f "$ISTAGE/bin/$applet"
   ln -sf busybox "$ISTAGE/bin/$applet"
-done < <(cd "$REPO/dist/build/initramfs/bin" && ls | grep -v '^busybox$')
-for d in sbin usr/bin usr/sbin; do
-  while read -r applet; do
-    [ -L "$ISTAGE/$d/$applet" ] || ln -sf /bin/busybox "$ISTAGE/$d/$applet"
-  done < <(cd "$REPO/dist/build/initramfs/$d" 2>/dev/null && ls)
-done
+done < "$REPO/dist/build/initramfs-applets.txt"
+# 仓库里那份 sbin/switch_root 是指向同目录 busybox 的相对链接，而 busybox 只在
+# bin/ 下 —— 断链。显式重建成指向 /bin/busybox 的绝对链接。
+rm -f "$ISTAGE/sbin/switch_root"
+ln -sf /bin/busybox "$ISTAGE/sbin/switch_root"
 mkdir -p "$ROOT/boot"
 "$REPO/tools/pack_initramfs.sh" "$ISTAGE" "$ROOT/boot/initramfs.cpio.gz"
 rm -rf "$ISTAGE"
