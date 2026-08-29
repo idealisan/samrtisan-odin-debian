@@ -509,6 +509,47 @@ dnsmasq pid 281 开机自启成功，监听 usb0，range 172.16.42.2–172.16.42
 （PC 侧拿到 .4/.6 会变，但不影响使用——SSH 连的是手机侧固定的 172.16.42.1。）
 （dnsmasq 日志时间戳显示 Apr 27 是手机系统时钟未同步，非故障。）
 
+### 拾肆、★ 解决了：启用 GPU 后面板初始化成功（屏幕链路通了）
+
+**根因就是 DTS 漏启用 GPU。**
+
+msm8953.dtsi 里 `gpu: gpu@1c00000` 默认 `status = "disabled"`，
+而 odin.dts 此前完全没有 `&gpu { status = "okay"; }`。补上之后实机：
+
+```
+1c00000.gpu driver=adreno                       ✅ GPU 驱动绑定
+msm_mdp 1a01000.display-controller: bound 1c00000.gpu (ops a3xx_ops)   ✅
+ft8716: Failed to initialize panel: -22          ← 消失 ✅
+card0-DSI-1  status=connected  enabled=enabled    ✅ 面板已连上并使能
+backlight    max=4095 cur=204                    ✅ 背光点亮
+fb0 = 1080x1920 @32bpp；vtcon1(frame buffer) bind=1  ✅ fbcon 已绑定
+/dev/dri: card0 renderD128 by-path
+vblank 计数持续增长（983→10130）                  ✅ CRTC 在跑
+
+日志：adreno 1c00000.gpu: supply vddcx not found, using dummy regulator（无害）
+     Direct firmware load for qcom/a530_pm4.fw failed with error -2（GPU 微码缺）
+```
+
+⇒ **msm_drm 的显示管线依赖 GPU 节点；少了它，DSI 主机在 panel prepare 阶段拒收
+DCS 命令（静默 -EINVAL），面板就永远初始化不了。**
+
+**当前状态**：面板已上电使能、背光点亮，但**没有画面内容**（fb0 全 0 = 黑屏）。
+用户观察到的"背光亮→黑屏→背光灭"正符合此状态（黑屏因无用户空间渲染，
+背光灭是 console blank / 无活动）。
+
+**验证像素管道**：执行 `dd if=/dev/urandom of=/dev/fb0 bs=1M count=8`
+（写入成功，8.0MB / 56.2MB/s），请用户目视确认屏幕是否出现噪点。
+- 有噪点 ⇒ 链路完全正常，只需补用户空间显示（compositor 或 fbcon 控制台）
+- 仍全黑 ⇒ 需继续查 DSI 视频模式配置
+
+**待办**
+1. GPU 微码固件 `qcom/a530_pm4.fw` / `a530_pfp.fw` 未装（Debian 无
+   firmware-misc-nonfree 候选，pmOS 的 firmware-qcom-adreno-a530 才有）⇒ 待补
+2. cmdline 目前只有 `console=ttyMSM0,115200n8`（串口），fb 上没有控制台输出；
+   若要开机即见画面，可加 `console=tty0`（注意最后一个 console= 为主控制台）
+3. `drm.debug=0x1ff` 已临时写入 extlinux（备份 .bak-dbg）——**验证完要去掉**，
+   否则 dmesg 被 vblank 刷爆、早期日志被冲掉（已踩：导致 GPU 固件错误被覆盖）
+
 ### 拾肆、当前未解：面板初始化 -EINVAL（屏幕仍未亮）
 
 ```
