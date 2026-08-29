@@ -5,7 +5,12 @@
 msm8953-mainline 内核（Linux 6.19，github.com/msm8953-mainline/linux）编写的
 屏幕 + USB 外接存储移植补丁。
 
-## 一、补丁清单（odin-port/patches/0001–0007）
+> **本仓库只放源码与文档。** 刷机镜像、lk2nd 固件、编译好的 DTB 与内核模块等二进制
+> 产物一律不进版本库，统一作为 **GitHub Release 资产**发布，到
+> [Releases](../../releases) 页面下载。仓库里留下的是"能从零重建出这些东西的全部脚本"：
+> 内核补丁 → DTB 构建 → rootfs 增量 → 镜像导出 → 真机刷入。
+
+## 一、补丁清单（odin-port/patches/0001–0008）
 
 | # | 补丁 | 内容 |
 |---|------|------|
@@ -16,6 +21,7 @@ msm8953-mainline 内核（Linux 6.19，github.com/msm8953-mainline/linux）编�
 | 5 | drm/panel: FT8716 | FocalTech FT8716 TDDI 1080p 视频模式面板 + Sharp 模组变体 |
 | 6 | drm/panel: NT36672 | Novatek NT36672 1080p 视频模式面板 |
 | 7 | arm64: dts: qcom | `msm8953-smartisan-odin.dts` 设备树 |
+| 8 | drm/panel: FT8716 | **修黑屏**：把初始化序列从 `.prepare` 挪到 `.enable`——DSI 主机未上电时 `dsi_host_transfer()` 会静默返回 `-EINVAL`，在 prepare 阶段发的命令一条都不生效 |
 | 3' | msm8953: oem_panel | ODIN 面板 GPIO 检测（TLMM91/92 复刻原厂）+ `fastboot oem panel` 实时切换（见 reports/009） |
 
 所有初始化序列逐字节取自原厂 DTB（用 msm8953-mainline 官方工具
@@ -109,16 +115,23 @@ exFAT 或 NTFS。**
 都在根分区里，不是 pmOS 那种 pmOS_boot+pmOS_root 双分区）。刷入后 `/extlinux/extlinux.conf`
 就在系统内，改完重启即可切换 —— 这一条让"双 label 救援"变得很便宜。
 
-**双 label 引导**
+**双 label 引导**（两个 label 只有 DTB 不同，内核与 initrd 相同）
 
 | label | DTB | 用途 |
 |---|---|---|
-| `l0-safe`（首刷默认） | `msm8953-smartisan-odin-norolesw.dtb` | USB 固定 device，UDC 恒在，SSH 不依赖 Type-C 判定；代价：无 OTG |
-| `l0` | `msm8953-smartisan-odin.dtb` | 完整版：Type-C 角色切换 + OTG host |
+| `l0-safe`（首刷默认） | `msm8953-smartisan-odin-ft8716-norolesw.dtb` | USB 固定 device，UDC 恒在，SSH 不依赖 Type-C 判定；代价：无 OTG |
+| `l0` | `msm8953-smartisan-odin-ft8716.dtb` | 完整版：Type-C 角色切换 + OTG host |
+
+用的是**面板写死 FT8716** 的那一对 DTB（`*-ft8716*`），不是自动识别版：写死之后面板
+是否点亮与 lk2nd 选中哪个 QCDT 条目无关，排障面小很多。自动识别的一对也随镜像发布，
+换屏后把 `fdt` 改回去即可。
 
 ```sh
 sudo sed -i 's/^default .*/default l0/' /extlinux/extlinux.conf && sudo reboot
 ```
+
+> `append` 行末尾的 `console=tty0` 不能删 —— 它是控制台上屏的开关。少了它屏幕只有
+> 背光、没有登录提示，看起来跟"屏没点亮"一模一样。
 
 **用户态组件的源码在 `dist/build/rootfs/`**（改这里，不要直接改 staging / 镜像内文件，
 否则下次重建会丢），由 `dist/build/apply-staging-fixes.sh` 幂等部署：
@@ -151,9 +164,14 @@ sudo sed -i 's/^default .*/default l0/' /extlinux/extlinux.conf && sudo reboot
 - ⚠️ exFAT 无法在 QEMU 验证：QEMU 用的 `odin-qemu/Image` 是另一个内核，无 exfat 支持。
   **镜像内核也跑不了 QEMU**（`.config` 无 `VIRTIO_PCI`/`VIRTIO_MMIO`）⇒ QEMU 只能验用户态
 
-**真机（只读 + dry-run，`reports/016`、`reports/017`）**
+**真机（已跑起来，`reports/016`/`017`、`evidence/device-probe/STATE-DISPLAY-OK.txt`）**
+
 - 硬件规格与 lk2nd 之后的完整启动链已摸清（9 跳）
-- `odin-usb-role.sh --dry-run` 在真机上跑通且零副作用
+- **屏幕点亮**：`Failed to initialize panel` = 0；DSI connector `enabled/connected`；
+  背光 4095/4095；fb0 1080x1920；`console=tty0` 后控制台上屏
+- **USB 网络稳定**：PC 侧自动拿到 172.16.42.2（dnsmasq 单地址池），SSH 可登录
+- 面板驱动移植经逐条比对原厂 ROM 确认无误（125 条命令，前 123 条与 stock 完全一致，
+  余下 2 条是 `0x11`/`0x29`，用标准 DCS API 实现）
 - ⚠️ 实测 `find /sys -name role` 为空 ⇒ `echo device > /sys/class/usb_role/*/role`
   这条手动回退手段在当前内核上**不可用**
 
@@ -172,15 +190,14 @@ sudo sed -i 's/^default .*/default l0/' /extlinux/extlinux.conf && sudo reboot
 
 ## 七、已知限制 / 后续工作
 
-- **【首刷头号风险】lk2nd 的 DTB 选择**：QCDT 表里 `msm8953-smartisan-odin` 的
+- **【已解决】lk2nd 的 DTB 选择**：QCDT 表里 `msm8953-smartisan-odin` 的
   board-id 是 `<0x0b 0x01>`，`msm8953-xiaomi-markw` 是 `<0x1000b 0x01>`；
   `VARIANT_MASK=0xff` ⇒ 两者 **variant_id 都是 0x0b**，高位 0x10 只是 major，
-  因此 lk2nd 可能把票投给 markw。
-  - 两个 label 都已改用**显式 `fdt`**，所以无论选中谁都能起（选中 markw 则无屏但 SSH 可用）。
-  - 但面板占位 compatible `smartisan,odin-panel` **只有选中 odin 才会被替换** ⇒
-    **若首刷后无屏，下一步是精简 lk2nd（只保留 odin 条目）强制命中。**
-  - 本包的两个 label **都不能用 `fdtdir`**：选中 markw 时会去找镜像里不存在的
-    `msm8953-xiaomi-markw.dtb` 而启动失败。
+  所以未精简的 lk2nd 很可能把票投给 markw。解法有两条，本包同时采用：
+  - **DTB 侧**：用面板写死的 `*-ft8716*` DTB，面板是否点亮不再依赖 lk2nd 选中谁。
+  - **lk2nd 侧**：发布精简版 lk2nd（去掉 markw 条目），强制命中 odin。
+  - 两个 label 都用**显式 `fdt`**，绝不能用 `fdtdir`：选中 markw 时会去找镜像里
+    不存在的 `msm8953-xiaomi-markw.dtb` 而启动失败。
 - **面板名透传未实锤**：实测当前 pmOS 的 `/proc/cmdline` **没有** `mdss_mdp.panel=`，
   但那台机器跑的是 pmOS 的 lk2nd（无 odin 条目），不能直接推断原厂 aboot 的行为。
   需在刷入本包后查 `/proc/cmdline` 或 `fastboot getvar lk2nd:panel`。
@@ -203,5 +220,43 @@ sudo sed -i 's/^default .*/default l0/' /extlinux/extlinux.conf && sudo reboot
 | 1 | 阶段 2（UTF-8） | **放弃 FAT32 中文，不做 `nls_utf8`**；以 exFAT / NTFS 为主力 |
 | 2 | 自动挂载方案 | **systemd mount unit**（不装 udisks2） |
 | 3 | 首刷策略 | **接受首刷期间没有 OTG**，`l0-safe` 作为 default |
+
+## 九、从头刷入（原生 fastboot → SSH 可用）
+
+`flash/` 下的阶段脚本串起完整流程，每个阶段可单独重跑，失败不必从头再来：
+
+| 阶段 | 做什么 |
+|---|---|
+| `10-backup.sh` | 全量备份真机根文件系统（默认在手机上打包，再 HTTP 拉回） |
+| `20-fastboot` | 轮询等待设备进入原生 fastboot |
+| `30-flash-boot` | `fastboot flash boot <lk2nd>` |
+| `40-flash-data` | `fastboot flash userdata`（sparse 优先，失败回退 raw） |
+| `50-boot` | `fastboot reboot`，等 PC 上出现 USB NCM 网卡 |
+| `60-usbnet` | 等 PC 拿到 172.16.42.2（DHCP 优先，超时静态兜底） |
+| `70-ssh` | 等 22 端口可达 |
+| `80-verify` | 跑验收项（内核 / 面板 / 背光 / DRM / usb0 / dnsmasq / 扩容） |
+
+公共函数在 `flash/lib/common.sh`（日志、重试、超时、SSH/fastboot 封装）。状态机与
+失败循环策略见 `reports/018-真机刷入循环操作手册.md`。
+
+> **两条实测教训，写在 `common.sh` 里了**：
+> 1. 大批量数据别用 `ssh cat` 直传 —— 设备端 tar 边读边往外吐会让 USB NCM stall
+>    （两次都在 ~110MB 处断、设备失联 30s；纯流量压测 400MB/20s 说明不是带宽问题）。
+>    先在设备本地落盘，再顺序拷贝。
+> 2. `/root` 是 0700，用 `user` 身份去读会得到空结果而不是报错 —— 差点把一份完好的
+>    备份判成"截断"。涉及 `/root` 一律走 `odin_sudo*`。
+
+## 十、仓库自身的可复现性
+
+二进制产物不入库，是为了让仓库能安全公开、也让 `.git` 保持可读大小。生成公开副本的
+流程固化在脚本里：
+
+```sh
+tools/prepare-public-repo.sh /tmp/odin-clean ~/.config/odin-port/replacements.txt
+```
+
+它会剔除全部二进制与超大 blob、按规则脱敏（文件内容**和提交信息**都换），
+源仓库不动。脱敏规则文件刻意放在仓库**外面**——规则里必然写着要替换掉的原串，
+一旦入库就等于把想藏的东西又写回公开仓库。
 
 工作日志见 `WORKLOG.md`（每步时间戳 + 踩坑记录 + 待清理清单）。
