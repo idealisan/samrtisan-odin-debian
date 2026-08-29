@@ -38,6 +38,16 @@ fi
 say() { printf '\033[36m[pub]\033[0m %s\n' "$*"; }
 ok()  { printf '\033[32m[pub]\033[0m %s\n' "$*"; }
 
+# file(1) 不认作 text/JSON/empty 的都算二进制。
+# 写成函数而不是内联 case：macOS 自带的 bash 3.2 解析不了 $( ) 里带 ;; 的 case
+# （最小复现都会报 syntax error near unexpected token ';;'）。
+is_binary() {
+  case "$(file -b "$1" 2>/dev/null)" in
+    *text*|*ASCII*|*UTF-8*|*JSON*|*Unicode*|*empty*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
 # ---------------------------------------------------------------- 1. 克隆
 say "克隆 → $TARGET"
 git clone -q "$REPO" "$TARGET" 2>/dev/null
@@ -45,15 +55,11 @@ BEFORE=$(du -sk "$TARGET/.git" | cut -f1)
 say "克隆完成，.git = $(( BEFORE / 1024 )) MiB"
 
 # ---------------------------------------------------------------- 2. 二进制清单
-# 判定方式：file(1) 不认作 text/JSON/empty 的都算二进制。
 BINLIST=$(mktemp -t odin-binlist)
 ( cd "$TARGET"
   git ls-files | while read -r f; do
     [ -f "$f" ] || continue
-    case "$(file -b "$f" 2>/dev/null)" in
-      *text*|*ASCII*|*UTF-8*|*JSON*|*Unicode*|*empty*) continue ;;
-    esac
-    printf '%s\n' "$f"
+    if is_binary "$f"; then printf '%s\n' "$f"; fi
   done ) > "$BINLIST"
 say "待剔除二进制：$(wc -l < "$BINLIST" | tr -d ' ') 个"
 
@@ -73,17 +79,14 @@ note() { printf '  %-28s %s\n' "$1" "$2"; }
 
 remain=$(cd "$TARGET" && git ls-files | while read -r f; do
     [ -f "$f" ] || continue
-    case "$(file -b "$f" 2>/dev/null)" in
-      *text*|*ASCII*|*UTF-8*|*JSON*|*Unicode*|*empty*) continue ;;
-    esac
-    printf '%s\n' "$f"
+    if is_binary "$f"; then printf '%s\n' "$f"; fi
   done | wc -l | tr -d ' ')
 [ "$remain" -eq 0 ] && note "残留二进制" "0" || { note "残留二进制" "$remain 个"; fail=1; }
 
 big=$(cd "$TARGET" && git ls-files | while read -r f; do
     [ -f "$f" ] || continue
     s=$(stat -f%z "$f" 2>/dev/null || stat -c%s "$f")
-    [ "${s:-0}" -gt 250000 ] && printf '%s\n' "$f"
+    if [ "${s:-0}" -gt 250000 ]; then printf '%s\n' "$f"; fi
   done | wc -l | tr -d ' ')
 [ "$big" -eq 0 ] && note ">250KB 的文件" "0" || { note ">250KB 的文件" "$big 个"; fail=1; }
 
@@ -100,7 +103,9 @@ if [ -n "$RULES" ]; then
 fi
 
 # 通用：私钥
-n=$(cd "$TARGET" && git log --all -p 2>/dev/null | grep -c -F "BEGIN PRIVATE KEY" || true)
+# 注意要 grep -v 掉本脚本自己那行——否则这条 grep 模式本身会被算成一次命中
+n=$(cd "$TARGET" && git log --all -p 2>/dev/null \
+    | grep -F "BEGIN PRIVATE KEY" | grep -cv "grep -c -F" || true)
 [ "${n:-0}" -eq 0 ] && note "私钥" "0 处" || { note "私钥" "$n 处残留"; fail=1; }
 
 commits=$(cd "$TARGET" && git log --oneline | wc -l | tr -d ' ')
