@@ -45,7 +45,7 @@ fi
 
 # ---------------------------------------------------------------- 编译
 say "编译四个 DTB（内核树: ${KDIR}）"
-KDIR="$KDIR" "$REPO/dts/build-dtb.sh"
+KDIR="$KDIR" bash "$REPO/dts/build-dtb.sh"
 
 for f in "$REPO"/dts/*.dtb; do
   cp -f "$f" "$OUT/"

@@ -34,7 +34,13 @@ for f in boot/vmlinuz boot/initramfs.cpio.gz extlinux/extlinux.conf .odin-debian
 done
 DTB=$(ls "$STAGE"/boot/dtbs/qcom/*.dtb 2>/dev/null | head -1)
 [ -n "$DTB" ] || fail "no dtb under /boot/dtbs/qcom"
-say "staging OK: $STAGE ($(du -sh "$STAGE" | cut -f1))"
+
+# 内核版本不能写死：scripts/setlocalversion 在"工作树不干净"时会追加一个 +，
+# 而 CI 里补丁是打在工作树上的（git 里永远是脏的），实际目录名是
+# 6.19.0-postmarketos-qcom-msm8953+ —— 少那个 + 就找不到模块。
+KVER=$(ls "$STAGE/usr/lib/modules" 2>/dev/null | head -1)
+[ -n "$KVER" ] || fail "no kernel modules under /usr/lib/modules"
+say "staging OK: $STAGE ($(du -sh "$STAGE" | cut -f1)), kernel $KVER"
 
 # ------------------------------------------------- 1. 模块树统一为标准 kernel/ 布局
 # 现状：msm8953 模块是手工拷贝进来的，缺 kernel/ 层级，而 modules.builtin 用
@@ -148,12 +154,12 @@ if [ -f "$REPO/dist/stage/initramfs.cpio.gz" ]; then
 fi
 for p in /extlinux/extlinux.conf /boot/vmlinuz /boot/dtbs/qcom/$(basename "$DTB") /.odin-debian \
          /usr/local/sbin/odin-firstboot-resize.sh /etc/NetworkManager/conf.d/99-odin-usb0.conf \
-         /usr/lib/modules/6.19.0-postmarketos-qcom-msm8953/kernel/drivers/gpu/drm/panel/panel-r69006.ko; do
+         /usr/lib/modules/$KVER/kernel/drivers/gpu/drm/panel/panel-r69006.ko; do
   exists "$p" && note "present $p" "OK" || { note "present $p" "MISSING"; rc=1; }
 done
 # 发布态不得带这些残留
 for p in /var/lib/odin-resize-done /var/lib/systemd/random-seed /mnt/dist \
-         /boot/msm8953-smartisan-odin.dtb /usr/lib/modules/6.19.0-postmarketos-qcom-msm8953/drivers; do
+         /boot/msm8953-smartisan-odin.dtb /usr/lib/modules/$KVER/drivers; do
   exists "$p" && { note "residual $p" "PRESENT (should be gone)"; rc=1; } || note "residual $p" "absent"
 done
 # 扩容服务必须处于启用态；machine-id 必须为空（否则所有设备同 ID）

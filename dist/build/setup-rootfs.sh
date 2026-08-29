@@ -187,6 +187,9 @@ install -D -m 0644 "$HERE/rootfs/etc/systemd/system/odin-wlan-nv.service" \
 chroot $R systemctl enable odin-wlan-nv.service 2>&1 | tail -2 || true
 # wcn36xx / qcom_wcnss_pil 是模块，靠 udev 在 platform 设备出现时加载，
 # 这里显式列进 modules-load 更稳（不依赖时序）
+# 目录不是必然存在：/etc/modules-load.d 是 kmod 提供的，而 debootstrap
+# minbase 只装 required 优先级的包，kmod 不在其中
+mkdir -p "$R/etc/modules-load.d"
 echo -e "wcn36xx\nqcom_wcnss_pil" > "$R/etc/modules-load.d/odin-wlan.conf"
 
 # --- enable ssh ---

@@ -85,13 +85,15 @@ done < "$REPO/dist/build/initramfs-applets.txt"
 rm -f "$ISTAGE/sbin/switch_root"
 ln -sf /bin/busybox "$ISTAGE/sbin/switch_root"
 mkdir -p "$ROOT/boot"
-"$REPO/tools/pack_initramfs.sh" "$ISTAGE" "$ROOT/boot/initramfs.cpio.gz"
+# 一律走显式解释器：pack_initramfs.sh 在 git 里是 100644（没有可执行位），
+# 直接调用会 Permission denied / exit 126
+bash "$REPO/tools/pack_initramfs.sh" "$ISTAGE" "$ROOT/boot/initramfs.cpio.gz"
 rm -rf "$ISTAGE"
 say "  initramfs: $(stat -c%s "$ROOT/boot/initramfs.cpio.gz") 字节"
 
 # ---------------------------------------------------------------- 4. 系统配置
 say "setup-rootfs.sh（用户 / 网络 / 服务）"
-ODIN_ROOTFS="$ROOT" "$REPO/dist/build/setup-rootfs.sh"
+ODIN_ROOTFS="$ROOT" bash "$REPO/dist/build/setup-rootfs.sh"
 
 say "apply-staging-fixes.sh（增量修复 + overlay + DTB + extlinux）"
 # 用 CI 刚编出来的 DTB，而不是仓库里（可能过期的）那份
@@ -99,11 +101,11 @@ if [ -d "$DOUT" ]; then
   mkdir -p "$ROOT/boot/dtbs/qcom"
   cp -f "$DOUT"/*.dtb "$ROOT/boot/dtbs/qcom/"
 fi
-"$REPO/dist/build/apply-staging-fixes.sh" "$ROOT"
+bash "$REPO/dist/build/apply-staging-fixes.sh" "$ROOT"
 
 # ---------------------------------------------------------------- 5. 导出镜像
 say "build-image.sh（保守特性集 + 导出 + 回读校验）"
-"$REPO/tools/build-image.sh" "$ROOT" "$OUT/odin-debian.img" 524288 pmOS_root
+bash "$REPO/tools/build-image.sh" "$ROOT" "$OUT/odin-debian.img" 524288 pmOS_root
 
 say "产物："
 ls -la "$OUT"
