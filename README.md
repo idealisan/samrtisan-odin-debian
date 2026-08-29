@@ -10,6 +10,9 @@ msm8953-mainline 内核（Linux 6.19，github.com/msm8953-mainline/linux）编�
 > [Releases](../../releases) 页面下载。仓库里留下的是"能从零重建出这些东西的全部脚本"：
 > 内核补丁 → DTB 构建 → rootfs 增量 → 镜像导出 → 真机刷入。
 
+> **完整使用说明见 [docs/](docs/README.md)**：
+> [复现构建](docs/01-复现构建.md) ｜ [刷入指南](docs/02-刷入指南.md) ｜ [系统使用](docs/03-系统使用.md)
+
 ## 一、补丁清单（odin-port/patches/0001–0008）
 
 | # | 补丁 | 内容 |
