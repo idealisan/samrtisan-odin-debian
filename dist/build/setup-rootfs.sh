@@ -1,7 +1,9 @@
 #!/bin/bash
 set -e
 export DEBIAN_FRONTEND=noninteractive
-R=/mnt/debian
+# 根目录可覆盖：CI 里不在 /mnt/debian，而是 debootstrap 到工作区下的某个目录
+R=${ODIN_ROOTFS:-/mnt/debian}
+[ -d "$R/etc" ] || { echo "不是 rootfs 目录: $R" >&2; exit 1; }
 
 # --- user & sudo (幂等：重跑时用户已存在则跳过) ---
 chroot $R id -u user >/dev/null 2>&1 || chroot $R useradd -m -s /bin/bash -G sudo user

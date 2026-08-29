@@ -1,0 +1,121 @@
+# ODIN 刷机产物构建 —— 只在发布 Release（含 Pre-release）时触发
+#
+# 刻意不挂 push / pull_request：内核要编几十分钟，rootfs 要走一遍 debootstrap，
+# 每次提交都跑纯属浪费公共资源。要验证就发一个 pre-release。
+#
+# 三个外部依赖全部固定到具体 commit / tag，上游再动也不影响复现：
+#   · 内核        msm8953-mainline/linux  @ af739964a9522753d2d8173908baf20e6eaac975
+#   · lk2nd       msm8916-mainline/lk2nd @ tag 19.0（postmarketOS 用的就是这个
+#                 版本；不是 msm8953-mainline/lk2nd，那个目录结构不一样）
+#   · Debian      发行版套件 bookworm（debootstrap 现装，不依赖任何预置镜像）
+#
+# 产物（全部挂到该 Release 上）：
+#   lk2nd.img / lk2nd-nomarkw.img   刷 boot 分区的二级引导（精简版强制命中 odin）
+#   msm8953-smartisan-odin*.dtb ×4  设备树
+#   odin-debian.img                 刷 userdata 的完整系统
+#   odin-debian-sparse.img          同上 sparse 版，fastboot 分块传输用
+#   SHA256SUMS                      全部产物的校验和
+
+name: release-build
+
+on:
+  release:
+    types: [published, prereleased]
+
+permissions:
+  contents: write
+
+env:
+  KERNEL_SHA: af739964a9522753d2d8173908baf20e6eaac975
+  LK2ND_VER: 19.0
+
+jobs:
+  # ------------------------------------------------------------------ 设备树
+  dtb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安装 dtc
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq device-tree-compiler
+      - name: 编译四个 DTB
+        run: bash tools/ci/build-dtb.sh out/dtb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: odin-dtb
+          path: out/dtb/*.dtb
+
+  # ------------------------------------------------- lk2nd（刷 boot 分区那个）
+  lk2nd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安装 ARM32 裸机工具链
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-arm-none-eabi device-tree-compiler libfdt-dev make
+      - name: 构建完整版与精简版
+        run: bash tools/ci/build-lk2nd.sh out/lk2nd
+      - uses: actions/upload-artifact@v4
+        with:
+          name: odin-lk2nd
+          path: out/lk2nd/*.img
+
+  # ------------------------------------------------------------------ 内核
+  kernel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安装交叉编译工具链
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-aarch64-linux-gnu bc bison flex \
+            libssl-dev libelf-dev kmod cpio rsync patch
+      - name: 编译内核与模块
+        run: bash tools/ci/build-kernel.sh out/kernel
+      - uses: actions/upload-artifact@v4
+        with:
+          name: odin-kernel
+          path: |
+            out/kernel/vmlinuz
+            out/kernel/modules.tar
+
+  # ------------------------------------------------------------------ 系统镜像
+  rootfs:
+    runs-on: ubuntu-latest
+    needs: [kernel, dtb]
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安装 debootstrap 与 arm64 模拟执行环境
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq debootstrap qemu-user-static binfmt-support \
+            e2fsprogs android-sdk-libsparse-utils kmod cpio parted
+      - uses: actions/download-artifact@v4
+        with: { name: odin-kernel, path: out/kernel }
+      - uses: actions/download-artifact@v4
+        with: { name: odin-dtb, path: out/dtb }
+      - name: 组装系统镜像
+        run: bash tools/ci/build-rootfs.sh out/rootfs out/kernel out/dtb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: odin-rootfs
+          path: |
+            out/rootfs/odin-debian.img
+            out/rootfs/odin-debian-sparse.img
+
+  # ------------------------------------------------------------------ 挂到 Release
+  publish:
+    runs-on: ubuntu-latest
+    needs: [dtb, lk2nd, rootfs]
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: odin-dtb, path: out }
+      - uses: actions/download-artifact@v4
+        with: { name: odin-lk2nd, path: out }
+      - uses: actions/download-artifact@v4
+        with: { name: odin-rootfs, path: out }
+      - name: 生成校验和
+        run: cd out && sha256sum * | sort -k2 > SHA256SUMS && cat SHA256SUMS
+      - name: 上传到 Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" out/* --clobber
