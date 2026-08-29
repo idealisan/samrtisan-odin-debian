@@ -154,4 +154,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$TAG" out/* --clobber
+        # 必须显式给 -R：本 job 没有 actions/checkout（只需要产物、不需要源码），
+        # 而 gh 在没有本地 .git 时无法推断仓库，会报
+        #   failed to run git: fatal: not a git repository
+        # 并让整条 run 染红 —— rc3 就是死在这里。
+        run: gh release upload "$TAG" out/* -R "${{ github.repository }}" --clobber
