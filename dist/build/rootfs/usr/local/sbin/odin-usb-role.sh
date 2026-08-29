@@ -30,7 +30,7 @@ DRY_RUN=0
 [ "$1" = "--dry-run" ] && DRY_RUN=1
 HOST_IP=172.16.42.1
 CLIENT_IP=172.16.42.2
-CLIENT_IP_MAX=172.16.42.10   # 地址池上限（兜底：MAC 万一变了也不会无地址可分）
+CLIENT_IP_MAX="${ODIN_CLIENT_IP_MAX:-172.16.42.2}"   # 单地址池——永远只连一台电脑，任何 MAC 都分到同一个 IP
 
 # 固定的 NCM MAC 地址（基于本机序列号 <emmc-serial>，本地管理地址，第二位为 2 合法）
 # 为什么必须写死：gadget 每次重启都会随机生成 MAC，PC 侧网卡的 MAC 随之变化，
@@ -122,11 +122,22 @@ apply_device() {
 		|| echo "ODIN Debian" > "$CFG/configs/c.1/strings/0x409/configuration" 2>/dev/null
 	ln -sf "$CFG/functions/ncm.usb0" "$CFG/configs/c.1/f1" 2>/dev/null
 
-	# 绑定 UDC 之前写死 MAC，否则 gadget 会用随机 MAC（见文件头注释）
-	[ -f "$CFG/functions/ncm.usb0/host_addr" ] \
-		|| echo "$GADGET_HOST_MAC" > "$CFG/functions/ncm.usb0/host_addr" 2>/dev/null
-	[ -f "$CFG/functions/ncm.usb0/dev_addr" ] \
-		|| echo "$GADGET_DEV_MAC" > "$CFG/functions/ncm.usb0/dev_addr" 2>/dev/null
+	# MAC 固定 —— 注意两点（都踩过）：
+	#  1) configfs 的 host_addr/dev_addr 一旦绑定 UDC 就不可写（Permission denied）；
+	#     而且这两个文件**总是存在**（内核填了随机值），所以不能用 [ -f ] 判断是否跳过
+	#     （旧代码正是这样 ⇒ 一直用随机 MAC，每次重启换一个，把 dnsmasq 地址池耗光）。
+	#  2) 改成 usb0 出现后用 ip link set 设置，这个在绑定后仍然有效。
+
+	ip link set usb0 up 2>/dev/null
+	ip addr add ${HOST_IP}/24 dev usb0 2>/dev/null   # 已存在时报错无妨
+	# 固定手机侧 MAC（PC 侧看到的 host MAC 由内核/对端决定，这里固定本端即可）
+	ip link set usb0 down 2>/dev/null
+	ip link set usb0 address "$GADGET_DEV_MAC" 2>/dev/null
+	ip link set usb0 up 2>/dev/null
+	ip addr add ${HOST_IP}/24 dev usb0 2>/dev/null   # 重新 up 后地址会丢，补一次
+
+	# dnsmasq 地址池：给足范围，避免多次重启后旧租约把池占满导致 "no address available。
+	# 更稳妥的做法是每次启动都清空租约文件（下面执行）。
 
 	# 【关键】先清空再写名字，否则 configfs 保留旧 udc_name 直接 -EBUSY
 	local cur=""
@@ -160,6 +171,9 @@ apply_device() {
 		return 0
 	fi
 	rm -f "$PIDFILE" 2>/dev/null
+	# 清租约：gadget MAC 每次随机 ⇒ 旧租约会累积，把（单地址）池占满 ⇒ 新客户端 "no address available
+	rm -f /var/lib/misc/dnsmasq.leases 2>/dev/null
+	# 每次重建 gadget 都清空租约：gadget MAC 每次随机 ⇒ 旧租约会累积把地址池占满，导致新客户端 'no address available'
 	# 注意两点（都是真机踩出来的）：
 	#   1) 必须 --conf-file=/dev/null：系统 /etc/dnsmasq.d/zz-gadget-exclude.conf
 	#      里有 bind-dynamic，与命令行的 --bind-interfaces 冲突，
@@ -168,7 +182,7 @@ apply_device() {
 	#      手机上没有别的用途，已在镜像里 disable 掉系统 dnsmasq。
 	dnsmasq --no-daemon --pid-file="$PIDFILE" --interface=usb0 \
 		--conf-file=/dev/null \
-		--bind-interfaces --dhcp-range=${CLIENT_IP},${CLIENT_IP_MAX},12h \
+		--bind-interfaces --dhcp-range=${CLIENT_IP},${CLIENT_IP_MAX},1h \
 		--dhcp-option=option:router --no-resolv --no-hosts \
 		--log-facility=/var/log/odin-dnsmasq.log &
 	dnsmasq_pid=$!
