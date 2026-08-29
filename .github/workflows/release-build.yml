@@ -18,9 +18,14 @@
 
 name: release-build
 
+# 触发条件只挂 release，且刻意只用 prereleased + released 这两个事件：
+# GitHub 发布一个 pre-release 时会**同时**发 published 与 prereleased，
+# 发布正式版时会同时发 published 与 released —— 若把 published 也写上，
+# 每次发布就会跑两遍（实测确实触发了两个 run）。
+# prereleased 覆盖预发布、released 覆盖正式版，两者不重叠，正好各一次。
 on:
   release:
-    types: [published, prereleased]
+    types: [prereleased, released]
 
 permissions:
   contents: write
