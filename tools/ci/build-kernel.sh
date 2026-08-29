@@ -26,7 +26,7 @@ mkdir -p "$OUT"
 say() { printf '[kernel] %s\n' "$*"; }
 
 # ---------------------------------------------------------------- 源码
-"$REPO/tools/ci/fetch-kernel.sh" "$KDIR"
+bash "$REPO/tools/ci/fetch-kernel.sh" "$KDIR"
 cd "$KDIR"
 say "内核树: $KDIR ($(git rev-parse --short HEAD 2>/dev/null || echo '?'))"
 

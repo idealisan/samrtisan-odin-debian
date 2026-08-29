@@ -26,6 +26,9 @@ name: release-build
 on:
   release:
     types: [prereleased, released]
+  # 只多一个手动入口：调 CI 时不必为了触发而多发一个 Release 版本。
+  # 不会有任何自动触发，因此不额外消耗资源。
+  workflow_dispatch:
 
 permissions:
   contents: write
