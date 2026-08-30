@@ -1,5 +1,7 @@
 blkid
 cat
+cmp
+cp
 echo
 findfs
 grep
