@@ -107,12 +107,23 @@ bash "$REPO/dist/build/apply-staging-fixes.sh" "$ROOT"
 
 # ---------------------------------------------------------------- 5. 导出镜像
 say "build-image.sh（保守特性集 + 导出 + 回读校验）"
-# 491520 blocks = 1.875 GiB。不能写 524288（正好 2 GiB）：
-# GitHub Release 的单个资产上限是 2147483648 字节，而且是"小于"不是"小于等于"，
-# 2 GiB 的 raw 镜像一上传就是
-#   HTTP 422: Validation Failed ... size must be less than 2147483648
-# 留 128 MiB 余量。当前 rootfs 约 859 MiB，文件系统内仍有约 1 GiB 空闲。
-bash "$REPO/tools/build-image.sh" "$ROOT" "$OUT/odin-debian.img" 491520 pmOS_root
+# 初始大小按 staging 实际内容估算：内容 + 25% 元数据余量 + 150 MiB 缓冲。
+# 这只是给 mke2fs 的**起始值**，真正定尺寸在 build-image.sh 里做（紧缩到最小
+# 再加冗余并截断文件），所以这里留点富余没关系，但也不能像从前那样写死 491520：
+# inode 表与 reserved blocks 都按这个尺寸分配，起始值给大了后面紧缩也收不回来。
+#
+# 上限仍是 GitHub Release 的单个资产限制 2147483648 字节，且要求"严格小于"。
+# 注意：build-image.sh 末尾还会再校验一次，超了会直接 fail。
+GH_MAX=$(( 2147483648 / 4096 ))   # 524287 块
+stage_kb=$(du -sk "$ROOT" 2>/dev/null | cut -f1)
+[ -n "$stage_kb" ] || stage_kb=900000
+blocks=$(( stage_kb * 125 / 100 / 4 + 150 * 1024 * 1024 / 4096 ))
+if [ "$blocks" -gt "$GH_MAX" ]; then
+  warn "按内容算出的初始大小 ${blocks} 块超过 GitHub 上限，压到 ${GH_MAX} 块"
+  blocks=$GH_MAX
+fi
+say "初始大小按内容算：staging $((stage_kb/1024)) MiB → ${blocks} 块（$((blocks*4096/1048576)) MiB）"
+bash "$REPO/tools/build-image.sh" "$ROOT" "$OUT/odin-debian.img" "$blocks" pmOS_root
 
 say "产物："
 ls -la "$OUT"

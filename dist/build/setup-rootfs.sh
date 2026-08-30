@@ -143,6 +143,15 @@ echo "en_US.UTF-8 UTF-8" > $R/etc/locale.gen
 chroot $R locale-gen >/dev/null 2>&1 || true
 chroot $R systemd-machine-id-setup 2>/dev/null || true
 
+# --- 时区：默认新加坡（UTC+8）---
+# 时区**无法靠联网可靠校正**：网络只能校到 UTC（NTP 给的就是 UTC），本地偏移得靠
+# IP 地理定位之类的外部服务，既不稳定又要额外依赖。所以直接给一个明确的默认值。
+# tzdata 属于 required 优先级，debootstrap minbase 会带上，/usr/share/zoneinfo 齐全。
+# 要改：sudo timedatectl set-timezone <时区>  或  sudo dpkg-reconfigure tzdata
+echo "Asia/Singapore" > $R/etc/timezone
+rm -f $R/etc/localtime
+ln -sf /usr/share/zoneinfo/Asia/Singapore $R/etc/localtime
+
 # --- WiFi management (equivalent to postmarketOS: NetworkManager + wpa) ---
 sed -i 's/ main$/ main contrib non-free non-free-firmware/' $R/etc/apt/sources.list
 chroot $R apt-get update -qq
@@ -178,7 +187,16 @@ unmanaged-devices=interface-name:usb0
 NMC
 # 首启已有扩容/日志压力，别再被 network-online 的 90s 超时拖慢
 chroot $R systemctl disable NetworkManager-wait-online.service 2>/dev/null || true
-# 本设备无蜂窝基带，ModemManager 只徒增启动开销并会扫描串口
+# 蜂窝网络（移动数据）：本设备**有**基带，不是没有硬件。
+#   - SoC 是骁龙 626（MSM8953 Pro），基带是 msm8953 的 MSS
+#   - 固件在原厂 modem 分区（mba.mbn + modem.mdt + modem.b00~b20，约 43MB）
+#   - 主线 qcom_q6v5_mss.c 有 msm8953 专门分支，Fairphone 3（同为 msm8953）是成功先例
+#   - 工具链走 QRTR（不是串口扫描），ModemManager / qmicli 都可装
+# 那为什么还 mask 掉 ModemManager？
+#   因为这条链路在 6.19 + 我们的 odin DTB 上**尚未实机验证**（DTS 里的 &mpss 还是
+#   上游默认的 disabled，WiFi 当初就是这么被挡住的）。在验证通过之前不默认启用，
+#   免得开机多一个必然会失败的探测。想试的人：装 tqftpserv + rmtfs、在 DTS 里启用
+#   &mpss（需 pll-supply = <&pm8953_l7>）、unmask ModemManager，然后看 dmesg 与 mmcli。
 chroot $R systemctl mask ModemManager.service 2>/dev/null || true
 
 # --- WiFi 固件与校准数据（原厂分区 → /lib/firmware） ---

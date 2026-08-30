@@ -94,15 +94,61 @@ say "cleanup done (machine-id/random-seed/journal/wtmp/lastlog)"
 
 # ---------------------------------------------------------------- 3. 建文件系统
 # 保守特性集 + 显式保留 resize_inode（=> mke2fs 会分配 reserved GDT blocks）
+#
+# -N 显式指定 inode 数量：默认 mke2fs 按"文件系统总大小 / inode_ratio"来分配，
+#   而文件系统大小是调用方给的保守估值（通常远大于实际内容），于是白白多出一大张
+#   inode 表。更要紧的是 **resize2fs -M 只收缩数据块，不会收缩 inode 表** ——
+#   实测：内容 813 MiB，按 1.875 GiB 建的 fs 紧缩后仍要 1.36 GiB，多出来的
+#   580 MiB 主要就是那张按大尺寸分配、又缩不回去的 inode 表。
+#   所以必须在这里就按实际文件数给准，后面才紧缩得下去。
+#   留 20% 余量 + 2000 个固定富余，覆盖 mke2fs -d 期间可能新建的条目。
+nfiles=$(find "$STAGE" | wc -l)
+ninodes=$(( nfiles * 12 / 10 + 2000 ))
+say "inode 数按实际条目算: ${nfiles} 条目 → -N ${ninodes}"
 rm -f "$OUT"
 mke2fs -q -F -t ext4 -L "$LABEL" \
   -O resize_inode,^extents,^64bit,^metadata_csum,^huge_file,^dir_nlink,^extra_isize \
-  -I 256 -b 4096 -d "$STAGE" "$OUT" "$BLOCKS"
+  -I 256 -b 4096 -N "$ninodes" -d "$STAGE" "$OUT" "$BLOCKS"
 say "mke2fs done ($BLOCKS blocks)"
 
 # 灌入后立即修一次：mke2fs -d 不会同步 free 计数到最终状态
 e2fsck -f -y "$OUT" > /dev/null 2>&1 || true
 say "e2fsck pass done"
+
+# ------------------------------------------------- 3b. 紧缩到"实际需要 + 冗余"
+#
+# 为什么需要这一步：调用方给的 BLOCKS 只能是个保守的估值（要留足 mke2fs 期间
+# 元数据扩张的余地），实际内容往往只占一半。实测 813 MiB 的内容躺在 1.875 GiB
+# 的镜像里，多出来的 1 GiB 全是空的，却要照付构建、上传、下载、刷入的时间。
+#
+# 做法不是去猜一个更准的系数，而是**让文件系统自己说出它需要多大**：
+#   1) resize2fs -M  → 收缩到理论最小（这个最小值是精确的，不是估算）
+#   2) +SLACK        → 留一点余量，避免首次启动后连装个包就满
+#   3) truncate      → 把镜像文件本身也截到新尺寸，否则只是 fs 小了文件没小
+#
+# 注意 resize2fs -M 只能对已卸载、已 e2fsck 干净的文件系统做，所以放在这里。
+SLACK_MIB=${SLACK_MIB:-100}
+BS=4096
+min_blocks=$(resize2fs -M "$OUT" 2>&1 | sed -n 's/.*now \([0-9]*\).*blocks long.*/\1/p' | tail -1)
+if [ -z "$min_blocks" ]; then
+  # 某些版本输出措辞不同，回退到从超级块读
+  min_blocks=$(dumpe2fs -h "$OUT" 2>/dev/null | awk -F: '/^Block count/{gsub(/ /,"",$2); print $2}')
+fi
+if [ -n "$min_blocks" ]; then
+  slack_blocks=$(( SLACK_MIB * 1024 * 1024 / BS ))
+  want_blocks=$(( min_blocks + slack_blocks ))
+  # 对齐到 16 MiB，避免产生零头
+  align=$(( 16 * 1024 * 1024 / BS ))
+  want_blocks=$(( (want_blocks + align - 1) / align * align ))
+  say "紧缩: 最小 ${min_blocks} 块 ($((min_blocks*BS/1048576)) MiB) + 冗余 ${SLACK_MIB} MiB → ${want_blocks} 块"
+  resize2fs -f "$OUT" "$want_blocks" > /dev/null 2>&1
+  # fs 缩小后文件本身还没变小，必须截断，否则前面全白做
+  truncate -s $(( want_blocks * BS )) "$OUT"
+  e2fsck -f -y "$OUT" > /dev/null 2>&1 || true
+  say "紧缩后: $(du -h "$OUT" | cut -f1)（调用方原本给的是 $BLOCKS 块）"
+else
+  say "紧缩: 读不到最小块数，跳过（保持调用方给的 $BLOCKS 块）"
+fi
 
 # ---------------------------------------------------------------- 4. 导出 sparse
 rm -f "$SPARSE"

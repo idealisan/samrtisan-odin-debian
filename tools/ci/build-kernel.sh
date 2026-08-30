@@ -70,8 +70,13 @@ cp arch/arm64/boot/Image "$OUT/vmlinuz"
 say "vmlinuz: $(stat -c%s "$OUT/vmlinuz") 字节"
 
 MODSTAGE=$(mktemp -d)
-make ARCH=arm64 CROSS_COMPILE="$CROSS" INSTALL_MOD_PATH="$MODSTAGE" modules_install \
-  >/dev/null 2>&1
+# modules_install 同样要看得见：depmod 在这一步跑，跨架构告警（如 Bad ELF）
+# 曾经被 >/dev/null 吞掉，失败时只剩一个非零退出码、没有任何线索
+if ! make ARCH=arm64 CROSS_COMPILE="$CROSS" INSTALL_MOD_PATH="$MODSTAGE" modules_install 2>&1 \
+     | tee /tmp/odin-modules-install.log; then
+  echo "modules_install 失败，日志见上面（同一份也留在 /tmp/odin-modules-install.log）" >&2
+  exit 1
+fi
 tar -cf "$OUT/modules.tar" -C "$MODSTAGE" .
 rm -rf "$MODSTAGE"
 say "modules.tar: $(stat -c%s "$OUT/modules.tar") 字节"
