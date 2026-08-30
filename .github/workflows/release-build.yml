@@ -42,6 +42,17 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  # 同一个 workflow 的多次运行**串行排队**，不取消在跑的那次。
+  #
+  # 为什么：两轮并行会抢同一份 ccache（key 相同）。后一轮在前一轮把缓存写回去
+  # 之前就恢复 ⇒ 两轮都是冷编（各 30 分钟），而且两轮结束时都要写同一个 key，
+  # 后写的覆盖先写的。排队等反而又快又省 runner 时间。
+  #
+  # 不取消在跑的：它是有价值的（正在把缓存建起来），取消等于白跑。
+  group: release-build
+  cancel-in-progress: false
+
 env:
   # 上游基线 Linux 6.19（不是本地 odin-wip 的 HEAD —— 那个已经含我们的补丁）
   KERNEL_SHA: 05f7e89ab9731565d8a62e3b5d1ec206485eeb0b
