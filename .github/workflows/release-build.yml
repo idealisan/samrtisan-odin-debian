@@ -129,15 +129,20 @@ jobs:
           echo "cc=$ccid" >> "$GITHUB_OUTPUT"
           echo "编译器身份: $ccid"
           ccache -z
-      # 缓存键四段：格式版本 + 编译器身份 + 内核 SHA + 补丁内容哈希。
+      # 缓存键五段：格式版本 + 编译器身份 + 内核 SHA + 补丁内容 + 内核配置。
       #   v2 —— ccache 规则（compiler_check / hash_dir）变更后的新格式，与 v1 条目
       #         互不通用，必须换 key 才能摆脱那份冻结的旧缓存。
       #   内核 SHA + 补丁哈希 —— 任一方变了缓存自然失效；不能为了命中率牺牲正确性。
+      #   内核配置 —— 这一项最容易漏，漏了后果和"编译器身份"那次一样：
+      #     改 .config 会改变 autoconf.h，几乎所有编译单元都要重编；
+      #     但 key 若不含配置，就会精确命中旧缓存（恢复一堆用不上的对象），
+      #     又因为精确命中而不回传 ⇒ 之后每轮都是"恢复旧缓存 + 全量重编"。
+      #     实测：第五轮正是撞在这个上（RTC 配置改动后仍恢复旧缓存）。
       - name: 取 ccache 缓存
         uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
-          key: kernel-ccache-v2-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-${{ hashFiles('patches/*.patch') }}
+          key: kernel-ccache-v2-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-${{ hashFiles('patches/*.patch') }}-${{ hashFiles('config-postmarketos-qcom-msm8953.aarch64') }}
           restore-keys: |
             kernel-ccache-v2-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-
             kernel-ccache-v2-${{ steps.toolchain.outputs.cc }}-
