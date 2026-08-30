@@ -1381,3 +1381,121 @@ sshd 主机密钥，PC 上 known_hosts 里的旧记录失效。
 - 仓库里出现过一份并非我创建的 `dts/msm8953-smartisan-odin-touch.dtsi`
   （含触摸节点，被两个变体 .dts include）。用户说没在并行改，按指示删除，
   内容留档在 `tmp/dts-test/touch.dtsi.存档`。
+
+### 贰拾柒：RTC —— 按 pmOS 的完整流程梳理后改用 fake-hwclock
+
+- **23:18 完成** — 时钟用户态一环改用 Debian 自带的 fake-hwclock（commit `21322f0`），
+  报告见 `reports/023-RTC-postmarketOS的完整流程与本机改造.md`
+- 要点
+  - 干净克隆了三个 pmOS 仓库做对照（`tmp/pmos-refs/`）：pmaports、
+    linux-postmarketos-qcom-msm8953、swclock-offset。
+  - 关键证据：`device/community/soc-qcom-msm8953/APKBUILD` 里
+    `depends="$pkgname-ucm swclock-offset"` —— 方案挂在 SoC 包上，
+    markw 等全系 msm8953 机型都会装；全仓共 14 处依赖。
+  - pmOS 的流程是四层：内核不读不写（HCTOSYS/SYSTOHC 都关）→ 设备树不加
+    allow-set-time → 用户态 swclock-offset 关机存「系统时间 − RTC」的偏差、
+    开机 RTC + 偏差还原 → 联网靠 NTP。
+  - 本机实测与之吻合：不加 allow-set-time 写 RTC 是 -ENODEV；
+    加了则 `hwclock --systohc` 把整机挂死（进程不可中断）。
+  - 没照搬它的自制脚本，改用 Debian 的 fake-hwclock：存绝对时间，
+    `/etc/fake-hwclock.data`，sysinit 早期 load、关机 save。
+  - 补了 pmOS 参考实现缺的一块：fake-hwclock 的每小时存盘靠
+    `/etc/cron.hourly/fake-hwclock`，要 cron 才跑，所以一并装 cron ——
+    手机很少干净关机，只靠关机存盘一硬复位就全丢。
+- **踩坑**：fake-hwclock 的数据文件是 **`/etc/fake-hwclock.data`**，
+  不是 `/var/lib/…`（`/sbin/fake-hwclock` 第 14 行 `FILE=` 写死的默认值）。
+  之前注释里写错了路径，已更正。
+- **踩坑**：bookworm 的 util-linux-extra **没有** hwclock-save.service
+  （只有 `/etc/init.d/hwclock.sh` 与 udev 的 hwclock-set，两者开头都是
+  `[ -e /run/systemd/system ] && exit 0`）。之前那句 `systemctl mask`
+  是照 pmOS 的思路想当然加的，撤掉。
+- **踩坑**：本仓库有**另一个会话在并行改同一批文件**。我 23:14 改
+  `setup-rootfs.sh` 时它 23:06 刚改过；并发写入把我写入的一行弄坏了
+  （混进 `2m` 前缀），已修复。改文件前先看 mtime，改完立刻 commit + push。
+- **踩坑**：OrbStack 的 Docker 守护进程会无响应（负载高时更明显），
+  `docker` 命令全部挂住；`orbctl stop && orbctl start` 可恢复，
+  但会杀掉容器里正在跑的构建。
+- **踩坑**：写文件用相对路径会被解析到 `.codebuddy/worktrees/bg-d58d0c38/`
+  而不是主仓库（WORKLOG 早先记过，又踩了一次）；报告最后是 `cp` 过去的。
+
+---
+
+## 2026-08-30 23:50 · RTC：照 postmarketOS 的完整流程改造（报告 023）
+
+### 起因
+
+真机时间一直是错的：显示 2026-04-27（systemd 的打包日期，无 RTC 时 systemd
+兜底用的就是这个），联网校正后一重启又回去。用户要求：先用**干净克隆**的
+postmarketOS 源码做对照分析，把它的完整流程搞清楚，再照着改我们这一套。
+
+### 干净克隆的参考仓库（都在 tmp/pmos-refs/）
+
+| 仓库 | 说明 |
+|---|---|
+| pmaports（161M，全量） | device-xiaomi-markw、soc-qcom-msm8953、官方内核配置 |
+| swclock-offset（全量，24 个提交） | 官方"存文件"方案的实现，不在 pmaports 里，是独立仓库 |
+| msm8953-mainline/linux（全量） | **pmOS 的 linux-postmarketos-qcom-msm8953 实际就是从这个仓库构建的**（APKBUILD 里 `url="https://github.com/msm8953-mainline/linux"`）。gitlab.com 上并没有这个仓库，一开始按 gitlab 地址克隆必然 401。 |
+
+### pmOS 的完整流程（四层）
+
+1. **SoC 包把方案钉死**：`device/community/soc-qcom-msm8953/APKBUILD` 写着
+   `depends="$pkgname-ucm swclock-offset"` —— markw 等整系 msm8953 机型都会装上。
+   全仓共 14 个设备/SoC 包依赖它。
+2. **内核不读不写 RTC**：官方配置里 `RTC_HCTOSYS` / `RTC_SYSTOHC` 都关着，
+   `RTC_DRV_PM8XXX=m`。与我们基线的 RTC 部分逐项一致。
+3. **设备树不加 allow-set-time**：主线所有 msm8953 机型都没有（只有 pmp8074 用过）。
+4. **用户态 swclock-offset**：关机把「系统时间 − RTC」存进
+   `/var/cache/swclock-offset/offset-storage`，开机 `RTC + 偏差` 还原；
+   服务位置是 fsck 之前 load、关机时 save。包描述原文：
+   *"Keep system time at an offset to a non-writable RTC"*。
+
+### 本机实测：RTC 只能读，不能写
+
+- 不加 `allow-set-time`：`rtc-pm8xxx` 的 `set_time` 走 `pm8xxx_rtc_update_offset()`，
+  它要设备树里名为 `offset` 的 nvmem cell，本机没有 ⇒ `return -ENODEV` ⇒
+  `hwclock --systohc` 报 `ioctl(RTC_SET_TIME) ... No such device`。
+- 加 `allow-set-time` 让它真写寄存器：`hwclock --systohc` 把整机**挂死**
+  （进程卡在不可中断状态，设备端的 `timeout` 都杀不掉）。
+- 之前开 `CONFIG_RTC_HCTOSYS/SYSTOHC=y` 的那版，真机出现 5–12 分钟一次的
+  周期性硬复位 —— 已撤销，本次需复验确认消失。
+
+### 改造：照流程走，但用户态用 Debian 自带的
+
+既然两边都是"写文件、读文件"，就不自己移植 swclock-offset，改用 bookworm 的
+`fake-hwclock`（0.12+nmu1，已解包逐字核对）。额外补的两处：
+
+1. **数据文件路径写错**：是 `/etc/fake-hwclock.data`，不是注释里原先写的
+   `/var/lib/…`（`/sbin/fake-hwclock` 里 `FILE=` 写死）。
+2. **装上 cron**：fake-hwclock 自带的 `/etc/cron.hourly/fake-hwclock` 要 cron
+   才跑得起来，而 minbase 不带 cron。手机很少干净关机，只有关机存盘的话
+   一掉电或长按电源硬复位就全丢 —— 这正好补上 pmOS 参考实现的短板
+   （它只在关机时存一次）。
+
+顺带撤掉一处想当然的屏蔽：`systemctl mask hwclock-save.service` ——
+bookworm 的 `util-linux-extra` 根本没有这个 unit，它只带
+`/etc/init.d/hwclock.sh` 与 udev 的 `hwclock-set`，两者开头都是
+`[ -e /run/systemd/system ] && exit 0`，systemd 下压根不会去写 RTC。
+
+### 过程中的坑
+
+- **两个会话在改同一个仓库**：对方提交了 `0d8841c`/`eb54960`/`328e50d`，
+  报告 023 也是同一时段出现的同名文件。我改 `setup-rootfs.sh` 时撞上并发写入，
+  被混入一行 `2m` 前缀的坏行（已修，`bash -n` 通过）。**同时刷机是真实风险**，
+  已语音提醒用户关掉一个会话。
+- **编辑工具把相对路径解析到 `.codebuddy/worktrees/bg-d58d0c38/`**：
+  报告 023 第一次就写进了 worktree，得再复制回主仓库（这个坑贰拾陆里记过）。
+- **OrbStack 会被高负载拖垮**：JOBS 用满时 docker 守护进程反复挂掉，
+  内核编到一半就断。改用 `JOBS=4` 后稳定。
+- **容器里 `git fetch` 会卡死**：取内核那步 20 分钟零增长；
+  在 Mac 侧绕代理直接克隆则正常（3.4MB/s）。构建改指向已有的
+  `tmp/linux-kernel-pmos`（已在新基线 `770e10fa1` 上）来避开这一步。
+- **工作区里有一份未提交的 `allow-set-time` 实验补丁**（对方会话加的），
+  与"写 RTC 会挂死"的结论冲突。为保证产物可预期，改用 `git archive HEAD`
+  导出的干净副本构建（`tmp/build-head`）。
+
+### 状态
+
+- 分析与代码改动已完成并推送（`21322f0`、`acaebd9`）。
+- 完整刷机包正在从 HEAD 干净副本构建（内核 → DTB → rootfs → 汇总）。
+- 待真机复验：联网后时间正确；重启后时间停在上次存盘点附近而非 2026-04-27；
+  `/etc/fake-hwclock.data` 在更新；连续静置 ≥15 分钟无周期性重启。
