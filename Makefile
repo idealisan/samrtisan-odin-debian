@@ -99,6 +99,17 @@ DTB_NAMES := msm8953-smartisan-odin \
              msm8953-smartisan-odin-ft8716-norolesw
 
 # ---------------------------------------------------------------- 目标
+# 描述"某棵内核源码树状态"的三个戳（fetch / dtb / kernel）必须按 KDIR 分开。
+#
+# 戳文件记的是一棵源码树的状态，不是"本项目取过源码"这件事。换一棵树却沿用旧戳，
+# make 会认为源码已取过、直接跳过 fetch ⇒ 补丁打进一个不存在的目录，
+# 报错是 `cd: /xxx: No such file or directory`，离真因有十万八千里。
+#
+# CI 上只有一棵树，永远不会遇到；本地必须给 dtb 与 kernel 各用一棵树
+# （dtb 只打 0007，kernel 打 0001-0008，共用一棵会撞"0007 已应用"），
+# 这个坑是必然踩到的。见 docs/05 第一节。
+KDIR_TAG := $(subst /,_,$(abspath $(KDIR)))
+
 .PHONY: all help print-config fetch-kernel dtb kernel lk2nd \
         rootfs rootfs-core rootfs-gui \
         publish publish-core publish-gui \
@@ -131,8 +142,8 @@ $(STAMPS):
 # ================================================================ 内核源码
 # 保留脚本：三级回退（depth 1 → shallow-since → 整支 master）+ 重试，
 # 上游 GitHub 只让取 ref 能到达的 commit，这段是纯逻辑，留在脚本里。
-fetch-kernel: $(STAMPS)/fetch-kernel
-$(STAMPS)/fetch-kernel: | $(STAMPS)
+fetch-kernel: $(STAMPS)/fetch-$(KDIR_TAG)
+$(STAMPS)/fetch-$(KDIR_TAG): | $(STAMPS)
 	KDIR="$(KDIR)" KERNEL_REPO="$(KERNEL_REPO)" KERNEL_SHA="$(KERNEL_SHA)" \
 		KERNEL_BRANCH="$(KERNEL_BRANCH)" KERNEL_SINCE="$(KERNEL_SINCE)" \
 		bash $(REPO)/tools/ci/fetch-kernel.sh "$(KDIR)"
@@ -141,8 +152,8 @@ $(STAMPS)/fetch-kernel: | $(STAMPS)
 # ================================================================ 设备树
 # DTB 只依赖 0007（设备树）；0001-0006/0008 是驱动，编 DTB 用不到，
 # 少打几个补丁就少几个失配点。
-dtb: $(STAMPS)/dtb
-$(STAMPS)/dtb: | $(STAMPS) fetch-kernel
+dtb: $(STAMPS)/dtb-$(KDIR_TAG)
+$(STAMPS)/dtb-$(KDIR_TAG): | $(STAMPS) fetch-kernel
 	@mkdir -p $(DTB_OUT)
 	@echo "[dtb] 应用设备树补丁 0007"
 	if [ ! -f "$(KDIR)/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts" ]; then \
@@ -163,8 +174,17 @@ $(STAMPS)/dtb: | $(STAMPS) fetch-kernel
 			echo "[dtb]   ❌ $$v 里没有 smartisan,odin-ft8716" >&2; exit 1; \
 		fi; \
 	done
-	@if dtc -I dtb -O dts "$(DTB_OUT)/msm8953-smartisan-odin-ft8716-norolesw.dtb" 2>/dev/null \
-		| grep -q "usb-role-switch"; then \
+# 自检一律写成 `| grep -c` 再比数量，**不要**写 `| grep -q`。
+# 原因：本 Makefile 全局开了 -o pipefail（上面 .SHELLFLAGS），而 grep -q 一匹配上
+# 就退出，把上游命令撞成 SIGPIPE(141)，pipefail 会把整个管道判为失败 ⇒
+# `if 管道; then` 走进 else 分支。实测后果有两种，都很糟：
+#   · "必须搜到"的检查 ⇒ 明明搜到了却报缺失（lk2nd 的 odin 条目，本地实测触发）
+#   · "必须搜不到"的检查 ⇒ 明明搜到了却报通过（假通过，比报错更危险）
+# 这是竞态：上游是否已经写完管道决定了会不会被信号打断，所以 CI 上时好时坏。
+# grep -c 会把输入读完，不给上游留 SIGPIPE 的机会，行为确定。
+	@n=$$(dtc -I dtb -O dts "$(DTB_OUT)/msm8953-smartisan-odin-ft8716-norolesw.dtb" 2>/dev/null \
+		| grep -c "usb-role-switch"); \
+	if [ "$$n" -gt 0 ]; then \
 		echo "[dtb]   ❌ 安全版仍含 usb-role-switch" >&2; exit 1; \
 	else \
 		echo "[dtb]   ✅ 安全版无 usb-role-switch"; \
@@ -173,8 +193,8 @@ $(STAMPS)/dtb: | $(STAMPS) fetch-kernel
 
 # ================================================================ 内核与模块
 # 0001-0008 全打：CI 的价值之一就是持续证明这些补丁仍适用于钉死的 commit。
-kernel: $(STAMPS)/kernel
-$(STAMPS)/kernel: | $(STAMPS) fetch-kernel
+kernel: $(STAMPS)/kernel-$(KDIR_TAG)
+$(STAMPS)/kernel-$(KDIR_TAG): | $(STAMPS) fetch-kernel
 	@mkdir -p $(KERNEL_OUT)
 	@echo "[kernel] 应用补丁 0001-0008"
 	@for p in $(sort $(wildcard $(REPO)/patches/*.patch)); do \
@@ -201,7 +221,7 @@ $(STAMPS)/kernel: | $(STAMPS) fetch-kernel
 	@echo "[kernel]   modules.tar $$($(call SIZE,$(KERNEL_OUT)/modules.tar)) 字节"
 	@echo "[kernel] 自检：新增驱动应编出来"
 	@for drv in panel-ft8716 panel-r69006 panel-nt36672; do \
-		if find "$(KDIR)" -name "$$drv.ko" | grep -q .; then \
+		if [ "$$(find "$(KDIR)" -name "$$drv.ko" | grep -c .)" -gt 0 ]; then \
 			echo "[kernel]   ✅ $$drv.ko"; \
 		else \
 			echo "[kernel]   ❌ $$drv.ko 缺失" >&2; exit 1; \
@@ -244,12 +264,12 @@ $(STAMPS)/lk2nd: | $(STAMPS)
 	cp -f "$(LK2ND_SRC)/build-lk2nd-msm8953/lk2nd.img" "$(LK2ND_OUT)/lk2nd-nomarkw.img"
 	@echo "[lk2nd]   lk2nd-nomarkw.img $$($(call SIZE,$(LK2ND_OUT)/lk2nd-nomarkw.img)) 字节"
 	@echo "[lk2nd] 自检"
-	@if strings "$(LK2ND_OUT)/lk2nd-nomarkw.img" | grep -q "xiaomi-markw"; then \
+	@if [ "$$(strings "$(LK2ND_OUT)/lk2nd-nomarkw.img" | grep -c "xiaomi-markw")" -gt 0 ]; then \
 		echo "[lk2nd]   ❌ 仍能搜到 xiaomi-markw" >&2; exit 1; \
 	else \
 		echo "[lk2nd]   ✅ xiaomi-markw: 0 处"; \
 	fi
-	@if strings "$(LK2ND_OUT)/lk2nd-nomarkw.img" | grep -q "smartisan-odin"; then \
+	@if [ "$$(strings "$(LK2ND_OUT)/lk2nd-nomarkw.img" | grep -c "smartisan-odin")" -gt 0 ]; then \
 		echo "[lk2nd]   ✅ smartisan-odin: 保留"; \
 	else \
 		echo "[lk2nd]   ❌ odin 条目丢失" >&2; exit 1; \
