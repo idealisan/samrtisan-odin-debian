@@ -139,8 +139,19 @@ fi
 
 # ---------------------------------------------------------------- 30 boot
 if run 30; then
-  step "30 boot（刷 lk2nd → lk2nd 分区）"
+  step "30 boot（刷 lk2nd）"
   require_fastboot "不在 fastboot，先跑 --from 20"
+
+  # 关于 reports/018 §二② 那条"绝对不要在这一步刷 lk2nd.img"的警告：
+  # 它针对的是**人工单次操作**的场景 —— 那时设备上的 lk2nd 是唯一的救援通道，
+  # 换掉它、若新版起不来就没有 fastboot 可回（真砖，只能 9008 EDL）。
+  # 但本项目是**CI/CD 流水线**，交付物就是"能从头刷入的一整套产物"：
+  # 不能依赖目标机上恰好有什么 lk2nd，所以 lk2nd 必须刷，且是流程的一部分。
+  # 正确的应对不是绕开这一步，而是把 lk2nd 本身修好（见 tools/ci/build-lk2nd.sh）。
+  #
+  # 仍然保留 SKIP_LK2ND=1 应急开关：真机调试、或想保留现有 lk2nd 时可用。
+  # 万一刷完起不来：长按电源关机 → 音量减+电源 进原厂 fastboot →
+  #   fastboot flash boot evidence/live-device-backup/boot-partition.img 可恢复。
 
   # ★★ 关键：lk2nd 装在自己那个叫 lk2nd 的分区里，不是 boot。
   #
@@ -155,10 +166,13 @@ if run 30; then
   # 偏移 0 那个旧的 lk2nd 毫发无损，重启后照样是旧版在跑 —— 而命令返回 OKAY，
   # 看上去一切正常。要换掉 lk2nd，必须刷 lk2nd 分区。
   LK2ND_PART=${LK2ND_PART:-lk2nd}
-  log "刷入 $(basename "$BOOT_IMG") → ${LK2ND_PART} 分区"
-  if [ "$DRY" = 1 ]; then
+  if [ "${SKIP_LK2ND:-0}" = 1 ]; then
+    ok "SKIP_LK2ND=1：跳过刷 lk2nd，保留现有版本"
+  elif [ "$DRY" = 1 ]; then
+    log "刷入 $(basename "$BOOT_IMG") → ${LK2ND_PART} 分区"
     info "[dry-run] fastboot flash ${LK2ND_PART} $BOOT_IMG"
   else
+    log "刷入 $(basename "$BOOT_IMG") → ${LK2ND_PART} 分区"
     if ! fb flash "$LK2ND_PART" "$BOOT_IMG"; then
       warn "刷 ${LK2ND_PART} 分区失败，回退刷 boot（有些环境不会导出 lk2nd 分区名）"
       fb flash boot "$BOOT_IMG" || die "刷 boot 失败"
