@@ -15,9 +15,15 @@
 # 产物（全部挂到该 Release 上）：
 #   lk2nd.img / lk2nd-nomarkw.img   刷 boot 分区的二级引导（精简版强制命中 odin）
 #   msm8953-smartisan-odin*.dtb ×4  设备树
-#   odin-debian.img                 刷 userdata 的完整系统
+#   odin-debian.img                 刷 userdata 的系统（core 变体，无 GUI）
 #   odin-debian-sparse.img          同上 sparse 版，fastboot 分块传输用
+#   odin-debian-gui.img             同上，gui 变体（Plasma Mobile 桌面）
+#   odin-debian-gui-sparse.img      同上 sparse 版
 #   SHA256SUMS                      全部产物的校验和
+#
+# 五个 job：dtb、lk2nd、kernel 并行 → rootfs×2（core / gui，matrix）→ publish。
+# core 是 gui 的子集，所以本地只编 gui（Makefile 的 ODIN_VARIANT 默认 gui）；
+# CI 两个都编，因为要发布的东西必须两个都验过。
 
 name: release-build
 
@@ -77,17 +83,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: 取 ccache 缓存
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ccache
-          # 内核源码 SHA + 补丁内容共同决定缓存键：任一方变了缓存自然失效。
-          # 不能为了命中率牺牲正确性，所以 hashFiles('patches/*.patch') 必须留在 key 里。
-          key: kernel-ccache-${{ env.KERNEL_SHA }}-${{ hashFiles('patches/*.patch') }}
-          restore-keys: |
-            kernel-ccache-${{ env.KERNEL_SHA }}-
-            kernel-ccache-
+      # 先装工具链，再取缓存：缓存键要带上编译器身份（见下），没装就无从计算。
       - name: 安装交叉编译工具链
+        id: toolchain
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq gcc-aarch64-linux-gnu bc bison flex \
@@ -107,7 +105,32 @@ jobs:
           # 注意：改配置会让既有缓存条目全部失效一次（哈希规则变了），只此一次。
           ccache --set-config=compiler_check=content
           ccache --set-config=hash_dir=false
+          # 编译器身份（版本 + 二进制 md5 前 8 位）写进缓存键。
+          #
+          # 为什么必须有这一段（踩过才知道）：**actions/cache 在精确命中时会跳过
+          # 上传**。于是只要 key 不变，缓存就永远冻结在第一份快照上 ——
+          # 即便 ccache 规则改了、编译器换了，每次恢复到的还是那份用不上的旧数据，
+          # 命中率永远是 2%（实测第二轮照样编了 30 分钟）。
+          # 把编译器身份编进 key：编译器一换 ⇒ key 变 ⇒ 无精确命中 ⇒
+          # 这一轮冷编一次并把新缓存存上去，之后轮次才命中。
+          ccbin=$(command -v aarch64-linux-gnu-gcc)
+          ccid="$(aarch64-linux-gnu-gcc -dumpversion)-$(md5sum "$ccbin" | cut -c1-8)"
+          echo "cc=$ccid" >> "$GITHUB_OUTPUT"
+          echo "编译器身份: $ccid"
           ccache -z
+      # 缓存键四段：格式版本 + 编译器身份 + 内核 SHA + 补丁内容哈希。
+      #   v2 —— ccache 规则（compiler_check / hash_dir）变更后的新格式，与 v1 条目
+      #         互不通用，必须换 key 才能摆脱那份冻结的旧缓存。
+      #   内核 SHA + 补丁哈希 —— 任一方变了缓存自然失效；不能为了命中率牺牲正确性。
+      - name: 取 ccache 缓存
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: kernel-ccache-v2-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-${{ hashFiles('patches/*.patch') }}
+          restore-keys: |
+            kernel-ccache-v2-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-
+            kernel-ccache-v2-${{ steps.toolchain.outputs.cc }}-
+            kernel-ccache-v2-
       - name: 编译内核与模块
         run: make kernel OUT=out
       - uses: actions/upload-artifact@v4
@@ -118,9 +141,19 @@ jobs:
             out/kernel/modules.tar
 
   # ------------------------------------------------------------------ 系统镜像
+  # 两个变体各一条 job（matrix）：core 无 GUI、gui 带 Plasma Mobile。
+  # dtb 与 kernel 的 artifact 两条都下载，但它们是同一份产物 —— 变体只影响
+  # rootfs 阶段装什么包，引导与内核两变体完全一样，没必要编两遍。
   rootfs:
     runs-on: ubuntu-latest
     needs: [kernel, dtb]
+    strategy:
+      # 一条失败不要让另一条被取消：core 与 gui 各自独立可发布，
+      # 而且 gui 挂掉时留着 core 的日志对比更容易定位。
+      fail-fast: false
+      matrix:
+        variant: [core, gui]
+    name: rootfs (${{ matrix.variant }})
     steps:
       - uses: actions/checkout@v4
       - name: 安装 debootstrap 与 arm64 模拟执行环境
@@ -142,14 +175,12 @@ jobs:
           # -o kernel -o dtb：这两个是上一个 job 的 artifact、刚下载到 out/ 里，
           # 不是这个 runner 编出来的。make 的 --old-file 正是"视为最新、不要重造"
           # 的语义，正好对上；不加就会在这里把内核重编一遍（20+ 分钟）。
-          sudo -E make -o kernel -o dtb rootfs OUT=out
-          sudo chown -R "$(id -u):$(id -g)" out/rootfs
+          sudo -E make -o kernel -o dtb rootfs-${{ matrix.variant }} OUT=out
+          sudo chown -R "$(id -u):$(id -g)" out/rootfs-${{ matrix.variant }}
       - uses: actions/upload-artifact@v4
         with:
-          name: odin-rootfs
-          path: |
-            out/rootfs/odin-debian.img
-            out/rootfs/odin-debian-sparse.img
+          name: odin-rootfs-${{ matrix.variant }}
+          path: out/rootfs-${{ matrix.variant }}/*.img
 
   # ------------------------------------------------------------------ 挂到 Release
   publish:
@@ -164,9 +195,33 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { name: odin-lk2nd, path: out }
       - uses: actions/download-artifact@v4
-        with: { name: odin-rootfs, path: out }
+        with: { name: odin-rootfs-core, path: out }
+      - uses: actions/download-artifact@v4
+        with: { name: odin-rootfs-gui, path: out }
       - name: 生成校验和
+        # 校验和按"逻辑资产"算，也就是**重组之后**的那个文件。
+        # 下一步会把超过 2 GiB 的切成片段，片段自身的校验和没有意义；
+        # 用户在 PC 上 cat 回来之后，要能对着这里的和对一遍。
         run: cd out && sha256sum * | sort -k2 > SHA256SUMS && cat SHA256SUMS
+      - name: 切分超过 2 GiB 的资产
+        # GitHub Release 单个资产上限 2 GiB（严格小于），GUI 镜像必然超过。
+        # 切成 1900 MiB 一片上传，刷机前在 PC 上拼回去：
+        #   cat odin-debian-gui.img.part-* > odin-debian-gui.img
+        # 片段名带 .part-NN 数字后缀，按字典序 cat 就是正确顺序。
+        # 阈值取 2000000000 而不是 2147483648：留点余量，别贴着上限走。
+        run: |
+          cd out
+          for f in *; do
+            [ -f "$f" ] || continue
+            [ "$f" = SHA256SUMS ] && continue
+            sz=$(stat -c%s "$f")
+            if [ "$sz" -ge 2000000000 ]; then
+              echo "切分 $f（$sz 字节）"
+              split -b 1900M -d -a 2 "$f" "$f.part-"
+              rm -f "$f"
+            fi
+          done
+          ls -l
       - name: 上传到 Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
