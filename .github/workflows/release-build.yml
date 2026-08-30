@@ -92,8 +92,21 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq gcc-aarch64-linux-gnu bc bison flex \
             libssl-dev libelf-dev kmod cpio rsync patch ccache
-          ccache --set-config=max_size=2G
+          ccache --set-config=max_size=5G
           ccache --set-config=compression=true
+          # 下面两条是 ccache 的默认值，在这个项目上必然导致全量未命中，必须改掉。
+          # 实测（debian:bookworm 容器，ccache 4.7.5，带 -g 编译）：
+          #   compiler_check 默认 mtime —— 把编译器二进制的 mtime 计入哈希。
+          #     本 job 每次都全新 apt-get install 交叉编译器 ⇒ mtime 每次都变
+          #     ⇒ 4399 个编译单元全部未命中，实测命中率 2.02%，内核编 29 分钟。
+          #     对照实验：只 touch 编译器，命中率就从 100% 掉到 0%。
+          #   hash_dir 默认 true —— 带 -g 时把当前工作目录计入哈希
+          #     （本内核 CONFIG_DEBUG_INFO=y）。源码树位置一变（旧脚本用
+          #     /tmp/linux-msm8953，迁进 Makefile 后变成仓库内 tmp/）旧缓存整体作废。
+          # 改成 content + hash_dir=false 后，换目录与 touch 编译器都能 100% 命中。
+          # 注意：改配置会让既有缓存条目全部失效一次（哈希规则变了），只此一次。
+          ccache --set-config=compiler_check=content
+          ccache --set-config=hash_dir=false
           ccache -z
       - name: 编译内核与模块
         run: make kernel OUT=out
