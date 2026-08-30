@@ -86,6 +86,21 @@ if [ -x /sbin/odin-wlan-fw.sh ]; then
     fi
 fi
 
+# 蜂窝基带（MSS）固件 —— 同样必须在驱动索取之前就位，
+# 理由见脚本内注释与 reports/021。只有确实缺文件时才临时挂为 rw，
+# 取完立刻 sync 并挂回 ro。
+if [ -x /sbin/odin-modem-fw.sh ]; then
+    if /sbin/odin-modem-fw.sh /mnt --check; then
+        echo "[initramfs] 蜂窝固件已在位"
+    else
+        echo "[initramfs] 取出蜂窝固件"
+        mount -o remount,rw /mnt 2>/dev/null
+        /sbin/odin-modem-fw.sh /mnt
+        sync
+        mount -o remount,ro /mnt 2>/dev/null
+    fi
+fi
+
 # 注意：此处不得 umount /mnt —— 根必须保持挂载态供 switch_root 使用；
 # 只读挂载由 systemd 依 fstab 重挂为 rw。
 kill %1 %2 2>/dev/null
