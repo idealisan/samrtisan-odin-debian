@@ -185,6 +185,7 @@ chroot $R apt-get install -y -qq \
 	systemd-resolved systemd-timesyncd \
 	nftables 2>&1 || echo "[setup-rootfs] WARN: 部分网络包装不上，继续"
 chroot $R systemctl enable NetworkManager.service
+chroot $R systemctl enable odin-swap.service 2>/dev/null || true
 chroot $R systemctl enable wpa_supplicant.service 2>/dev/null || true
 
 # --- USB 救援通道保护（reports/013 的 P0-2） ---

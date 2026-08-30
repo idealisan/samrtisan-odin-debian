@@ -1,0 +1,15 @@
+[Unit]
+Description=Prepare swapfile (first boot)
+Documentation=file:/usr/local/sbin/odin-swap.sh
+# 要在文件系统就绪之后、内存压力出现之前把 swap 挂上
+DefaultDependencies=no
+After=local-fs.target
+Before=sysinit.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/odin-swap.sh
+
+[Install]
+WantedBy=sysinit.target
