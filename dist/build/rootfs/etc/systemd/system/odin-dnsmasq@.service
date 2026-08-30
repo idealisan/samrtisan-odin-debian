@@ -1,0 +1,62 @@
+# ODIN USB gadget 的 DHCP 服务器（每个网卡一个实例）
+#
+# 为什么必须独立成一个 unit，而不是由 odin-usb-role.sh 用 & 后台起：
+#
+#   odin-usb-role.sh 有两个调用者：udev 的 RUN{program} 和 systemd 的
+#   odin-usb-gadget.service。用裸 & 起的 dnsmasq 会留在**调用者**的 cgroup 里：
+#
+#     - 走 udev 时：udevd 在事件处理结束后会清理该事件 cgroup 内的遗留进程
+#       ⇒ dnsmasq 被杀。而 UDC 的 add 事件发生在内核枚举阶段，远早于
+#       multi-user.target，所以开机时第一个拉起它的就是 udev，必死。
+#     - 走 service 时：unit 重启按 KillMode 默认 control-group 清 cgroup
+#       ⇒ 也会被杀。
+#
+#   实测现象：日志里 dnsmasq 明明 "started" 且 "sockets bound exclusively to
+#   interface usb0"，随后 pgrep -x dnsmasq 却是 0，UDP 67 无人监听，PC 只能拿
+#   169.254 自分配地址。
+#
+# 独立成 unit 后，dnsmasq 有自己的 cgroup 和重启策略，上面两条都杀不到它；
+# 就算真被杀，Restart=always 也会在 3 秒后拉回来。
+
+[Unit]
+Description=ODIN USB gadget DHCP server on %i
+Documentation=file:/usr/local/sbin/odin-usb-role.sh
+# 只依赖网卡本身，**不要**写 After=odin-usb-gadget.service。
+# 那会造成死锁：gadget service 的脚本会 systemctl start 本 unit（默认阻塞），
+# 而本 unit 又要等 gadget service 先完成 ⇒ 两边互等，开机卡在
+# "USB Gadget Service" 上（真机实测就是这样卡住的）。
+After=sys-subsystem-net-devices-%i.device
+
+[Service]
+Type=simple
+# --no-daemon + --keep-in-foreground：让 dnsmasq 留在前台，由 systemd 管生命周期。
+# 注意 --no-daemon 下 --pid-file 不会写（实测 0 字节），所以这里干脆不用。
+#
+# 各参数都是有来历的，别随手删：
+#   --conf-file=/dev/null  绕开 /etc/dnsmasq.d/zz-gadget-exclude.conf 里的
+#                          bind-dynamic，它与 --bind-interfaces 互斥会直接退出
+#   --port=0               关掉 DNS 服务。我们只需要发地址，留着 DNS 会去监听
+#                          172.16.42.1:53，两个实例并发时抢这个端口
+#   --bind-interfaces      只钉在指定网卡，不通配
+#   --dhcp-range 单地址    PC 侧 MAC 每次重启都变，地址池若被旧租约占住会出现
+#                          "no address available" ⇒ PC 拿不到 IP
+#   --no-resolv --no-hosts 不提供 DNS 解析，与 --port=0 一致
+ExecStart=/usr/sbin/dnsmasq \
+	--no-daemon --keep-in-foreground \
+	--conf-file=/dev/null \
+	--port=0 \
+	--bind-interfaces \
+	--interface=%i \
+	--dhcp-range=172.16.42.2,172.16.42.2,1h \
+	--dhcp-option=option:router \
+	--no-resolv --no-hosts \
+	--log-facility=/var/log/odin-dnsmasq.log
+
+Restart=always
+RestartSec=3
+
+# 故意**不写** [Install] / WantedBy：本 unit 只在 usb0 真正起来了之后由
+# odin-usb-role.sh 按需 systemctl start 拉起，不参与开机事务。
+# 让它进 multi-user.target 反而危险：开机时 usb0 还没被 systemd 认成 device unit，
+# 本 unit 会一直卡在 starting，加上 After= 又把 odin-usb-gadget.service 拖在后面
+# ⇒ 开机卡死（真机实测）。按需启动既简单又不会拖慢开机。

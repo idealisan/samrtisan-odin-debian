@@ -21,7 +21,10 @@
 
 LOG=${ODIN_USB_ROLE_LOG:-/var/log/odin-usb-role.log}
 CFG=/sys/kernel/config/usb_gadget/odin
-PIDFILE=/run/odin-dnsmasq.pid
+# dnsmasq 由独立的 systemd unit 托管（见 etc/systemd/system/odin-dnsmasq@.service）。
+# 以前这里是 PIDFILE=/run/odin-dnsmasq.pid，但 --no-daemon 下 dnsmasq 根本不写
+# pidfile（实测 0 字节），靠它判定只会出错，已弃用。
+DNSMASQ_UNIT="${ODIN_DNSMASQ_UNIT:-odin-dnsmasq@usb0.service}"
 LOCK=/run/lock/odin-usb-role.lock
 #   odin-usb-role.sh [--dry-run]     加 --dry-run 只判断不动作（真机排障用：
 #                                    直接执行会抢走 pmOS 已绑定的 UDC，SSH 会断）
@@ -77,17 +80,13 @@ udc_now() { ls /sys/class/udc 2>/dev/null | head -n1; }
 
 # ---------------------------------------------------------------- device 分支
 dnsmasq_running() {
-	# 判定依据改成"进程命令行"，不用 pidfile。原因（本次真机踩到）：
-	#   1) pidfile 有可能是空的或被别的进程占着，只看它会误判成"已在运行"
-	#      而永远不启动，或反过来一直判定"没在跑"而反复起新实例；
-	#   2) 更关键的是 **--no-daemon 模式下 dnsmasq 根本不写 pidfile**
-	#      （实测：进程跑得好好的，$PIDFILE 是 0 字节）。于是依赖 pidfile
-	#      的判定恒为假 ⟹ 每次触发都再起一个 dnsmasq ⟹ 起两个、日志一堆
-	#      "failed to create listening socket ... Address already in use"。
-	# 直接按命令行筛：进程名是 dnsmasq 且带 --interface=usb0。
-	# 注意：别写成 `pgrep ... | while read; do ... return 0; done` —— while 在管道里
-	# 会开子 shell，里面的 return 退不出函数，判定会永远返回假。用命令替换喂养
-	# for 循环，循环体在当前 shell 里跑。
+	# dnsmasq 现在是独立的 systemd unit，判定直接问 systemd 最准。
+	if systemctl is-active --quiet "$DNSMASQ_UNIT" 2>/dev/null; then
+		return 0
+	fi
+	# systemd 不可用时的兜底（例如某些容器里跑 dry-run）：按进程命令行筛。
+	# 别写成 `pgrep | while read; do return 0; done` —— while 在管道里开子 shell，
+	# 里面的 return 退不出函数，判定会永远返回假。用命令替换喂 for 循环。
 	local p
 	for p in $(pgrep -x dnsmasq 2>/dev/null); do
 		if tr '\000' ' ' < "/proc/$p/cmdline" 2>/dev/null | grep -q -- "--interface=usb0"; then
@@ -145,11 +144,22 @@ apply_device() {
 
 	ip link set usb0 up 2>/dev/null
 	ip addr add ${HOST_IP}/24 dev usb0 2>/dev/null   # 已存在时报错无妨
+
 	# 固定手机侧 MAC（PC 侧看到的 host MAC 由内核/对端决定，这里固定本端即可）
-	ip link set usb0 down 2>/dev/null
-	ip link set usb0 address "$GADGET_DEV_MAC" 2>/dev/null
-	ip link set usb0 up 2>/dev/null
-	ip addr add ${HOST_IP}/24 dev usb0 2>/dev/null   # 重新 up 后地址会丢，补一次
+	#
+	# **仅当当前 MAC 不是目标 MAC 才重设**。
+	# 以前这里是无条件 down/up，而看门狗每 30s 跑一次脚本 —— 等于每 30s 把网卡
+	# 打掉一次。dnsmasq 用 --bind-interfaces 把 socket 钉死在 usb0 上（不会动态
+	# 重绑），链路 down 会让 DHCP 实际失效：进程还在，但发不出回包，PC 又退回
+	# 169.254。加重设守卫后，看门狗空跑时不再打断网络。
+	local cur_mac=""
+	[ -r /sys/class/net/usb0/address ] && cur_mac=$(cat /sys/class/net/usb0/address 2>/dev/null)
+	if [ "$cur_mac" != "$GADGET_DEV_MAC" ]; then
+		ip link set usb0 down 2>/dev/null
+		ip link set usb0 address "$GADGET_DEV_MAC" 2>/dev/null
+		ip link set usb0 up 2>/dev/null
+		ip addr add ${HOST_IP}/24 dev usb0 2>/dev/null   # 重新 up 后地址会丢，补一次
+	fi
 
 	# dnsmasq 地址池：给足范围，避免多次重启后旧租约把池占满导致 "no address available。
 	# 更稳妥的做法是每次启动都清空租约文件（下面执行）。
@@ -185,54 +195,36 @@ apply_device() {
 		log "device: dnsmasq already running, skip"
 		return 0
 	fi
-	rm -f "$PIDFILE" 2>/dev/null
-	# 清租约：gadget MAC 每次随机 ⇒ 旧租约会累积，把（单地址）池占满 ⇒ 新客户端 "no address available
-	rm -f /var/lib/misc/dnsmasq.leases 2>/dev/null
-	# 每次重建 gadget 都清空租约：gadget MAC 每次随机 ⇒ 旧租约会累积把地址池占满，导致新客户端 'no address available'
-	# 注意两点（都是真机踩出来的）：
-	#   1) 必须 --conf-file=/dev/null：系统 /etc/dnsmasq.d/zz-gadget-exclude.conf
-	#      里有 bind-dynamic，与命令行的 --bind-interfaces 冲突，
-	#      dnsmasq 会直接 "cannot set --bind-interfaces and --bind-dynamic" 退出。
-	#   2) 系统 dnsmasq 会占住 UDP 67（bind-dynamic 绑通配地址），导致这里起不来。
-	#      手机上没有别的用途，已在镜像里 disable 掉系统 dnsmasq。
-	#   3) **必须 --port=0 关掉 DNS 服务器**。实测踩到：dnsmasq 默认会去监听
-	#      172.16.42.1:53；而 udev 事件与 systemd 各会触发本脚本一次，两个实例
-	#      并发启动时第二个必然
-	#        "failed to create listening socket for 172.16.42.1: Address already in use"
-	#      叠加第一个实例又被 udev 事件收走 ⟹ 最后没有 dnsmasq 在跑，PC 拿不到
-	#      DHCP 回包、只能退回 169.254 自分配地址（本次真机实测到的正是这条链）。
-	#      我们只需要给 PC 发地址，DNS 完全用不上（--no-resolv --no-hosts 也印证
-	#      这一点），关掉它就能根除这个竞态的失败面。
-	start_dnsmasq() {
-		dnsmasq --no-daemon --pid-file="$PIDFILE" --interface=usb0 \
-			--conf-file=/dev/null \
-			--port=0 --bind-interfaces --dhcp-range=${CLIENT_IP},${CLIENT_IP_MAX},1h \
-			--dhcp-option=option:router --no-resolv --no-hosts \
-			--log-facility=/var/log/odin-dnsmasq.log &
-		# 等它把 pidfile 写完再判定，别拿 $! 直接查 —— dnsmasq 起得比 shell 拿到的
-		# pid 慢，容易出现"进程其实在跑、却判定成失败"
-		local i
-		for i in 1 2 3 4 5; do
-			sleep 1
-			dnsmasq_running && return 0
-			kill -0 $! 2>/dev/null || break   # 进程已退出，别再等
-		done
-		return 1
-	}
 
-	if start_dnsmasq; then
-		log "device: usb0=${HOST_IP}/24 dnsmasq started (pid $(cat "$PIDFILE" 2>/dev/null))"
+	# 清租约：gadget MAC 每次重启随机 ⇒ 旧租约会累积，把（单地址）池占满 ⇒
+	# 新客户端 "no address available"。每次重建 gadget 都清一次。
+	rm -f /var/lib/misc/dnsmasq.leases 2>/dev/null
+
+	# 【关键】交给 systemd unit 启动，而不是在这里用 & 裸起。
+	#
+	# 为什么：裸 & 起的 dnsmasq 会留在**调用者**的 cgroup 里。本脚本有两个调用者，
+	# udev 的 RUN{program} 和 odin-usb-gadget.service：
+	#   - udev 事件处理完会清理事件 cgroup ⇒ dnsmasq 被杀；
+	#     UDC 的 add 事件发生在内核枚举阶段、远早于 multi-user.target，
+	#     所以开机时第一个拉起它的就是 udev ⇒ 必死。
+	#   - service 重启时按 KillMode 默认 control-group 清 cgroup ⇒ 也会被杀。
+	# 独立成 unit 后 dnsmasq 有自己的 cgroup 和 Restart=always，两条都杀不到它，
+	# 真被杀也会在 3 秒后自己回来。
+	#
+	# dnsmasq 的具体参数（--conf-file=/dev/null / --port=0 / --bind-interfaces /
+	# 单地址池）全部在 unit 文件里维护，这里不再重复；注释见
+	# etc/systemd/system/odin-dnsmasq@.service。
+	# --no-block 很重要：默认 systemctl start 会一直阻塞到目标 unit 变 active。
+	# 本脚本是被 systemd 拉起的，若 dnsmasq unit 因任何原因起不来（比如 usb0 还没
+	# 被 systemd 认成 device unit），阻塞会让 odin-usb-gadget.service 一直挂在
+	# "starting"，看门狗也就再也排不上（实测开机卡在 USB Gadget Service 一分多钟）。
+	if systemctl start --no-block "$DNSMASQ_UNIT" 2>/dev/null; then
+		log "device: usb0=${HOST_IP}/24 dnsmasq start requested ($DNSMASQ_UNIT)"
 	else
-		# 并发启动抢端口是瞬时的，等一下再试一次；仍失败才留证据
-		log "device: dnsmasq 首次启动未成功，2s 后重试"
-		sleep 2
-		if start_dnsmasq; then
-			log "device: usb0=${HOST_IP}/24 dnsmasq 重试后启动 (pid $(cat "$PIDFILE" 2>/dev/null))"
-		else
-			log "device: dnsmasq FAILED to start; last log:"
-			tail -3 /var/log/odin-dnsmasq.log 2>/dev/null | sed 's/^/    /' | tee -a "$LOG"
-			log "device: hint: 检查 67 端口是否被别的 dnsmasq 占用"
-		fi
+		log "device: dnsmasq start FAILED ($DNSMASQ_UNIT); last log:"
+		tail -3 /var/log/odin-dnsmasq.log 2>/dev/null | sed 's/^/    /' | tee -a "$LOG"
+		systemctl status "$DNSMASQ_UNIT" --no-pager -n 5 2>/dev/null \
+			| sed 's/^/    /' | tee -a "$LOG"
 	fi
 	return 0
 }
@@ -248,10 +240,11 @@ apply_host() {
 	if [ -n "$cur" ]; then
 		echo "" > "$CFG/UDC" 2>/dev/null && log "host: unbound UDC '$cur'"
 	fi
+	# 以前这里是 kill "$(cat $PIDFILE)"，但 --no-daemon 下 $PIDFILE 恒为 0 字节
+	# ⇒ kill "" 必失败 ⇒ 切 host 时 dnsmasq 根本杀不掉。改走 systemctl。
 	if dnsmasq_running; then
-		kill "$(cat "$PIDFILE")" 2>/dev/null && log "host: dnsmasq stopped"
+		systemctl stop "$DNSMASQ_UNIT" 2>/dev/null && log "host: dnsmasq stopped"
 	fi
-	[ -s "$PIDFILE" ] && rm -f "$PIDFILE" 2>/dev/null
 	ip addr flush dev usb0 2>/dev/null
 	return 0
 }

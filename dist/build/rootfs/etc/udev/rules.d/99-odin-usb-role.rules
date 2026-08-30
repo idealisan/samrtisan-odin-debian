@@ -7,9 +7,24 @@
 # 注意：udev 的 RUN 有 60s 超时上限，脚本内的 UDC 等待窗口默认 20s，
 # 长等待交给 odin-usb-gadget.timer 看门狗（每 30s 一次）。
 
+# ★ 不要再用 RUN{program} 拉起脚本
+#
+# 以前这里是三条 RUN+="/usr/local/sbin/odin-usb-role.sh"。问题在于：脚本里 dnsmasq
+# 是用裸 & 起的，会留在 **udev 事件自身的 cgroup**；udevd 在事件处理完后会清理该
+# cgroup 内遗留的进程 ⇒ dnsmasq 被杀。而 UDC 的 add 事件发生在内核枚举阶段、远早于
+# multi-user.target，所以开机时第一个拉起 dnsmasq 的就是 udev ⇒ 必死。
+# 实测现象：日志里 dnsmasq "started" 且 "sockets bound exclusively to interface usb0"，
+# 随后 pgrep -x dnsmasq 是 0，UDP 67 无人监听，PC 只能退回 169.254。
+#
+# （现在 dnsmasq 已独立成 odin-dnsmasq@.service，就算走 RUN 也杀不到了。但 udev 官方
+# 明确不建议用 RUN 起长驻工作，改成走 systemd 是顺手把隐患一次清掉。）
+#
+# 改法：给设备打 systemd 标签，由 systemd 去拉 odin-usb-gadget.service。
+# 这样脚本永远在 service 自己的 cgroup 里跑，与 udev 事件的生命周期解耦。
+
 # UDC 增删是主触发器
-SUBSYSTEM=="udc", ACTION=="add",    RUN+="/usr/local/sbin/odin-usb-role.sh"
-SUBSYSTEM=="udc", ACTION=="remove", RUN+="/usr/local/sbin/odin-usb-role.sh"
+SUBSYSTEM=="udc", ACTION=="add",    TAG+="systemd", ENV{SYSTEMD_WANTS}=odin-usb-gadget.service
+SUBSYSTEM=="udc", ACTION=="remove", TAG+="systemd", ENV{SYSTEMD_WANTS}=odin-usb-gadget.service
 
 # Type-C data_role 变化为辅触发器
-SUBSYSTEM=="typec", ACTION=="change", RUN+="/usr/local/sbin/odin-usb-role.sh"
+SUBSYSTEM=="typec", ACTION=="change", TAG+="systemd", ENV{SYSTEMD_WANTS}=odin-usb-gadget.service

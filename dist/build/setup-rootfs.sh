@@ -60,9 +60,18 @@ After=systemd-modules-load.service
 Before=network.target sshd.service
 [Service]
 Type=oneshot
-RemainAfterExit=yes
-# 脚本内部保证任何分支都 exit 0；失败只留日志，由 .timer 看门狗重试
+# 注意：这里**故意不写** RemainAfterExit=yes。
+# 原因（真机实测踩到）：写了之后 unit 执行完永不转为 inactive，而本 unit 的看门狗
+# 用的是 OnUnitActiveSec=30s —— 它依赖 unit 的激活周期来排下一跳；unit 一直是 active
+# 时，systemd 252（Debian 12）不会重新排期 ⇒ timer 触发一次就再也不触发了
+# （实测：LastTriggerUSec 停在开机后 25.8s，TimersMonotonic 里 next_elapse=0）。
+# 不写 RemainAfterExit 则每次跑完转 inactive，OnUnitActiveSec 才能正确排期。
+# 副作用只是 systemctl status 显示为 inactive，不影响功能。
+# 脚本内部保证任何分支都 exit 0；失败只留日志，由 .timer 看门狗重试。
 ExecStart=/usr/local/sbin/odin-usb-role.sh
+# dnsmasq 已独立成 odin-dnsmasq@.service，不在这个 cgroup 里；
+# 显式写 process 是免得以后再有人往这里塞后台进程时被连带杀掉。
+KillMode=process
 [Install]
 WantedBy=multi-user.target
 UNIT
@@ -72,6 +81,10 @@ Description=ODIN USB role watchdog (self-healing every 30s)
 [Timer]
 OnBootSec=10s
 OnUnitActiveSec=30s
+# 日历式兜底：OnUnitActiveSec 依赖 unit 的激活周期，一旦 unit 状态异常
+# （例如被 RemainAfterExit 钉在 active）就不会重排 ⇒ 看门狗静默失效。
+# 加一条 OnCalendar 保证无论如何都会周期性重排，宁可多跑一次也别漏。
+OnCalendar=*:0/1
 AccuracySec=1s
 [Install]
 WantedBy=timers.target
