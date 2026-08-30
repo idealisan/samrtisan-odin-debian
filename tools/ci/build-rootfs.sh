@@ -30,6 +30,11 @@ esac
 # 第二个变体会直接复用第一个已经摆好的根 —— 表现为"编了 gui，出来的却是 core"。
 ROOT=${ROOT:-/tmp/odin-rootfs-$VARIANT}
 SUITE=${SUITE:-bookworm}
+# 镜像站：本地构建走国内镜像（debootstrap 与 chroot 里的 apt 都用它），
+# CI 不设这个变量、用官方源。只影响构建速度 —— 导出镜像前会把 chroot 的
+# sources.list 还原成官方源，免得本地编出来的镜像与 CI 编出来的内容不一致
+# （发布制品以 CI 为准，两者不该有差异）。
+MIRROR=${DEBIAN_MIRROR:-http://deb.debian.org/debian}
 
 mkdir -p "$OUT"
 # 必须转绝对路径：下面会 cd 进内核树，届时 "out/kernel" 这种相对路径就指到别处去了
@@ -48,13 +53,20 @@ if [ ! -d "$ROOT/etc" ]; then
   # 下面那句"debootstrap 失败"永远打印不出来。
   if ! debootstrap --arch arm64 --variant=minbase \
     --include=busybox-static,udev,ssh,sudo,systemd,iproute2,dnsmasq,parted,e2fsprogs \
-    "$SUITE" "$ROOT" http://deb.debian.org/debian \
+    "$SUITE" "$ROOT" "$MIRROR" \
     2>&1 | tee /tmp/odin-debootstrap.log; then
     echo "debootstrap 失败，日志见上面（同一份也留在 /tmp/odin-debootstrap.log）" >&2
     exit 1
   fi
 fi
 say "rootfs 就绪: $ROOT"
+
+# 镜像站对已存在的 staging 同样要生效：上一行可能被跳过（debootstrap 过一次就不再
+# 重来），但后续 chroot 里的 apt 仍应走镜像站。导出前会还原，见第 6 节。
+if [ "$MIRROR" != "http://deb.debian.org/debian" ] && [ -f "$ROOT/etc/apt/sources.list" ]; then
+	sed -i "s|http://deb.debian.org/debian|$MIRROR|g" "$ROOT/etc/apt/sources.list"
+	say "sources.list 指向镜像站: $MIRROR"
+fi
 
 # ---------------------------------------------------------------- 2. 内核模块 + vmlinuz
 say "安装内核模块与 vmlinuz"
@@ -116,7 +128,28 @@ if [ -d "$DOUT" ]; then
 fi
 bash "$REPO/dist/build/apply-staging-fixes.sh" "$ROOT"
 
-# ---------------------------------------------------------------- 5. 导出镜像
+# ---------------------------------------------------------------- 6. 导出前卫生
+# 构建期为了方便在 chroot 里装包，动过两处与运行环境有关的东西，导出前必须还原，
+# 否则本地编出来的镜像会带着构建机的痕迹，和 CI 编出来的不是一回事
+# （发布制品以 CI 为准，两者不该有差异）。
+#
+#   · /etc/resolv.conf：setup-rootfs.sh 换成了构建环境的那份（chroot 里的
+#     systemd-resolved 没在跑，stub 符号链接指向的文件不存在，不换就没法解析域名）。
+#     设备上 DNS 由 systemd-resolved 提供，所以恢复成它留下的那个 stub 符号链接。
+#   · sources.list：用了国内镜像站的换回官方源。
+if [ -e "$ROOT/usr/lib/systemd/systemd-resolved" ] || [ -e "$ROOT/lib/systemd/systemd-resolved" ]; then
+	ln -sfn ../run/systemd/resolve/stub-resolv.conf "$ROOT/etc/resolv.conf"
+	say "导出卫生: resolv.conf 恢复为 systemd-resolved 的 stub 符号链接"
+else
+	rm -f "$ROOT/etc/resolv.conf"
+	say "导出卫生: 删掉构建环境的 resolv.conf（镜像里没有 resolved）"
+fi
+if [ "$MIRROR" != "http://deb.debian.org/debian" ]; then
+	sed -i "s|$MIRROR|http://deb.debian.org/debian|g" "$ROOT/etc/apt/sources.list"
+	say "导出卫生: sources.list 还原为官方源（构建期用的是 $MIRROR）"
+fi
+
+# ---------------------------------------------------------------- 7. 导出镜像
 say "build-image.sh（保守特性集 + 导出 + 回读校验）"
 # 初始大小按 staging 实际内容估算。
 #
@@ -134,18 +167,20 @@ say "build-image.sh（保守特性集 + 导出 + 回读校验）"
 # 但也不能像从前那样写死 491520 块：journal 与 inode 表都按初始尺寸分配，
 # 起始值给大了，后面紧缩也收不回来（实测收完仍要 1.36 GiB）。
 #
-# 上限仍是 GitHub Release 的单个资产限制 2147483648 字节，且要求"严格小于"。
-# build-image.sh 末尾还会再校验一次，超了直接 fail。
-GH_MAX=$(( 2147483648 / 4096 ))   # 524287 块
+# 上限不再是 GitHub 的 2 GiB —— 超过 2 GiB 的资产由 publish 阶段切成片段上传，
+# 构建期按真实内容给尺寸即可（mke2fs 给小了会直接 "Could not allocate block"，
+# GUI 变体实测就是这个报错）。但仍留 8 GiB 硬上限兜住失控的情况，
+# 与 tools/build-image.sh 的 HARD_LIMIT 保持一致。
+HARD_MAX=$(( 8589934592 / 4096 ))   # 2097152 块
 stage_mb=$(du -sm "$ROOT" 2>/dev/null | cut -f1)
 [ -n "$stage_mb" ] || stage_mb=900
 # pmOS 公式，向上取整；再兜一个下限，避免 staging 异常小时 mke2fs 都建不起来
 size_mb=$(( stage_mb * 12 / 10 + 50 ))
 [ "$size_mb" -lt 512 ] && size_mb=512
 blocks=$(( size_mb * 1024 * 1024 / 4096 ))
-if [ "$blocks" -gt "$GH_MAX" ]; then
-  echo "  [rootfs] WARN: 按内容算出的初始大小 ${size_mb} MiB 超过 GitHub 上限，压到 ${GH_MAX} 块" >&2
-  blocks=$GH_MAX
+if [ "$blocks" -gt "$HARD_MAX" ]; then
+  echo "  [rootfs] WARN: 按内容算出的初始大小 ${size_mb} MiB 超过硬上限，压到 ${HARD_MAX} 块" >&2
+  blocks=$HARD_MAX
 fi
 # 镜像名：core 沿用历史名 odin-debian.img —— flash-all.sh 的默认路径、
 # dist/FLASH.md 与几处文档都按这个名字取，改名要连带改一堆地方却没有任何收益。

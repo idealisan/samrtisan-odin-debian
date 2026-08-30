@@ -11,6 +11,30 @@ say() { printf '[setup-rootfs] %s\n' "$*"; }
 R=${ODIN_ROOTFS:-/mnt/debian}
 [ -d "$R/etc" ] || { echo "不是 rootfs 目录: $R" >&2; exit 1; }
 
+# ---------------------------------------------------------------- DNS
+# chroot 里必须有能解析域名的 resolv.conf，而且要**在任何 apt 之前**就位。
+#
+# debootstrap 拷进来的那份会被 systemd-resolved 的 postinst 换成指向
+# ../run/systemd/resolve/stub-resolv.conf 的符号链接，而 chroot 里 resolved
+# 根本没在跑 ⇒ 那个文件不存在 ⇒ 之后所有 chroot 里的 apt 都报
+#     Temporary failure resolving 'deb.debian.org'
+# 更隐蔽的是 apt-get update 在这种情况下**仍然返回 0**（只是打几行 W:），
+# 于是包索引是空的，等到 install 才冒出满屏 "Unable to locate package" ——
+# 报错离真因很远。core 变体碰不到（那之后不再装包），gui 变体必踩。
+#
+# 做法：拿构建环境的 resolv.conf 顶上；导出镜像前由 build-rootfs.sh 换回符号链接，
+# 不能把构建机的 DNS 带进发布镜像。
+# 做成函数而不是只做一次：systemd-resolved 的 postinst 在**安装时**还会再换一次，
+# 所以每次 apt 之前都要重新确认一遍。
+fix_dns() {
+	if [ -L "$R/etc/resolv.conf" ] || [ ! -s "$R/etc/resolv.conf" ]; then
+		rm -f "$R/etc/resolv.conf"
+		cp -f /etc/resolv.conf "$R/etc/resolv.conf"
+		say "resolv.conf: 换成构建环境的（chroot 内的 apt 要能解析域名）"
+	fi
+}
+fix_dns
+
 # --- user & sudo (幂等：重跑时用户已存在则跳过) ---
 chroot $R id -u user >/dev/null 2>&1 || chroot $R useradd -m -s /bin/bash -G sudo user
 echo "user:user" | chroot $R chpasswd
@@ -183,13 +207,19 @@ chroot $R apt-get update -qq
 # 有多处依赖它：odin-usb-role.sh 加载 configfs、/etc/modules-load.d/*.conf
 # 也要靠它。缺了不会报错（这些调用都带 2>/dev/null），
 # 只会静默失效 —— 实测真机上 command -v modprobe 为空，确认缺失。
-chroot $R apt-get install -y -qq \
+# 装包失败必须让构建失败：没有 NetworkManager / modprobe / resolved 的镜像是废的，
+# 静默继续只会产出一个"看着成功、实际不能用"的制品，等刷进真机才发现。
+# 所以这里不吞退出码（原来是 `|| echo WARN`，实测它吞掉过整批失败）。
+if ! chroot $R apt-get install -y -qq \
 	kmod \
 	network-manager wpasupplicant iw wireless-tools rfkill firmware-atheros \
 	iputils-ping curl wget bind9-dnsutils net-tools traceroute tcpdump \
 	iperf3 ethtool mtr-tiny \
 	systemd-resolved systemd-timesyncd \
-	nftables 2>&1 || echo "[setup-rootfs] WARN: 部分网络包装不上，继续"
+	nftables; then
+	echo "[setup-rootfs] FATAL: 网络/基础包没装上，构建中止（apt 的完整报错在上面）" >&2
+	exit 1
+fi
 chroot $R systemctl enable NetworkManager.service
 chroot $R systemctl enable odin-swap.service 2>/dev/null || true
 chroot $R systemctl enable wpa_supplicant.service 2>/dev/null || true
@@ -213,6 +243,10 @@ chroot $R systemctl disable NetworkManager-wait-online.service 2>/dev/null || tr
 # 不是现编的：手工装过、确认能起来，这里只是把它固化进构建。
 if [ "$ODIN_VARIANT" = "gui" ]; then
 	say "变体=gui：安装 Plasma Mobile 与配套工具（这步较慢）"
+	# 上面装 systemd-resolved 时它的 postinst 又把 resolv.conf 换回那个悬空符号链接
+	# 了，装包前必须再修一次，否则 apt 报 "Temporary failure resolving ..."
+	fix_dns
+	chroot $R apt-get update -qq
 	# 装包失败必须让整个构建失败。GUI 的依赖链是全项目最长的，
 	# 静默继续只会产出一个"看着成功、实际缺组件"的镜像，等刷进真机才发现 ——
 	# 那时定位成本比现在高一个量级。所以不吞退出码，也不接 | tail

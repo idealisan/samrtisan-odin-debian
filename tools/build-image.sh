@@ -23,9 +23,16 @@ LABEL=${4:-pmOS_root}
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 SPARSE="${OUT%.img}-sparse.img"
 
-# GitHub Release 单个资产上限 2147483648 字节（且是"小于"）。超了要等 publish job
-# 报 HTTP 422 才发现，排查要跨 job，不如在这里就挡住。
+# GitHub Release 单个资产上限 2147483648 字节（且是"小于"）。
+#
+# 超过上限**不再是致命错误**：publish 阶段会把大资产切成片段再上传，
+# 用户下载后 cat 回来即可（见 .github/workflows/release-build.yml 与 dist/FLASH.md）。
+# 所以这里只提示"这个要分片"，把判定的责任交给上传环节。
+#
+# 但仍留一道硬上限：某次改动让镜像失控（比如误装一整套 TeX）时，
+# 宁可在这里炸掉，也不要悄悄产出一个 20 GiB 的东西。
 ASSET_LIMIT=2147483648
+HARD_LIMIT=8589934592          # 8 GiB
 
 say()  { echo "[build] $*"; }
 fail() { echo "[build] FATAL: $*" >&2; exit 1; }
@@ -90,7 +97,10 @@ rm -f  "$STAGE/var/log/wtmp" "$STAGE/var/log/btmp" "$STAGE/var/log/lastlog"
 rm -f  "$STAGE/root/.bash_history"
 rm -rf "$STAGE"/tmp/* "$STAGE"/var/tmp/* 2>/dev/null || true
 rm -rf "$STAGE/mnt/dist"
-say "cleanup done (machine-id/random-seed/journal/wtmp/lastlog)"
+# apt 缓存与包索引：装完包就再没用了。**GUI 变体光这一项就是 1.2 GiB**（实测），
+# 占镜像体积的四分之一，清掉是纯赚，且不影响任何功能。
+rm -rf "$STAGE"/var/cache/apt/* "$STAGE"/var/lib/apt/lists/*
+say "cleanup done (machine-id/random-seed/journal/wtmp/lastlog/apt-cache)"
 
 # ---------------------------------------------------------------- 3. 建文件系统
 # 保守特性集 + 显式保留 resize_inode（=> mke2fs 会分配 reserved GDT blocks）
@@ -157,8 +167,11 @@ say "img2simg done: $(du -h "$SPARSE" | cut -f1)"
 
 for f in "$OUT" "$SPARSE"; do
   s=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f")
-  [ "$s" -lt "$ASSET_LIMIT" ] \
-    || fail "$f 有 $s 字节，达到/超过 GitHub 单资产上限 $ASSET_LIMIT 字节，缩小 BLOCKS 重编"
+  if [ "$s" -ge "$HARD_LIMIT" ]; then
+    fail "$f 有 $s 字节，超过硬上限 $HARD_LIMIT 字节（8 GiB）—— 多半是误装了什么，查 staging 内容"
+  elif [ "$s" -ge "$ASSET_LIMIT" ]; then
+    say "注意: $f 有 $s 字节，超过 GitHub 单资产上限 $ASSET_LIMIT，publish 阶段会切成片段上传"
+  fi
 done
 
 # ---------------------------------------------------------------- 5. 回读校验
