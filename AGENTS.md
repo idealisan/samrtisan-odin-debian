@@ -45,6 +45,12 @@
 7. **任何联网 IO 一律走后台任务**，状态检查用 **≤15 秒短轮询**，不要分钟级长等待。
    （git push/pull、`gh`、curl/wget、apt/pip、debootstrap、Release 上传…）
 
+8. **需要用户动手时，用 `say` 语音提醒**：
+   `say -v 'Ting-Ting' "<要他做什么>"`
+   用户在旁边但不是一直盯着屏幕，听到就会过来操作。
+   **凡是需要人工介入的时刻都要喊**（按住电源键进 fastboot、看屏幕读报错、
+   回答选择题…），不要只在文字里等。
+
 > 补充：从 GitHub 下大文件要**显式去代理**（`env -u http_proxy -u https_proxy`），
 > 快 4.7 倍。详见 `docs/05` 第五节。
 
