@@ -66,6 +66,7 @@
 | 路径 | 内容 |
 |---|---|
 | `Makefile` | **构建入口** | `make help` / `make all`，见 `docs/05` |
+| `Dockerfile` | 编译专用镜像（依赖清单来自 CI 各 job 的 apt 行），见 `docs/05` 第一节 |
 | `tools/ci/` | 2 个构建脚本（取内核、装 rootfs） | 其余构建步骤已迁进 Makefile |
 | `tools/` | 镜像导出、打包、校验 |
 | `patches/` | 内核补丁 0001–0008 |
@@ -87,19 +88,30 @@
 **入口：`make`**（不要再手敲 `bash tools/ci/*.sh`）。常用：
 `make help`、`make dtb`、`make kernel`、`make lk2nd`、`make rootfs`、`make clean`。
 
+**本地一律在容器里跑**（镜像由 `Dockerfile` 定义，起容器与挂载见 `docs/05` 第一节）。
+宿主是 macOS，缺 debootstrap 与一堆 e2fsprogs 工具，且构建要 root + chroot ——
+放容器里是可丢弃的，放宿主上不可逆。
+
+**两个变体：`core`（无 GUI）与 `gui`（Plasma Mobile）**，目标是
+`make rootfs-core` / `make rootfs-gui`（`publish-*` 同理）。
+dtb / kernel / lk2nd 与变体无关，两变体共用一份产物；core 是 gui 的子集，
+所以**本地默认只编 gui**（`ODIN_VARIANT ?= gui`），**CI 两个都编**。
+
 - **能写成直线命令的写进 Makefile，有真逻辑的留脚本**：
   dtb / kernel / lk2nd 已在 Makefile 里；`fetch-kernel`（三级回退重试）、
   `build-rootfs`（debootstrap 流水线）、`build-image`（20+ 项校验）仍是脚本。
 - CI 也走 make（rootfs 那个 job 用 `-o kernel -o dtb` 表示"产物来自 artifact，别重编"）。
+- CI 的 rootfs 是 **matrix**（`core` / `gui`）两条 job，共用同一份 kernel / dtb artifact。
 - CI 只在 `release: [prereleased, released]` 与 `workflow_dispatch` 触发。
 
-三个钉死的外部输入：
+四个钉死的外部输入：
 
 | 项 | 值 |
 |---|---|
 | 内核 commit | `05f7e89ab9731565d8a62e3b5d1ec206485eeb0b` |
 | lk2nd | `23.1` |
 | Debian | `bookworm` |
+| 编译镜像基础层 | `debian:bookworm@sha256:813017…`（钉在 `Dockerfile` 里，钉 digest 不钉 tag） |
 
 **版本号**：严格递增、永不重用或修改；小修直接递增 patch 号。
 开发中用 `v0.9.4-<简述>` 后缀（如 `-lk2nd-reboot`），只有最终通过才用干净的 `v0.9.4`。

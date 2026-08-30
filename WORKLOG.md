@@ -1224,3 +1224,85 @@ sshd 主机密钥，PC 上 known_hosts 里的旧记录失效。
 
 **为什么迭代慢**：每验证一次 lk2nd 都要先进 fastboot，而进 fastboot 正是坏的
 ⇒ 每次都要用户按电源键。修它和用它互相卡住。
+
+---
+
+## 贰拾伍、容器化构建环境 + gui 变体（2026-08-30，用户指定）
+
+用户给的三件事：① Dockerfile 定义编译专用镜像并用它起容器（旧 `odin-build`
+容器整只放弃，不看、不抄）；② Makefile 增加 gui 变体、保留 core；
+③ CI 两个变体都编，本地只编 gui（core 是 gui 的子集）。
+
+- **18:59 未提交的那份 gui 草稿丢弃** —— 用户确认不要。按 §1.3 只增不删的原则，
+  先 `git diff` 留档到 `tmp/gui-wip/setup-rootfs-gui-uncommitted.patch`，再
+  `git checkout` 回去。GUI 内容按用户"真机上手工验证过的那套"重写，不沿用草稿代码。
+  - **草稿有三个致命问题**（这也是判断"它没被执行过"的依据）：
+    1. 调用了未定义的 `say()` —— `setup-rootfs.sh` 顶部没这个函数，脚本是
+       `set -e` ⇒ `ODIN_VARIANT=gui` 时第一条 `say` 就 command not found，
+       exit 127，apt 一行都还没跑。
+    2. `ODIN_VARIANT` 根本没接线：`build-rootfs.sh` 只传 `ODIN_ROOTFS`。
+    3. `apt-get ... 2>&1 | tail -5 || echo WARN` 会吞掉失败（管道退出码取
+       `tail` 的，且没开 pipefail）。
+
+- **19:03 CI 缓存"恢复成功但完全用不上"—— 真因找到了**
+  - 现象：kernel job 从不到 10 分钟退化到 29 分钟；日志里
+    "Cache hit for: kernel-ccache-<sha>-<patchhash>"、恢复 235 MB 看着一切正常，
+    但 `ccache -s` 是 **Hits: 89 / 4399 (2.02%)**。
+  - **别把"缓存恢复成功"当成"缓存生效"** —— 那只说明文件下载下来了。要看得看
+    `Hits` 行。这是这次最大的教训。
+  - 真因是两条 ccache 默认值叠加：
+    1. `compiler_check` 默认 `mtime` ⇒ 编译器二进制的 mtime 计入哈希。
+       CI 每个 job 都全新 `apt-get install` 交叉编译器 ⇒ mtime 每次都变
+       ⇒ 全量未命中。**主因。**
+    2. `hash_dir` 默认 `true` ⇒ 带 `-g` 时把 CWD 计入哈希。本内核
+       `CONFIG_DEBUG_INFO=y`，而 `KDIR` 从旧脚本的 `/tmp/linux-msm8953`
+       迁到 Makefile 的仓库内 `tmp/` ⇒ 历史缓存整体作废。
+  - **验证方式：不靠推理，做了个 10 秒的小实验**（debian:bookworm-slim 容器，
+    ccache 4.7.5，`gcc -g` 编同一个文件）：
+    | 场景 | 默认配置 | content + hash_dir=false |
+    |---|---|---|
+    | 同目录重编 | 100% | 100% |
+    | 换目录（CWD 变） | **0%** | 100% |
+    | touch 编译器（模拟重装） | **0%** | 100% |
+  - 修法：`ccache --set-config compiler_check=content` +
+    `hash_dir=false`，max_size 2G→5G。CI 与容器镜像都改。
+  - **已知的一次性代价**：改配置会让既有缓存条目全部失效（哈希规则变了），
+    下一次构建仍是全量，再往后才稳定命中。已触发一次 CI 建新缓存。
+
+- **19:09 Dockerfile 与容器就位**
+  - 依赖清单逐条来自 CI 四个 job 的 apt 行，不是现编的；基础镜像钉 digest
+    （`debian:bookworm@sha256:813017…`）不钉 tag，本地已有该层 ⇒ 实测
+    `docker build` **没有走网络**（这是用户明确要求，免得网络故障添乱）。
+  - 构建 92 秒。容器 `odin-dev` 已起：`--privileged` + 三个挂载
+    （仓库 → /work/odin-work、`odin-ccache` 卷 → `/var/cache/odin-ccache`、
+    `odin-kernelsrc` 卷 → /work/src）。
+  - **内核源码树挂容器自己的卷而不是仓库的 bind mount**：几万个小文件的编译
+    走 macOS bind mount 会慢一个量级。ccache 同理挂卷，重建容器不丢缓存。
+  - 冒烟验证过：工具链 19 个命令全部就位，ccache 两条配置生效，
+    `make print-config` 在容器内正常。
+
+- **19:16 Makefile 变体落地** —— `ODIN_VARIANT ?= gui`，模式规则
+  `$(STAMPS)/rootfs-%`（`%` = core/gui）用 `$*` 传变体名，两个变体不抄两遍 recipe。
+  - 变体相关路径一律递归展开（`=` 不是 `:=`）：`ODIN_VARIANT` 在 recipe 运行时
+    才确定，`:=` 会把解析期默认值钉死 ⇒ 两个变体串台。
+  - 戳文件、输出目录、`debootstrap` 的 staging 根目录**都按变体分开**。
+    staging 共用会表现为"编了 gui，出来的却是 core"（第二个变体直接复用
+    第一个已摆好的根，因为 build-rootfs.sh 是按 `[ ! -d "$ROOT/etc" ]` 判断的）。
+  - 镜像名：core 沿用 `odin-debian.img`（flash-all.sh 与文档都按这个名字取默认
+    路径，改名没收益），gui 用 `odin-debian-gui.img`。
+
+- **踩坑**：`make -n` 里想用 `$(subst $(space),$(comma),$(VARIANTS))` 拼提示文字，
+  但 `space`/`comma` 这两个变量在本 Makefile 里并不存在 —— 直接写死 "core 或 gui"
+  了事，别为一行提示文字造变量。
+
+- **19:23 待办 / 下一步**
+  - 本次触发的 CI（run 33308322764）跑的是旧 job 定义（单 rootfs），
+    只用来验证 ccache 修复；**下一次** CI 才会带上 core/gui 两条 matrix job。
+  - gui 变体的包清单从未在 CI 上跑过（只在真机手工装过），第一次 CI 大概率会
+    在 `apt-get install plasma-mobile` 处暴露问题。
+  - 本地完整构建还没跑过（内核 20+ 分钟），等 CI 结果确认缓存生效后再跑。
+  - **本地跑 `make dtb` 与 `make kernel` 必须用两棵不同的内核树**
+    （`KDIR=/work/src/linux-dtb` 与 `/work/src/linux-kernel`）：dtb 只打 0007、
+    kernel 打 0001-0008，共用一棵树时 kernel 会撞上"0007 已应用"，
+    `patch --forward` 跳过并返回 1 ⇒ `set -e` 下直接失败。CI 上是两个 runner
+    各自 fetch，永远遇不到。
