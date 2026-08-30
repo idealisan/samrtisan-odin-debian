@@ -1082,3 +1082,145 @@ systemd 尚未起来、驱动（约 10s 才索取固件）也还没动作。
   两者都是内核内置（`/lib/modules/*/kernel/fs/` 里找不到它们）⇒ initramfs 可直接挂
 - `wcn36xx` / `qcom_wcnss_pil` 在 `/etc/modules-load.d/odin-wlan.conf`，
   由 `systemd-modules-load` 在 `basic.target` 之前加载 ⇒ 固件已在位，首次加载即成功
+
+---
+
+## 贰拾叁、v0.9.3 真机验收 16/16 全通过（2026-08-30）
+
+### v0.9.2 作废、改用 v0.9.3 的经过
+v0.9.2 发布后立刻自查发现：`a1fe79f` 声称"initramfs-applets.txt 补 cp 与 cmp"，
+**但那个文件根本没进提交** —— `git add -A dist/build/initramfs ...` 只匹配到
+**目录** `dist/build/initramfs/`，而 `dist/build/initramfs-applets.txt` 是它的
+**同级文件**（名字以 initramfs- 开头），不在那个目录下。既没 add、也没报错，
+提交照样成功。没有 cp ⇒ initramfs 里的固件供给会**静默失败**（脚本失败不致命）。
+
+处置（按 §3.4 新写入的版本号准则，未删旧版本）：
+1. `gh run cancel` 掐掉 v0.9.2 正在跑的构建
+2. 补提交 `ae85275`
+3. **开新号 v0.9.3** 重新发布
+4. 在 v0.9.3 说明里写明 v0.9.2 为何作废
+
+v0.9.2 的 Release 先留着，删除放统一清理轮次。
+
+### v0.9.3 CI 与刷入
+- CI run `33296547668`，**7m19s completed/success**，8 个资产
+- 7 个已下载文件 `shasum -a 256 -c SHA256SUMS` 全部 OK
+  （odin-debian-sparse.img md5 `4aa736d5567379938624924779d79c22`）
+- **下载踩坑**：直连在中途 `connection reset`（只下了 62MB/855MB）。
+  `gh release download` 不支持续传，改用
+  `curl -L -C - --retry 8 --retry-all-errors --speed-time 30 --speed-limit 1024`
+  断点续传救回。**以后下大文件一律带 `-C -` 与重试**。
+- 刷入（含 lk2nd，用户已确认）：20 fastboot 30s → 30 lk2nd ok → 40 userdata 40s
+  → 50 reboot（USB 网卡 10s）→ 60 usbnet ok → 70 ssh 40s → **80 verify 16/16，失败 0**
+
+### WiFi 修复的决定性证据（这次是真的修好了）
+```
+[   11.673944] remoteproc remoteproc0: Booting fw image wcnss.mdt, size 7324
+[   13.847119] remoteproc remoteproc0: remote processor a204000.remoteproc is now up
+[   34.823256] wcn36xx: firmware WLAN version 'WCN v2.0 RadioPhy vIris_TSMC_4.0 with 48MHz XO'
+```
+- **那句 `failed with error -2` 彻底消失** —— 驱动第一次索取就拿到了
+- 时序对比：
+  | | 供给时刻 | 索取时刻 | 结果 |
+  |---|---|---|---|
+  | 修前（v0.9.1） | 25.9s | 10.230s | 失败，且永不重试 |
+  | 修后（v0.9.3） | **~4s**（initramfs） | 11.673s | **首次即成功** |
+- `/var/log/odin-wlan-fw.log` 时间戳是 `1970-01-01 00:00:04` —— 开机第 4 秒，
+  那时还没有 systemd、时钟也没同步，正是 initramfs 阶段，与预期完全吻合
+- `remoteproc0/state = running`，`wlan0` 在 `ip link` 与 `nmcli` 里都在
+
+### 一个每次重刷都会撞到的小坑
+刷完后 SSH 报 `REMOTE HOST IDENTIFICATION HAS CHANGED` —— 新 rootfs 会重新生成
+sshd 主机密钥，PC 上 known_hosts 里的旧记录失效。
+处置：`ssh-keygen -R 172.16.42.1`（旧记录自动留档为 `known_hosts.old`），重连即可。
+
+### v0.9.3 已转正式 Release
+`gh release edit v0.9.3 --prerelease=false` → 作为阶段性标志与后续开发基准。
+
+### 下一版目标（用户指定）：lk2nd 反复重启
+**现象**：刷入 Linux 系统镜像之前，lk2nd 会反复重启，必须人工按住电源键才能停下，
+否则一直重启 ⇒ 无法自动接着刷入系统镜像 ⇒ 开发/调试循环不能完全自动走完。
+定位方向（尚未验证，仅为待查）：lk2nd 找不到可启动配置后的 reboot 策略 /
+看门狗 / `boot_into_fastboot` 未置位。见 reports/018 §零 的状态机 B 态。
+
+---
+
+## 贰拾肆、v0.9.4 目标（2026-08-30，用户指定）
+
+两个目标：**① lk2nd 反复重启需人工按电源键**、**② 构建改用 Makefile**。
+历史 Release 与旧文件按用户指示**一律不清理**，留着即可。
+
+版本号规则也按用户要求改了：目标版本成功前用 `v0.9.4-<简述>` 的 Pre-release
+（如 `-lk2nd-reboot`、`-makefile`），只有最终验证通过才用干净的 `v0.9.4`。
+（用户最初提时间戳，随后改成简述后缀 —— 理由是时间戳记不住"这版在试什么"。）
+
+### ① 现象与链路
+刷入 Linux 系统镜像之前（即改名 extlinux.conf 让 lk2nd 落 fastboot 那一步），
+设备**反复重启**，必须人工按住电源键才能停 ⇒ 无法自动接着刷 ⇒ 开发循环断在这里。
+
+### 已查到的事实（lk2nd 23.1 源码 + 真机核对）
+1. **`lk2nd_scan_devices()` 找到不启动项时只是打一行日志就返回**
+   （`lk2nd/boot/boot.c:63`："Bootable file system not found. Reverting to android boot."）
+   —— 它**不会**置 `boot_into_fastboot`。
+2. 随后 aboot 走 `retry_boot:` → `boot_linux_from_mmc()`
+   （`app/aboot/aboot.c:5687`），失败才落到 `fastboot:` 标签（`aboot.c:5723`）。
+3. **boot 分区偏移 512KB 处还留着一个原厂 Android 引导镜像** —— 真机实测：
+   ```
+   offset 0      : A N D R O I D !     ← lk2nd 本体（lk2nd 也是个 Android boot image）
+   offset 524288 : A N D R O I D !     ← 残留的原厂 Android 引导镜像
+   ```
+   分区布局：`lk2nd` = 0…512KB（`getvar` 报 0x80000），`boot` = 512KB…64MB（0x3f80000），
+   两者合起来正好是 mmcblk0p21 的 64MB。
+
+⇒ **真因（待最后确认）**：lk2nd 找不到可启动 fs → 回退引导那个残留的 Android 镜像
+→ Android 起不来 → 重启 → 回到 lk2nd → **循环**。
+这解释了两件事：为什么会重启（不是停在 fastboot）、以及为什么按住电源键能停
+（`is_user_force_reset()` 分支，`aboot.c:5580` 会 `goto normal_boot`）。
+
+### 备选修法（尚未定，也未实机验证）
+- **A. `fastboot erase boot`** 清掉残留 Android 镜像 ⇒ `boot_linux_from_mmc()` 失败
+  ⇒ 干净落到 `fastboot:`。一次性改动，且 `lk2nd` 分区（0…512KB）不受影响；
+  evidence/live-device-backup/boot-partition.img 有全量备份可回退。
+  属设备侧改动，按 §7 需用户单独确认。
+- **B. 改 lk2nd** 让它在找不到可启动 fs 时直接进 fastboot，而不是回退 Android。
+  影响面大（改上游行为），但可随 CI 产物交付。
+- **C. 让 Linux 侧能 `reboot bootloader`** —— 真机有 `pon@800`，
+  `reboot_mode` + `qcom_pon` 驱动已加载，`/sys/kernel/reboot/mode` 存在但只有
+  cold/warm/hard；DT 里**没有** reboot-mode 子节点，需要补节点与魔数。
+  这条路最"正常 Linux"，但要先把 lk2nd 期望的魔数核对清楚。
+
+### ② Makefile（下一步做）
+当前构建入口全是 `bash tools/ci/*.sh`，无 Makefile。
+
+### lk2nd 循环重启：第一轮排查结论（详见 reports/022）
+
+**推翻了两条假设，都没成立：**
+
+1. **"回退引导残留 Android 镜像"** —— 据此写了 `lk2nd/0005`。
+   `strings` 对比证实补丁**确实进了镜像**：
+   v0.9.3 是 `Reverting to android boot.`，新版是 `Reverting to fastboot.`
+   **但真机行为毫无变化，仍然循环。**
+   教训：补丁"进没进镜像"（strings 能验）和"有没有用"（行为变没变）是两回事，
+   只验前者会得出虚假的安全感。
+   另注：0005 写在 `#if WITH_LK2ND_BOOT` 块里，而该宏全树只在 aboot.c 出现 4 次、
+   没有任何 .mk 定义它 —— 若为假则补丁是死代码，这是下一步优先要确认的点。
+
+2. **"panic 重启 + 原因读不回来"** —— 查证后发现**读回路径是完整的**：
+   `msm_shared/reboot.c:84` 有 `check_hard_reboot_mode()` 的真实实现
+   （读 `PON_SOFT_RB_SPARE`，`(v & 0xFC) >> 2`，读后擦除），且 reboot.o 确实编译
+   （`ENABLE_REBOOT_MODULE := 1` 在 msm8953.mk:127/144）。
+
+**过程中的两个自我纠偏：**
+- 早期日志里"设备进入 fastboot (30s)"那几次，其实是**用户按了电源键**的结果，
+  我之前当成自动流程跑通了 —— 这是后面一连串误判的源头。
+- 查 `check_hard_reboot_mode` 时加了 `grep -i 8953` 过滤，把真正实现所在的
+  `platform/msm_shared/reboot.c` 滤掉了，一度误判"只有弱实现"。
+  **查东西别用想当然的过滤条件先剪枝。**
+
+**下一步：诊断构建。** 把 `lk2nd/project/lk2nd.mk:20` 的
+`PANIC_REBOOT_MODE ?= FASTBOOT_MODE` 改成 `NO_REBOOT`，
+`platform_halt()` 就会打印后停住不重启，panic 原因能留在屏幕上让用户读到。
+代价是这版会卡死、只能纯诊断用。
+
+**为什么迭代慢**：每验证一次 lk2nd 都要先进 fastboot，而进 fastboot 正是坏的
+⇒ 每次都要用户按电源键。修它和用它互相卡住。
