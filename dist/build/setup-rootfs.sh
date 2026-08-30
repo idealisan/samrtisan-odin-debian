@@ -214,7 +214,7 @@ chroot $R apt-get update -qq
 # 所以这里不吞退出码（原来是 `|| echo WARN`，实测它吞掉过整批失败）。
 # util-linux-extra 提供 hwclock。minbase 里没有它，于是真机上连"看一眼 RTC 现在
 # 几点"都做不到（实测 `command -v hwclock` 为空）。只能**读**（hwclock -r）：
-# 写是不行的 —— 本机的 RTC 不可写，见下面 swclock-offset 那一段。
+# 写是不行的 —— 本机的 RTC 不可写，见下面时钟那一段。
 # 注意：续行里不能再插 # 注释 —— 反斜杠续行会把各行拼成一行，# 之后全被吃掉。
 #
 # fake-hwclock：本机 RTC **写不了**（pm8xxx 驱动在没有 allow-set-time 时只能读；
