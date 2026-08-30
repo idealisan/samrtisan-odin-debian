@@ -151,7 +151,12 @@ chroot $R apt-get update -qq
 # 有 resolved 才会按顺序尝试后续服务器（这次实机就撞上了这个坑）。
 # systemd-timesyncd 解决无 RTC 导致的时钟错乱 —— 时钟差几个月时 apt 会直接
 # 拒绝 Release 文件（"Release file ... is not valid yet"）。
+# kmod 提供 /sbin/modprobe。它不是 debootstrap minbase 的一部分，但项目里
+# 有多处依赖它：odin-wlan-fw.sh 重载 wcn36xx、odin-usb-role.sh 加载 configfs、
+# /etc/modules-load.d/*.conf 也要靠它。缺了不会报错（这些调用都带 2>/dev/null），
+# 只会静默失效 —— 实测真机上 command -v modprobe 为空，确认缺失。
 chroot $R apt-get install -y -qq \
+	kmod \
 	network-manager wpasupplicant iw wireless-tools rfkill firmware-atheros \
 	iputils-ping curl wget bind9-dnsutils net-tools traceroute tcpdump \
 	iperf3 ethtool mtr-tiny \

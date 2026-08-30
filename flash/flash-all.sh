@@ -220,18 +220,59 @@ if run 80 && [ "$DRY" = 0 ]; then
   has() { case "$3" in *"$2"*) ok "  ✅ $1"; pass=$((pass+1));;
           *) err "  ❌ $1（实际: $3）"; fail=$((fail+1));; esac; }
   r() { odin_ssh "$1" 2>/dev/null | tr -d '\r\n' | head -1; }
+  # 精确判断某个内核模块是否已加载。两个坑都实测踩过：
+  #   1. 不能写 lsmod | grep -c <名字>：lsmod 的 "used by" 列里也会出现该名字，
+  #      grep -c 数的是行数，会多算（查 ft8716 得 2、查 wcn 得 4）。
+  #   2. 也别用 lsmod | awk '{print $1}'：$1 要经过 本地shell → ssh → 远端shell
+  #      三层，转义极易出错（实测拿到 "unbound variable"）。
+  # 直接查 /proc/modules 的行首最干净，一行搞定、无需任何转义。
+  mod_loaded() { r "grep -q '^$1 ' /proc/modules && echo 1 || echo 0"; }
 
   chk "hostname"        "odin"         "$(r 'cat /etc/hostname')"
   has "内核版本"         "6.19"         "$(r 'uname -r')"
+
+  # --- 显示链路：必须"先证明驱动加载了"，再查有没有报错 ---
+  # 反面教训：只查 dmesg 里错误串的条数，是"无错即通过"——驱动压根没加载时
+  # dmesg 里自然 0 条错误，一样通过。所以先做正向检查。
+  chk "面板驱动已加载(ft8716)" "1" "$(mod_loaded panel_ft8716)"
   chk "DSI 已连接"       "connected"    "$(r 'cat /sys/class/drm/card0-DSI-1/status')"
+  # status 只是连接器的探测结果，enabled 才表示真的做了一次 modeset。两者都看，
+  # 与仓库 docs/04-排障.md 的显示类排障流程保持一致
+  chk "DSI 已使能"       "enabled"      "$(r 'cat /sys/class/drm/card0-DSI-1/enabled')"
+  has "DRM 设备节点"     "card0"        "$(odin_ssh 'ls /dev/dri/ | tr "\n" " "' 2>/dev/null)"
   chk "面板初始化失败数"  "0"            "$(r 'dmesg | grep -c "Failed to initialize panel"')"
-  bl=$(r 'cat /sys/class/backlight/*/brightness')
-  if [ -n "$bl" ] && [ "$bl" -gt 0 ] 2>/dev/null; then ok "  ✅ 背光: $bl"; pass=$((pass+1))
-  else err "  ❌ 背光: [$bl]"; fail=$((fail+1)); fi
+  # 用 actual_brightness（硬件回读）而不是 brightness（只是请求值），后者非零
+  # 也可能屏幕是黑的
+  bl=$(r 'cat /sys/class/backlight/*/actual_brightness')
+  if [ -n "$bl" ] && [ "$bl" -gt 0 ] 2>/dev/null; then ok "  ✅ 背光(回读): $bl"; pass=$((pass+1))
+  else err "  ❌ 背光(回读): [$bl]"; fail=$((fail+1)); fi
+
+  # --- 网络 ---
   has "usb0 地址"        "172.16.42.1"  "$(r 'ip -4 -o addr show usb0 | awk "{print \$4}"')"
+  # wlan0 存在只说明 net device 建出来了；固件没起来时它也可能在。所以顺带看
+  # 驱动有没有真的加载
   has "wlan0 存在"       "wlan0"        "$(odin_ssh 'ls /sys/class/net/ | tr "\n" " "' 2>/dev/null)"
-  has "根分区已扩容"      "G"            "$(r 'df -h / | tail -1 | awk "{print \$2}"')"
+  chk "WiFi 驱动已加载(wcn36xx)" "1" "$(mod_loaded wcn36xx)"
   chk "sshd"            "active"       "$(r 'systemctl is-active ssh')"
+
+  # --- 首启扩容 ---
+  # 不能拿 df 的第 2 列含不含 "G" 来判断：镜像本身就是 2 GiB，扩没扩都是 "xG"，
+  # 那条判据恒真。直接读 resize 服务自己写的日志，那才是最直接的证据。
+  # grep -c 给的是"匹配行数"：日志里有一行 rc=0 才是成功，所以期望值是 1 不是 0
+  chk "resize2fs 成功(日志行)" "1"    "$(r 'grep -c "resize2fs rc=0" /var/log/odin-resize.log')"
+  chk "扩容标记已落"      "1"            "$(r 'test -f /var/lib/odin-resize-done && echo 1 || echo 0')"
+  # 兜底再判一次容量：镜像是 2 GiB，所以"明显大于 2G"才说明真的扩容了
+  sz=$(r 'df -h / | tail -1 | awk "{print \$2}"' | tr -d 'G')
+  if [ -n "$sz" ] && [ "${sz%.*}" -gt 10 ] 2>/dev/null; then
+    ok "  ✅ 根分区容量: ${sz}G（镜像本身 2G，说明已扩容）"; pass=$((pass+1))
+  else err "  ❌ 根分区容量: [${sz}G]（镜像本身 2G，未扩容）"; fail=$((fail+1)); fi
+
+  # --- modprobe 是否可用 ---
+  # 项目里多处依赖它（重载 wcn36xx、加载 configfs、modules-load.d），缺了不会报错
+  # 只会静默失效。真机实测确认过缺 kmod 包，这条就是为了防止它悄悄回来。
+  # 注意 /usr/sbin 不在普通用户 PATH 里，直接 command -v modprobe 会漏报。
+  # 我们真正在意的是"以 root 运行时能不能调到"，所以带上 sbin 再查。
+  has "modprobe 可用"    "modprobe"     "$(r 'PATH=$PATH:/usr/sbin:/sbin command -v modprobe || echo 无')"
 
   echo
   ok "验收通过 $pass 项，失败 $fail 项"
