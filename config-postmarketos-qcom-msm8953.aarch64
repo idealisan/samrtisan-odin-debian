@@ -4886,17 +4886,8 @@ CONFIG_EDAC_SUPPORT=y
 # CONFIG_EDAC is not set
 CONFIG_RTC_LIB=y
 CONFIG_RTC_CLASS=y
-# 开机从 RTC 读时间；NTP 同步之后由内核按 11 分钟节奏回写 RTC。
-# 这两项是**正常 Debian 内核的默认行为**，pmOS 这份配置里默认关着，后果是：
-#   · 开机内核不读 RTC ⇒ 系统时钟停在 1970（本机型实测 RTC 里就是 1970 年的废值），
-#     systemd 只好把它顶到自己内置的 epoch（某个过去的日期）；
-#   · 即便之后 NTP 校正了系统时间，也不会回写 RTC ⇒ 一重启又回到那个错误时间。
-# 打开之后：第一次联网同步后时间会落进 RTC，之后断网重启也是对的。
-# 设备是 rtc0（rtc-pm8xxx，见 dmesg: "registered as rtc0"）。
-CONFIG_RTC_HCTOSYS=y
-CONFIG_RTC_HCTOSYS_DEVICE="rtc0"
-CONFIG_RTC_SYSTOHC=y
-CONFIG_RTC_SYSTOHC_DEVICE="rtc0"
+# CONFIG_RTC_HCTOSYS is not set
+# CONFIG_RTC_SYSTOHC is not set
 # CONFIG_RTC_DEBUG is not set
 CONFIG_RTC_NVMEM=y
 

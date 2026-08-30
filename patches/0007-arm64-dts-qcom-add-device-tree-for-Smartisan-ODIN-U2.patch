@@ -27,8 +27,8 @@ Add initial support for the Smartisan ODIN (U2 Pro), an MSM8953
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 ---
  arch/arm64/boot/dts/qcom/Makefile             |   1 +
- .../boot/dts/qcom/msm8953-smartisan-odin.dts  | 465 ++++++++++++++++++
- 2 files changed, 466 insertions(+)
+ .../boot/dts/qcom/msm8953-smartisan-odin.dts  | 449 ++++++++++++++++++
+ 2 files changed, 450 insertions(+)
  create mode 100644 arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
 
 diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,465 @@
+@@ -0,0 +1,449 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -369,22 +369,6 @@ index 000000000..3dc8f434d
 +	pinctrl-1 = <&sdc2_clk_off &sdc2_cmd_off &sdc2_data_off &sdc2_cd_off>;
 +
 +	status = "okay";
-+};
-+
-+/* RTC 时间写入：默认 pm8xxx 驱动不直接写 RTC 寄存器，而是把“偏差”
-+ * 存进名为 offset 的 nvmem cell 来模拟（pm8xxx_rtc_update_offset）。
-+ * 本机没有提供那个 cell ⇒ set_time 一律返回 -ENODEV ⇒
-+ *   hwclock --systohc 失败、内核 11 分钟回写（CONFIG_RTC_SYSTOHC）也失败，
-+ *   于是每次重启都回到 RTC 里那个 1970 年的废值。
-+ * 加上 allow-set-time，驱动改为真写 RTC 时间寄存器（binding 里的语义：
-+ * 允许主机 CPU 设置 RTC 时间）。
-+ */
-+&spmi_bus {
-+	pmic@0 {
-+		rtc@6000 {
-+			allow-set-time;
-+		};
-+	};
 +};
 +
 +&spmi_bus {
