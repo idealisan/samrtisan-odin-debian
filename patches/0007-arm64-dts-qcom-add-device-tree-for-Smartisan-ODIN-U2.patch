@@ -27,8 +27,8 @@ Add initial support for the Smartisan ODIN (U2 Pro), an MSM8953
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 ---
  arch/arm64/boot/dts/qcom/Makefile             |   1 +
- .../boot/dts/qcom/msm8953-smartisan-odin.dts  | 449 ++++++++++++++++++
- 2 files changed, 450 insertions(+)
+ .../boot/dts/qcom/msm8953-smartisan-odin.dts  | 462 ++++++++++++++++++++
+ 2 files changed, 463 insertions(+)
  create mode 100644 arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
 
 diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,449 @@
+@@ -0,0 +1,462 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -496,6 +496,19 @@ index 000000000..3dc8f434d
 +	vddrfa-supply = <&pm8953_l19>;
 +	vddpa-supply = <&pm8953_l9>;
 +	vdddig-supply = <&pm8953_l5>;
++	status = "okay";
++};
++
++&mpss {
++	/* 上游 msm8953.dtsi 里该节点默认 status = "disabled"，这里显式启用。
++	 * pll-supply 是硬要求：驱动 msm8953_mss.proxy_supply 要求 .supply = "pll"
++	 * @100000 µA，缺了 probe 直接失败。pm8953_l7 本文件里已有（1.8–1.9 V），
++	 * 且原厂 stock.dts 的 qcom,mss@4080000 的 vdd_pll-supply 也是它，三方一致。
++	 * firmware-name 是字符串列表：index 0 = mba，index 1 = modem（驱动里
++	 * of_property_read_string_index 依次读 0 和 1），顺序写反会找错文件。 */
++	firmware-name = "qcom/msm8953/smartisan/u2pro/mba.mbn",
++			"qcom/msm8953/smartisan/u2pro/modem.mdt";
++	pll-supply = <&pm8953_l7>;
 +	status = "okay";
 +};
 -- 
