@@ -1,0 +1,12 @@
+[Unit]
+Description=每 10 分钟保存一次系统时间与 RTC 的偏差
+
+[Timer]
+# 参考实现只在关机时保存，掉电或长按电源硬复位就丢了。手机很少干净关机，
+# 所以定期再存一次，把最坏误差压到 10 分钟。
+OnBootSec=2min
+OnUnitActiveSec=10min
+Unit=odin-swclock-offset-save.service
+
+[Install]
+WantedBy=timers.target

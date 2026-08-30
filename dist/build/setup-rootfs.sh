@@ -213,8 +213,8 @@ chroot $R apt-get update -qq
 # 静默继续只会产出一个"看着成功、实际不能用"的制品，等刷进真机才发现。
 # 所以这里不吞退出码（原来是 `|| echo WARN`，实测它吞掉过整批失败）。
 # util-linux-extra 提供 hwclock。minbase 里没有它，于是真机上连"看一眼 RTC 现在
-# 几点、手工把系统时间写回去"都做不到（实测 `command -v hwclock` 为空）。
-# 内核那套 11 分钟自动回写（CONFIG_RTC_SYSTOHC）之外，留个手工手段排障时很值钱。
+# 几点"都做不到（实测 `command -v hwclock` 为空）。只能**读**（hwclock -r）：
+# 写是不行的 —— 本机的 RTC 不可写，见下面 swclock-offset 那一段。
 # 注意：续行里不能再插 # 注释 —— 反斜杠续行会把各行拼成一行，# 之后全被吃掉。
 if ! chroot $R apt-get install -y -qq \
 	kmod \
@@ -226,6 +226,24 @@ if ! chroot $R apt-get install -y -qq \
 	echo "[setup-rootfs] FATAL: 网络/基础包没装上，构建中止（apt 的完整报错在上面）" >&2
 	exit 1
 fi
+# --- 时钟：RTC 能读不能写，照 postmarketOS 的做法把「系统时间 − RTC」存文件 ---
+# pmOS 给 msm8953 的 SoC 包（device/community/soc-qcom-msm8953/APKBUILD）里写着
+# 	depends="$pkgname-ucm swclock-offset"
+# 即官方也认定这一整系 SoC 的 RTC 不可写：不开 CONFIG_RTC_HCTOSYS/SYSTOHC，
+# 改用 swclock-offset —— 关机把「系统时间 − RTC」写进文件，开机 RTC + 偏差还原。
+# 本机实测与之一致：rtc-pm8xxx 的 set_time 需要设备树里名为 offset 的 nvmem
+# cell，本机没有 ⇒ 一律 -ENODEV ⇒ hwclock --systohc 与内核回写都失败。
+install -D -m 0755 "$HERE/rootfs/usr/local/sbin/odin-swclock-offset.sh" \
+	"$R/usr/local/sbin/odin-swclock-offset.sh"
+for u in odin-swclock-offset-boot.service odin-swclock-offset-save.service \
+	odin-swclock-offset-save.timer; do
+	install -D -m 0644 "$HERE/rootfs/etc/systemd/system/$u" "$R/etc/systemd/system/$u"
+done
+chroot $R systemctl enable odin-swclock-offset-boot.service \
+	odin-swclock-offset-save.service odin-swclock-offset-save.timer
+# Debian 的 util-linux-extra 带 hwclock-save.service，关机时它会去写 RTC；
+# 本机写 RTC 必然 -ENODEV，屏蔽掉，免得每次关机留一条红字。
+chroot $R systemctl mask hwclock-save.service
 chroot $R systemctl enable NetworkManager.service
 chroot $R systemctl enable odin-swap.service 2>/dev/null || true
 chroot $R systemctl enable wpa_supplicant.service 2>/dev/null || true

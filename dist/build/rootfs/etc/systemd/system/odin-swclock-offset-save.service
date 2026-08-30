@@ -1,0 +1,13 @@
+[Unit]
+Description=保存系统时间与 RTC 的偏差
+Documentation=https://gitlab.postmarketos.org/postmarketOS/swclock-offset
+DefaultDependencies=no
+Before=shutdown.target reboot.target halt.target
+
+[Service]
+Type=oneshot
+TimeoutSec=0
+ExecStart=/usr/local/sbin/odin-swclock-offset.sh save
+
+[Install]
+WantedBy=shutdown.target reboot.target halt.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=开机按偏差文件设置系统时间（RTC 不可写时的替代方案）
+Documentation=https://gitlab.postmarketos.org/postmarketOS/swclock-offset
+DefaultDependencies=no
+Before=systemd-fsck-root.service systemd-fsck@.service
+
+[Service]
+Type=oneshot
+TimeoutSec=0
+ExecStart=/usr/local/sbin/odin-swclock-offset.sh boot
+
+[Install]
+WantedBy=sysinit.target
