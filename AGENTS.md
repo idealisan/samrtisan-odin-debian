@@ -54,8 +54,8 @@
 
 | 路径 | 内容 |
 |---|---|
-| `Makefile` | **构建入口**（`make help` / `make all`） |
-| `tools/ci/` | 5 个构建脚本 —— **Makefile 的实现层**，构建逻辑只在这里 |
+| `Makefile` | **构建入口** | `make help` / `make all`，见 `docs/05` |
+| `tools/ci/` | 2 个构建脚本（取内核、装 rootfs） | 其余构建步骤已迁进 Makefile |
 | `tools/` | 镜像导出、打包、校验 |
 | `patches/` | 内核补丁 0001–0008 |
 | `lk2nd/` | lk2nd 补丁 0001–0004 + 设备树 |
@@ -76,8 +76,10 @@
 **入口：`make`**（不要再手敲 `bash tools/ci/*.sh`）。常用：
 `make help`、`make dtb`、`make kernel`、`make lk2nd`、`make rootfs`、`make clean`。
 
-- **Makefile 只编排，构建逻辑只在 `tools/ci/*.sh`**。新增步骤先改脚本，再加 make 目标。
-- CI 仍直接调脚本（三个并行 job + artifact 传递，套 make 会重编内核），见 `docs/05`。
+- **能写成直线命令的写进 Makefile，有真逻辑的留脚本**：
+  dtb / kernel / lk2nd 已在 Makefile 里；`fetch-kernel`（三级回退重试）、
+  `build-rootfs`（debootstrap 流水线）、`build-image`（20+ 项校验）仍是脚本。
+- CI 也走 make（rootfs 那个 job 用 `-o kernel -o dtb` 表示"产物来自 artifact，别重编"）。
 - CI 只在 `release: [prereleased, released]` 与 `workflow_dispatch` 触发。
 
 三个钉死的外部输入：

@@ -51,7 +51,8 @@ jobs:
       - name: 安装 dtc
         run: sudo apt-get update -qq && sudo apt-get install -y -qq device-tree-compiler
       - name: 编译四个 DTB
-        run: bash tools/ci/build-dtb.sh out/dtb
+        # 走 make：构建逻辑在 Makefile 里，CI 与本地同一条路径
+        run: make dtb OUT=out
       - uses: actions/upload-artifact@v4
         with:
           name: odin-dtb
@@ -65,7 +66,7 @@ jobs:
       - name: 安装 ARM32 裸机工具链
         run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-arm-none-eabi device-tree-compiler libfdt-dev make
       - name: 构建完整版与精简版
-        run: bash tools/ci/build-lk2nd.sh out/lk2nd
+        run: make lk2nd OUT=out
       - uses: actions/upload-artifact@v4
         with:
           name: odin-lk2nd
@@ -95,7 +96,7 @@ jobs:
           ccache --set-config=compression=true
           ccache -z
       - name: 编译内核与模块
-        run: bash tools/ci/build-kernel.sh out/kernel
+        run: make kernel OUT=out
       - uses: actions/upload-artifact@v4
         with:
           name: odin-kernel
@@ -122,10 +123,13 @@ jobs:
         with: { name: odin-dtb, path: out/dtb }
       - name: 组装系统镜像
         run: |
-          # debootstrap / chroot / mke2fs 都必须以 root 运行，脚本本身不自己 sudo，
-          # 由这里统一提权；跑完把产物交还给 runner，否则 upload-artifact 读不到
-          # root 建的 0600 镜像
-          sudo -E bash tools/ci/build-rootfs.sh out/rootfs out/kernel out/dtb
+          # debootstrap / chroot / mke2fs 都必须以 root 运行，由这里统一提权；
+          # 跑完把产物交还给 runner，否则 upload-artifact 读不到 root 建的 0600 镜像。
+          #
+          # -o kernel -o dtb：这两个是上一个 job 的 artifact、刚下载到 out/ 里，
+          # 不是这个 runner 编出来的。make 的 --old-file 正是"视为最新、不要重造"
+          # 的语义，正好对上；不加就会在这里把内核重编一遍（20+ 分钟）。
+          sudo -E make -o kernel -o dtb rootfs OUT=out
           sudo chown -R "$(id -u):$(id -g)" out/rootfs
       - uses: actions/upload-artifact@v4
         with:

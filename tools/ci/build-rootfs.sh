@@ -8,7 +8,7 @@
 #      → build-image.sh（保守特性集 + 导出 + 逐项回读校验）
 #
 # 这一步刻意不依赖任何"上一次构建留下来的东西"：根文件系统从发行版现装，
-# 内核由 build-kernel.sh 的产物提供，DTB 由 build-dtb.sh 的产物提供。
+# 内核由 `make kernel` 的产物提供，DTB 由 `make dtb` 的产物提供。
 # 唯一不能现造的是 busybox —— 它的二进制不入库（见 .gitignore），
 # 这里从刚 debootstrap 完的 arm64 根里装 busybox-static 再拷出来，
 # 于是整个链路仍然是从源码/发行版出发、可复现的。
@@ -26,7 +26,7 @@ mkdir -p "$OUT"
 # （CI 上表现为编译 22 分钟成功、最后 cp 时 "No such file or directory"）
 OUT=$(cd "$OUT" && pwd)
 say() { printf '[rootfs] %s\n' "$*"; }
-[ -f "$KOUT/vmlinuz" ] || { echo "缺内核产物: $KOUT/vmlinuz（先跑 build-kernel.sh）" >&2; exit 1; }
+[ -f "$KOUT/vmlinuz" ] || { echo "缺内核产物: $KOUT/vmlinuz（先跑 make kernel）" >&2; exit 1; }
 
 # ---------------------------------------------------------------- 1. debootstrap
 if [ ! -d "$ROOT/etc" ]; then
