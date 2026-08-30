@@ -118,7 +118,8 @@ apt/pip/npm 安装、Release 上传、任何访问远端仓库或外部站点的
 | `lk2nd/` | lk2nd 补丁 0001–0004 + 设备树 | 版本钉死 tag 23.1 |
 | `dts/` | 设备树源码与 `build-dtb.sh` | 完整版 `msm8953-smartisan-odin.dts` 由 patches/0007 注入内核树，不在本仓库 |
 | `dist/` | 刷机包与**用户态组件源码** | `dist/build/rootfs/` 是唯一该改的地方 |
-| `tools/ci/` | 5 个构建脚本（无 Makefile） | 构建入口全是 `bash tools/ci/*.sh` |
+| `Makefile` | **构建入口**（v0.9.4 起） | `make help` / `make all`，见 §3.1 |
+| `tools/ci/` | 5 个构建脚本，**Makefile 的实现层** | 构建逻辑只在这里；不要绕过 Makefile 另起一套 |
 | `tools/` | 镜像导出、打包、校验等辅助脚本 | |
 | `flash/` | `flash-all.sh` 阶段状态机（00→90） | 支持 `--from <阶段>` 与 `--dry-run` |
 | `odin-qemu/` | QEMU 回归测试台 | **只能验用户态**，不能验 msm8953 硬件链路 |
@@ -134,15 +135,40 @@ apt/pip/npm 安装、Release 上传、任何访问远端仓库或外部站点的
 
 ## 3. 构建与发布
 
-### 3.1 本地流水线（无 Makefile，靠目录约定串联）
+### 3.1 本地流水线：用 Makefile
+
+**入口是仓库根的 `Makefile`**，不要再手敲一长串 `bash tools/ci/*.sh`：
 
 ```sh
-bash tools/ci/fetch-kernel.sh     # 三级回退取内核到钉死 SHA
-bash tools/ci/build-dtb.sh  out/dtb
-bash tools/ci/build-kernel.sh out/kernel
-bash tools/ci/build-lk2nd.sh out/lk2nd
-sudo -E bash tools/ci/build-rootfs.sh out/rootfs out/kernel out/dtb
+make help          # 目标与可覆盖变量一览
+make print-config  # 打印当前配置（路径、钉死的 SHA、并行度…）
+make               # 全量：dtb + kernel + lk2nd + rootfs → out/publish
+make dtb           # 只编 4 个设备树
+make kernel        # 只编内核与模块
+make lk2nd         # 只编二级引导
+make rootfs        # 组装根文件系统并导出镜像（依赖 kernel 与 dtb）
+make clean         # 清 out/；make distclean 连内核源码树一起清
 ```
+
+依赖关系由 Makefile 显式声明（`rootfs` 依赖 `kernel` + `dtb`，`lk2nd` 独立），
+并用 `out/.stamps/` 下的戳文件做增量 —— 编过的不会白编第二遍。
+
+常用变量覆盖：
+
+```sh
+make JOBS=16 KDIR=/tmp/linux-msm8953 all
+make OUT=build rootfs
+```
+
+**关键约定：Makefile 只做编排，构建逻辑仍然只在 `tools/ci/*.sh` 里。**
+新增构建步骤时，先写/改脚本，再在 Makefile 里加一个目标调用它。
+不要为了"统一"把脚本逻辑搬进 Makefile —— 那会搞出第二份实现，两边必然分叉。
+
+**CI 为什么仍直接调脚本**（`.github/workflows/release-build.yml`）：
+CI 把 `dtb` / `lk2nd` / `kernel` 拆成三个并行 job，`rootfs` job 靠下载 artifact
+拿到前两者的产物。这条链是"跨 runner 传产物"，不是本地依赖，
+套 `make rootfs` 反而会在 rootfs 那个 runner 上把内核重编一遍（20+ 分钟）。
+所以 CI 保留直接调脚本，Makefile 面向人与全量构建 —— 产物两边一致。
 
 常用环境变量覆盖：`KDIR`、`KERNEL_SHA`、`CROSS`、`JOBS`、`LK2ND_VER`、`SRC`、`ROOT`、`SUITE`、`KOUT`、`DOUT`。
 

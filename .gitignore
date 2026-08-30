@@ -4,6 +4,9 @@
 # 本地临时工作区（替代系统 /tmp；见 AGENTS.md §1.6）
 tmp/
 
+# make 的构建输出（make clean 可重建，见 Makefile）
+out/
+
 # 工具私有状态
 .codebuddy/
 
