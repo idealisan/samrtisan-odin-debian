@@ -959,3 +959,126 @@ bind9-dnsutils / net-tools / traceroute / tcpdump / iperf3 / ethtool / mtr-tiny�
 - 我修的：kernel job 其实是**编译成功**后死在 `cp out/kernel/vmlinuz` ——
   脚本 `cd` 进内核树后 $OUT 相对路径失效；四个脚本的 $OUT 统一转绝对路径
 - 构建日志已全部改成 `tee` 双写，CI 页面能实时看到编译过程
+
+---
+
+## 贰拾贰、v0.9.1 发布与真机基准验证（2026-08-30）
+
+### 背景与目的
+此前真机跑的系统是 8/30 12:01–12:04 手工摆上去的（`/boot/vmlinuz` 时间戳 12:01、
+`/boot/dtbs/qcom/*.dtb` 12:04，`uname` 显示 `6.19.0-postmarketos-qcom-msm8953+`），
+**不是 CI 制品**，按 AGENTS.md §1.4 只能算开发尝试，不能作为基准。
+本轮目的：用 CI 构建的 v0.9.1 完整刷一遍，把验证结果定为后续开发的基准线。
+
+### 13:12 发布 v0.9.1（Pre-Release）
+- 基准提交 `4706103`；相对 v0.9.0 只有 3 笔提交（f6feac1 / ea7275f / 4706103）
+- CI `release-build` run `33294177252` 五个 job 全绿：
+  dtb 34s、lk2nd 50s、kernel 1m42s、rootfs、publish → **completed / success**
+- 8 个资产：lk2nd.img / lk2nd-nomarkw.img / 4× dtb / odin-debian.img /
+  odin-debian-sparse.img / SHA256SUMS
+
+### 13:36 制品下载与校验（落在 tmp/release-v0.9.1/）
+- `shasum -a 256 -c SHA256SUMS` 已下载 7 个全部 **OK**（raw 版 odin-debian.img 未下，仅作回退）
+- 本机 md5 存档：
+  ```
+  1e482a89404cb722c22293150d1323f1  lk2nd-nomarkw.img
+  cca537d6140531ffc4ec6a69a858545c  lk2nd.img
+  47d2e0017e5882633eef8d23e535f454  odin-debian-sparse.img
+  92dbbb8c83b2d6e6235399974120a02f  msm8953-smartisan-odin-ft8716-norolesw.dtb
+  9a32ce00d5f7d2c8db521281e8bb9637  msm8953-smartisan-odin-ft8716.dtb
+  b67413fc2651536d27dadaec3ac604a8  msm8953-smartisan-odin-norolesw.dtb
+  ca210736fe68e615bb091035c2494bd3  msm8953-smartisan-odin.dtb
+  ```
+
+### 踩坑：GitHub 下载必须显式去掉代理
+本机默认带 `http_proxy`/`https_proxy=http://127.0.0.1:3030`（给别的功能用的），
+走它下载 GitHub Release 资产只有 **0.81 MB/s**；直连是 **3.8 MB/s（4.7 倍）**。
+实测手法（同一 URL 取前 20 MB 对比）：
+```sh
+curl -sL -o /dev/null -w '%{speed_download}\n' -r 0-20971519 "$U"      # 走代理
+env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY curl ...  # 直连
+```
+**注意**：不加 `-L` 时测出来是 0 B/s（GitHub 会 302 到 objects.githubusercontent.com，
+那 4.2s vs 1.2s 的差只是重定向响应耗时，不是带宽）。以后凡是从 GitHub 下大文件，
+一律 `env -u http_proxy -u https_proxy ... curl -L`。
+
+### 设备现状记录（刷之前的取证）
+- 状态 C：Debian 12 运行中，SSH `user@172.16.42.1` 可达
+- `/dev/mmcblk0p57`（PARTLABEL=`userdata`，LABEL=`pmOS_root`）挂载为 `/`
+- `/extlinux/extlinux.conf` 在**根下**（不是 `/boot/extlinux/`），`default l0-safe`，两个 label l0 / l0-safe
+- **GPT 里没有 `lk2nd` 分区标签**，`/dev/disk/by-partlabel/` 只有 aboot/boot/recovery/
+  persist/system/userdata 等原厂名字；但 fastboot 层会导出 `lk2nd`
+  （`fastboot getvar all` 报 `partition-size:lk2nd: 0x80000` = 512 KB）
+  ⇒ 设备侧看不到、fastboot 侧能刷，这两件事并不矛盾
+  ⇒ 设备侧看不到、fastboot 侧能刷，这两件事并不矛盾
+
+### 13:37–13:40 真机刷入 v0.9.1（`flash/flash-all.sh --from 20`）
+用户拍板：**完整刷（含 lk2nd）**，**跳过备份**（此前已备份多次，且当前系统
+只是开发中的测试系统、无有价值数据；它疑似是 0.9.0 的 CI 版，但不确定，
+本轮正是为了确认）。
+
+| 阶段 | 结果 |
+|---|---|
+| 20 fastboot | ok（40s，改名 extlinux.conf 后重启落进 fastboot） |
+| 30 boot | ok `Sending 'lk2nd' (356 KB) OKAY` → `Writing 'lk2nd' OKAY` |
+| 40 data | ok（sparse 40s，未用 raw 回退） |
+| 50 reboot | USB 网卡 10s 出现 |
+| 60 usbnet | PC 拿到 172.16.42.2 |
+| 70 ssh | SSH 可达（30s） |
+| **80 verify** | **15 项通过 / 1 项失败** |
+
+通过项：hostname、内核版本、面板驱动 ft8716、DSI connected、DSI enabled、
+DRM 节点、面板初始化失败数 0、背光 2048、usb0 地址、wcn36xx 已加载、
+sshd active、resize2fs 成功、扩容标记、根分区 112G、modprobe 可用。
+失败项：**wlan0 不存在**（实际只有 lo / usb0）。
+
+### 13:44–13:51 查 wlan0：真因是时序，且旧补救动作重载错了对象
+- `/lib/firmware/` 下 10 个 `wcnss.*` **其实是齐的**（开机 03:49:16 已全部取到），
+  我第一次 `ls /lib/firmware/ | head` 只看到前 10 行（ar3k/ath* 开头），
+  `wcnss.*` 排在后面被截断，一度误判成"固件没取到"——**记这个坑：别用 head 看目录**
+- 真正在的是：
+  ```
+  [   10.230706] remoteproc remoteproc0: Direct firmware load for wcnss.mdt failed with error -2
+  [   25.899417] EXT4-fs (mmcblk0p24): mounted filesystem ...   ← late service 这时才去取
+  ```
+  内核 **10.230s** 就索要固件，late service **25.9s** 才动手，晚了 15 秒；
+  `request_firmware` 失败后 remoteproc 停在 `offline`，补文件也不会重试
+- 旧脚本的补救是 `modprobe -r wcn36xx; modprobe wcn36xx`，**但 wcnss.mdt 是
+  remoteproc 读的、不是 wcn36xx 读的**，所以那个补救从来没生效过
+- 手工验证（确认判断，不作为修法）：
+  `echo start > /sys/class/remoteproc/remoteproc0/state` → `Booting fw image wcnss.mdt`
+  → `remote processor is now up`（WCNSS Version 1.5 1.2）；
+  再 `modprobe -r wcn36xx; modprobe wcn36xx` → **wlan0 出现**，
+  nmcli 显示 `wlan0:wifi:disconnected`，固件 `WCN v2.0 RadioPhy vIris_TSMC_4.0`
+
+### 13:58–14:06 修法：把供给动作放进 initramfs（不做事后补救）
+用户要求"最合理正确的修复，像一个正常的 Linux 系统，而不是 Workaround"。
+按启动时序，正确落点是 **`switch_root` 之前**：那时真正的根已挂载、
+systemd 尚未起来、驱动（约 10s 才索取固件）也还没动作。
+
+- 新增 `dist/build/initramfs/sbin/odin-wlan-fw.sh`（POSIX sh；initramfs 是
+  busybox ash，**没有 bash**）
+  - 目标根以参数接收，另支持 `--check`
+  - 用 `/sys/class/block/*/uevent` 里的 **`PARTNAME`** 定位分区 —— initramfs 里
+    没有 udev，`/dev/disk/by-partlabel/` 那套符号链接不存在
+  - `cmp -s` 幂等（wcnss.b06 有 3.2MB，不必每次开机重写闪存）
+- `dist/build/initramfs/init` 在 `switch_root` 前调用；`--check` 判定缺文件时
+  才 `remount,rw`，取完 `sync` 立刻 `remount,ro` ⇒ 绝大多数开机根全程只读
+- `initramfs-applets.txt` 补 **`cp` 与 `cmp`** —— 原名单里竟然没有 `cp`
+- 不再安装 / enable `odin-wlan-fw.service`；`dist/build/rootfs/` 下那两个文件
+  留到统一清理轮次再删（apply-staging-fixes.sh 只拷贝、不 enable，留着无副作用）
+
+**真机实测（假根，不动真 `/lib/firmware`）**：12 个文件全部取出，
+与旧服务产出的文件 **md5 全部一致** ✅
+
+### 新增 reports/021 —— 固件与驱动的供给策略
+把这个坑固化成规范：固件必须在驱动第一次索取之前就位 ⇒ 落点是 initramfs
+而非 late service；附"补一个新外设的实施清单"（查谁在要/何时要 → 确认来源分区
+→ 判时序 → 写脚本 → 补 applet → **真机假根验证后再发版** → 确认模块加载时机），
+以及"禁止的做法"表（late service / modprobe -r 补救 / 硬编码 mmcblk0pNN 等）。
+
+### 顺带记下的事实
+- modem 分区（mmcblk0p52）是 **vfat**、persist（mmcblk0p24）是 **ext4**，
+  两者都是内核内置（`/lib/modules/*/kernel/fs/` 里找不到它们）⇒ initramfs 可直接挂
+- `wcn36xx` / `qcom_wcnss_pil` 在 `/etc/modules-load.d/odin-wlan.conf`，
+  由 `systemd-modules-load` 在 `basic.target` 之前加载 ⇒ 固件已在位，首次加载即成功
