@@ -16,10 +16,14 @@
 # 注意不是 msm8953-mainline/lk2nd —— 那个仓库的目录结构不一样。
 #
 # 两个产物：
-#   lk2nd.img         完整版（打 0001-0003）：保留全部 29 个设备条目
+#   lk2nd.img         完整版（打 0001-0003 + 0005）：保留全部 29 个设备条目
 #   lk2nd-nomarkw.img 精简版（再打 0004）：去掉 msm8953-xiaomi-markw 与
 #                     sdm450-xiaomi-rosy，强制 lk2nd 命中 odin 条目 ——
 #                     只有命中 odin，占位 compatible 才会被替换成真实面板
+#
+# 补丁号不是严格递增打的：0005 进的是第一组（两个变体都要），0004 只在精简版加。
+# 所以实际顺序是 1,2,3,5 → 4。两者改动的文件不重叠，顺序颠倒无妨；
+# 0004 必须留在后面，否则完整版也会掉设备条目。
 set -euo pipefail
 
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../.." && pwd)
@@ -69,12 +73,13 @@ build() {
   fi
 }
 
-# ------------------------------------------------- 1) 完整版（0001-0003）
+# ------------------------------------------------- 1) 完整版（0001-0003 + 0005）
 rm -rf "$SRC"
 mkdir -p "$SRC"
 curl -sSL "https://github.com/msm8916-mainline/lk2nd/archive/refs/tags/${LK2ND_VER}.tar.gz" \
   | tar -xz --strip-components=1 -C "$SRC"
-for p in "$REPO"/lk2nd/0001-*.patch "$REPO"/lk2nd/0002-*.patch "$REPO"/lk2nd/0003-*.patch; do
+for p in "$REPO"/lk2nd/0001-*.patch "$REPO"/lk2nd/0002-*.patch \
+         "$REPO"/lk2nd/0003-*.patch "$REPO"/lk2nd/0005-*.patch; do
   apply_patch "$p"
 done
 build full
