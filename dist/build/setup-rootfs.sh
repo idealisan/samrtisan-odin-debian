@@ -216,12 +216,19 @@ chroot $R apt-get update -qq
 # 几点"都做不到（实测 `command -v hwclock` 为空）。只能**读**（hwclock -r）：
 # 写是不行的 —— 本机的 RTC 不可写，见下面 swclock-offset 那一段。
 # 注意：续行里不能再插 # 注释 —— 反斜杠续行会把各行拼成一行，# 之后全被吃掉。
+#
+# fake-hwclock：本机 RTC **写不了**（pm8xxx 驱动在没有 allow-set-time 时只能读；
+# 而加上 allow-set-time 让它真写寄存器，实测 hwclock --systohc 会把整机挂死，
+# 进程卡在不可中断状态）。于是每次开机内核从 RTC 读到的都是 1970 年的废值。
+# Debian 对"没有可用 RTC 的机器"的标准解法就是这个包：定时 + 关机时把系统时间
+# 存进 /var/lib/fake-hwclock.data，开机早期再恢复 —— 至少不会一重启就退回 1970。
+# 联网时仍以 systemd-timesyncd 的 NTP 为准（fake-hwclock 只是兜底）。
 if ! chroot $R apt-get install -y -qq \
 	kmod \
 	network-manager wpasupplicant iw wireless-tools rfkill firmware-atheros \
 	iputils-ping curl wget bind9-dnsutils net-tools traceroute tcpdump \
 	iperf3 ethtool mtr-tiny \
-	systemd-resolved systemd-timesyncd util-linux-extra \
+	systemd-resolved systemd-timesyncd util-linux-extra fake-hwclock \
 	nftables; then
 	echo "[setup-rootfs] FATAL: 网络/基础包没装上，构建中止（apt 的完整报错在上面）" >&2
 	exit 1
