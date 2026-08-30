@@ -220,37 +220,50 @@ chroot $R apt-get update -qq
 # fake-hwclock：本机 RTC **写不了**（pm8xxx 驱动在没有 allow-set-time 时只能读；
 # 而加上 allow-set-time 让它真写寄存器，实测 hwclock --systohc 会把整机挂死，
 # 进程卡在不可中断状态）。于是每次开机内核从 RTC 读到的都是 1970 年的废值。
-# Debian 对"没有可用 RTC 的机器"的标准解法就是这个包：定时 + 关机时把系统时间
-# 存进 /var/lib/fake-hwclock.data，开机早期再恢复 —— 至少不会一重启就退回 1970。
+# Debian 对"没有可用 RTC 的机器"的标准解法就是这个包：把系统时间存进
+# /etc/fake-hwclock.data（0.12 版的默认路径，不是 /var/lib —— 解包核对过
+# /sbin/fake-hwclock 里的 FILE 默认值），开机早期（sysinit、fsck 之前）再恢复 ——
+# 至少不会一重启就退回 1970。
 # 联网时仍以 systemd-timesyncd 的 NTP 为准（fake-hwclock 只是兜底）。
+# 存盘时机是包自带的 /etc/cron.hourly/fake-hwclock（每小时）与
+# fake-hwclock.service 的 ExecStop（关机）；前者要 cron 才跑得起来，
+# minbase 不带 cron，所以一并装上 —— 手机很少干净关机，只靠关机存盘的话
+# 一掉电或长按电源硬复位就全丢了。
 if ! chroot $R apt-get install -y -qq \
 	kmod \
 	network-manager wpasupplicant iw wireless-tools rfkill firmware-atheros \
 	iputils-ping curl wget bind9-dnsutils net-tools traceroute tcpdump \
 	iperf3 ethtool mtr-tiny \
-	systemd-resolved systemd-timesyncd util-linux-extra fake-hwclock \
+	systemd-resolved systemd-timesyncd util-linux-extra fake-hwclock cron \
 	nftables; then
 	echo "[setup-rootfs] FATAL: 网络/基础包没装上，构建中止（apt 的完整报错在上面）" >&2
 	exit 1
 fi
-# --- 时钟：RTC 能读不能写，照 postmarketOS 的做法把「系统时间 − RTC」存文件 ---
-# pmOS 给 msm8953 的 SoC 包（device/community/soc-qcom-msm8953/APKBUILD）里写着
-# 	depends="$pkgname-ucm swclock-offset"
-# 即官方也认定这一整系 SoC 的 RTC 不可写：不开 CONFIG_RTC_HCTOSYS/SYSTOHC，
-# 改用 swclock-offset —— 关机把「系统时间 − RTC」写进文件，开机 RTC + 偏差还原。
-# 本机实测与之一致：rtc-pm8xxx 的 set_time 需要设备树里名为 offset 的 nvmem
-# cell，本机没有 ⇒ 一律 -ENODEV ⇒ hwclock --systohc 与内核回写都失败。
-install -D -m 0755 "$HERE/rootfs/usr/local/sbin/odin-swclock-offset.sh" \
-	"$R/usr/local/sbin/odin-swclock-offset.sh"
-for u in odin-swclock-offset-boot.service odin-swclock-offset-save.service \
-	odin-swclock-offset-save.timer; do
-	install -D -m 0644 "$HERE/rootfs/etc/systemd/system/$u" "$R/etc/systemd/system/$u"
-done
-chroot $R systemctl enable odin-swclock-offset-boot.service \
-	odin-swclock-offset-save.service odin-swclock-offset-save.timer
-# Debian 的 util-linux-extra 带 hwclock-save.service，关机时它会去写 RTC；
-# 本机写 RTC 必然 -ENODEV，屏蔽掉，免得每次关机留一条红字。
-chroot $R systemctl mask hwclock-save.service
+# --- 时钟：本机 RTC 能读不能写，用 Debian 自带的 fake-hwclock 兜底 ---
+# 内核侧与 postmarketOS 官方那份 msm8953 配置逐项比对过，RTC 部分完全一致：
+# 	# CONFIG_RTC_HCTOSYS is not set
+# 	# CONFIG_RTC_SYSTOHC is not set
+# 	CONFIG_RTC_DRV_PM8XXX=m
+# 即内核不读也不写 RTC —— 因为本机写不了，两条路都是实测不通：
+#   · 不加 allow-set-time：rtc-pm8xxx 的 set_time 走 pm8xxx_rtc_update_offset()，
+#     它要设备树里名为 offset 的 nvmem cell，本机没有 ⇒ 一律 -ENODEV；
+#   · 加上 allow-set-time 让它真写寄存器：hwclock --systohc 会把整机挂死
+#     （进程卡在不可中断状态，连设备端的 timeout 都杀不掉）。
+#   ⇒ 开机内核从 RTC 读到的永远是 1970 年的废值，只能靠用户态兜住。
+#
+# 用户态不再照搬 pmOS 的 swclock-offset（把「系统时间 − RTC」的偏差存文件）——
+# 既然都是写文件，就用 Debian 自带的 fake-hwclock（存绝对时间）：
+#   · fake-hwclock.service 在 sysinit 早期 load，ExecStop 在关机时 save；
+#   · load 只在"存的时刻比现在新"时才设，不会把时间往回拨；
+#   · 存盘由包自带的 /etc/cron.hourly/fake-hwclock（每小时）+ ExecStop（关机）完成。
+# 服务本由包自己的 postinst（deb-systemd-helper enable）启用，这里显式再开一次，
+# 免得换包 / 换 debhelper 版本时悄悄失效。
+chroot $R systemctl enable fake-hwclock.service
+chroot $R systemctl enable cron.service
+# 注：bookworm 的 util-linux-extra **没有** hwclock-save.service（解包核对过：
+# 它只带 /etc/init.d/hwclock.sh 与 udev 的 hwclock-set，两者开头都是
+# `[ -e /run/systemd/system ] && exit 0`，systemd 下压根不会去写 RTC），
+# 所以没什么要屏蔽的 —— 之前那句 mask 是照 pmOS 的思路想当然加的，撤掉。
 chroot $R systemctl enable NetworkManager.service
 chroot $R systemctl enable odin-swap.service 2>/dev/null || true
 chroot $R systemctl enable wpa_supplicant.service 2>/dev/null || true
