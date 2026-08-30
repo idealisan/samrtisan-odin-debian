@@ -196,8 +196,8 @@ $(STAMPS)/lk2nd: | $(STAMPS)
 	curl -sSL "https://github.com/msm8916-mainline/lk2nd/archive/refs/tags/$(LK2ND_VER).tar.gz" \
 		| tar -xz --strip-components=1 -C "$(LK2ND_SRC)"
 	test -f "$(LK2ND_SRC)/makefile"
-	@echo "[lk2nd] 打补丁 0001 0002 0003 0005"
-	@for p in $(foreach n,0001 0002 0003 0005,$(firstword $(wildcard $(REPO)/lk2nd/$(n)-*.patch))); do \
+	@echo "[lk2nd] 打补丁 0001 0002 0003 0005 0006"
+	@for p in $(foreach n,0001 0002 0003 0005 0006,$(firstword $(wildcard $(REPO)/lk2nd/$(n)-*.patch))); do \
 		echo "[lk2nd]   $$(basename $$p)"; \
 		patch -p1 --forward --no-backup-if-mismatch -d "$(LK2ND_SRC)" < "$$p"; \
 	done
