@@ -1499,3 +1499,35 @@ bookworm 的 `util-linux-extra` 根本没有这个 unit，它只带
 - 完整刷机包正在从 HEAD 干净副本构建（内核 → DTB → rootfs → 汇总）。
 - 待真机复验：联网后时间正确；重启后时间停在上次存盘点附近而非 2026-04-27；
   `/etc/fake-hwclock.data` 在更新；连续静置 ≥15 分钟无周期性重启。
+
+### 4. RTC：查到底了，结论是**本机用不了 RTC**（不是没修对）
+
+- 现象：手动把系统时间设对之后，`hwclock --systohc` 依然失败
+  `ioctl(RTC_SET_TIME) to /dev/rtc0 ... failed: No such device`。
+- 真因（drivers/rtc/rtc-pm8xxx.c）：set_time 有两条路径 ——
+  真写寄存器（需要设备树 `allow-set-time`），或把"偏差"存进名为 offset 的
+  nvmem cell。后者第一句就是 `if (!nvmem_cell && !use_uefi) return -ENODEV;`。
+  **本机 /sys/bus/nvmem/devices/ 是空的**，没有任何 nvmem 设备。
+- 参照 pmOS 官方（完整克隆 gitlab.com/postmarketOS/pmaports，见
+  tmp/pmos-pmaports）：markw 用的是共享内核包 linux-postmarketos-qcom-msm8953，
+  其配置里 `RTC_HCTOSYS` / `RTC_SYSTOHC` **两个都是关的**，
+  `CONFIG_RTC_DRV_PM8XXX=m`。即 pmOS 给 msm8953 **也不用 RTC 对时**，靠 NTP。
+  另外主线里没有任何 msm8953 机型用 allow-set-time。
+- 实测：加上 allowing RTC（allow-set-time + 两个内核开关）之后，
+  设备开机约 2 分钟、5 分钟各重启一次（期间没执行任何写 RTC 的命令，
+  pstore 为空＝硬复位、无 panic/OOM）；**撤掉之后连续运行 39 分钟以上不重启**。
+  用户的一句判断很关键：掉电不可能"立刻重启"，而它是立刻重启 ⇒ 不是掉电。
+- 于是撤掉这两处（提交 f137e04），内核配置回到与 pmOS 逐项一致。
+  保留的用户态改动：timesyncd 国内可达 NTP 候选、时区 Asia/Shanghai、
+  util-linux-extra（hwclock）。
+- 遗留：NTP 能否真的校时还需设备联网后复验。
+
+### 5. 另外两件值得记的
+
+- **换用 pmOS 那棵内核树（tmp/linux-kernel-pmos，commit 770e10fa1）的构建失败**：
+  编到 drivers/usb/gadget/udc 与 wireguard 时中断（Error 123/1）。
+  但同一时段 **OrbStack/Docker 崩了两次**（把编译进程直接杀掉），
+  所以更像是环境中断而非代码问题，需要重跑才能定论。
+- **OrbStack 在本机不稳定**：这轮崩了两次，docker 守护进程消失，
+  需要用 `open -a OrbStack` 拉回；之后 `docker start odin-dev`。
+  长时间构建期间要留意这一点。
