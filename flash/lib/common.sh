@@ -128,8 +128,12 @@ FB=${ODIN_FASTBOOT:-fastboot}
 fb() { "$FB" "$@"; }
 
 # in_fastboot —— 有 fastboot 设备且能读到 product
+# 注意别写 awk 'NR>1'：那本来是想跳过 "List of devices attached" 表头，
+# 但现在 fastboot devices 只输出一行（"序列号\tfastboot"），NR>1 会把它整个跳过，
+# 导致设备明明在 fastboot 却判不出来（实测卡过一次）。
+# 直接按第 2 列是不是 fastboot 来筛，两种输出格式都兼容。
 in_fastboot() {
-  [ -n "$(fb devices 2>/dev/null | awk 'NR>1 && $2=="fastboot" {print $1; exit}')" ]
+  [ -n "$(fb devices 2>/dev/null | awk '$2=="fastboot" {print $1; exit}')" ]
 }
 
 fb_getvar() { fb getvar "$1" 2>&1 | head -1 | tr -d '\r'; }

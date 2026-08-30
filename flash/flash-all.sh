@@ -139,14 +139,31 @@ fi
 
 # ---------------------------------------------------------------- 30 boot
 if run 30; then
-  step "30 boot（刷 lk2nd → boot 分区）"
+  step "30 boot（刷 lk2nd → lk2nd 分区）"
   require_fastboot "不在 fastboot，先跑 --from 20"
-  log "刷入 $(basename "$BOOT_IMG")"
+
+  # ★★ 关键：lk2nd 装在自己那个叫 lk2nd 的分区里，不是 boot。
+  #
+  # 实测（这次刷机踩出来的）：boot 分区的真实布局是
+  #    偏移 0      … 512 KB   ← lk2nd 本体，设备就从这里启动
+  #    偏移 512 KB …          ← fastboot 的 "boot" 分区，给内核用的
+  # 证据：boot 分区里有 4 个 ANDROID! 魔数（0 / 266840 / 524288 / 795132），
+  # 而 `fastboot getvar all` 报 `partition-size:lk2nd: 0x80000`（正好 512 KB）、
+  # `partition-size:boot: 0x3f80000`。
+  #
+  # 所以 `fastboot flash boot <lk2nd.img>` 会把镜像写到偏移 512 KB 处，
+  # 偏移 0 那个旧的 lk2nd 毫发无损，重启后照样是旧版在跑 —— 而命令返回 OKAY，
+  # 看上去一切正常。要换掉 lk2nd，必须刷 lk2nd 分区。
+  LK2ND_PART=${LK2ND_PART:-lk2nd}
+  log "刷入 $(basename "$BOOT_IMG") → ${LK2ND_PART} 分区"
   if [ "$DRY" = 1 ]; then
-    info "[dry-run] fastboot flash boot $BOOT_IMG"
+    info "[dry-run] fastboot flash ${LK2ND_PART} $BOOT_IMG"
   else
-    fb flash boot "$BOOT_IMG" || die "刷 boot 失败"
-    ok "boot 分区刷写完成"
+    if ! fb flash "$LK2ND_PART" "$BOOT_IMG"; then
+      warn "刷 ${LK2ND_PART} 分区失败，回退刷 boot（有些环境不会导出 lk2nd 分区名）"
+      fb flash boot "$BOOT_IMG" || die "刷 boot 失败"
+    fi
+    ok "${LK2ND_PART} 分区刷写完成"
   fi
 fi
 
