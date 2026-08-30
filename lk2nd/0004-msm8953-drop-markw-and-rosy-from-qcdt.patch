@@ -1,27 +1,37 @@
 From: Smartisan ODIN mainline porting effort
 Subject: [PATCH 4/4] msm8953: drop markw and rosy from the device table
 
-Force lk2nd to pick the Smartisan ODIN entry —— 只有命中 odin，
-占位 compatible 才会被替换成真实面板名。
+Force lk2nd to pick the Smartisan ODIN entry.
 
-本补丁按 **lk2nd 21.0** 的设备表重新生成。21.0 与 23.x 的差异：
-  - 21.0 是 msm8953-billion-rimob（23.x 改名成 flipkart-rimob）
-  - 21.0 没有 meizu-m1871 / qrd-sku3 / wingtech-wt89536 / sdm450-mtp
-按 23.x 生成的那份打到 21.0 上会 Hunk #1 FAILED。
+Why this is needed: the table holds both msm8953-smartisan-odin (board-id
+<0x0b 0x01>) and msm8953-xiaomi-markw (<0x1000b 0x01>). VARIANT_MASK is 0xff,
+so both have variant_id 0x0b -- the 0x10 nibble is only the variant *major*,
+which loses to SUBTYPE_EXACT_MATCH. Both carry subtype 0x01, so the tie-break
+falls through to comparing variant_major, and markw can win.
 
+markw requires an exact major match while odin only needs MAJOR_BEST, so once
+markw is gone odin is the only SUBTYPE_EXACT candidate left and wins outright.
+
+This patch builds the "nomarkw" image.
+Apply only 0001-0003 for the full (untrimmed) image.
+
+Generated against lk2nd 23.1 —— 实测确认 23.1 在本机可启动且能正确替换面板 compatible。
+diff --git a/lk2nd/device/dts/msm8953/rules.mk b/lk2nd/device/dts/msm8953/rules.mk
+index 32b8f48..86c3729 100644
 --- a/lk2nd/device/dts/msm8953/rules.mk
 +++ b/lk2nd/device/dts/msm8953/rules.mk
-@@ -16,13 +16,11 @@
- 	$(LOCAL_DIR)/msm8953-smartisan-odin.dtb \
+@@ -19,14 +19,12 @@ ADTBS += \
+ 	$(LOCAL_DIR)/msm8953-wingtech-wt89536.dtb \
  	$(LOCAL_DIR)/msm8953-xiaomi-common.dtb \
  	$(LOCAL_DIR)/msm8953-xiaomi-daisy.dtb \
 -	$(LOCAL_DIR)/msm8953-xiaomi-markw.dtb \
  	$(LOCAL_DIR)/msm8953-xiaomi-oxygen.dtb \
  	$(LOCAL_DIR)/msm8953-xiaomi-vince.dtb \
+ 	$(LOCAL_DIR)/sda450-samsung-r05.dtb \
  	$(LOCAL_DIR)/sdm450-motorola-ali.dtb \
+ 	$(LOCAL_DIR)/sdm450-mtp.dtb \
  	$(LOCAL_DIR)/sdm450-samsung-r04.dtb \
- 	$(LOCAL_DIR)/sdm450-samsung-r05.dtb \
 -	$(LOCAL_DIR)/sdm450-xiaomi-rosy.dtb \
  	$(LOCAL_DIR)/sdm632-fairphone-fp3.dtb \
- 	$(LOCAL_DIR)/sdm632-motorola-ocean.dtb \
  	$(LOCAL_DIR)/sdm632-mtp.dtb \
+ 	$(LOCAL_DIR)/sdm632-mtp-3.dtb \

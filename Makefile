@@ -35,6 +35,12 @@ SHELL := bash
 # ---------------------------------------------------------------- 路径
 REPO := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 OUT  ?= $(REPO)/out
+# 立刻转绝对路径：recipe 里会 cd 进内核源码树，届时 "out/kernel" 这种相对路径
+# 就指到别处去了（CI 上的表现是 modules_install 把 modstage 建在源码树下，
+# 最后 tar 报 No such file or directory）。老脚本里也有这条警告，重构时漏了。
+# override 不能省：CI 是命令行传参（make kernel OUT=out），
+# 命令行变量会盖掉 Makefile 里的普通赋值，只有 override 才拦得住。
+override OUT := $(abspath $(OUT))
 
 # 内核源码树：默认落在项目内 tmp/（AGENTS.md §1.6，不用系统 /tmp）。
 # CI 想用 /tmp 更快可覆盖：make KDIR=/tmp/linux-msm8953
@@ -56,7 +62,7 @@ KERNEL_REPO   ?= https://github.com/msm8953-mainline/linux.git
 KERNEL_SHA    ?= 05f7e89ab9731565d8a62e3b5d1ec206485eeb0b
 KERNEL_BRANCH ?= master
 KERNEL_SINCE  ?= 2026-02-07
-LK2ND_VER     ?= 21.0
+LK2ND_VER     ?= 23.1
 SUITE         ?= bookworm
 
 # ---------------------------------------------------------------- 工具链
