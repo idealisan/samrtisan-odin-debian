@@ -35,7 +35,7 @@ Smartisan U2 Pro（ODIN，msm8953 / SDM450）主线 Linux 6.19 + Debian 12 (book
 | `README.md` | 补丁清单、多面板自动选择机制、USB 外接存储链路、已知限制 |
 | `WORKLOG.md` | 按时间的工作日志，含大量实测记录与踩坑 |
 | `reports/` | 各类分析报告；`018-真机刷入循环操作手册.md` 是刷机状态机与救援的权威参考 |
-| `dist/FLASH.md` | 早期版本的刷入指南（历史产物，以 `docs/` 为准） |
+| `dist/FLASH.md` | 刷机包产物清单 + 最快上手四条命令（指针，细节在本目录） |
 | `dist/build/rootfs/` | 用户态组件的源码（改这里，不要直接改镜像内文件） |
 | `tools/ci/` | 五个复现构建脚本 |
 | `.github/workflows/release-build.yml` | Release 触发的构建流水线 |
