@@ -6,9 +6,16 @@
 #   make dtb        只编 4 个设备树
 #   make kernel     只编内核与模块
 #   make lk2nd      只编二级引导（完整版 + 精简版）
-#   make rootfs     组装根文件系统并导出镜像（依赖 kernel 与 dtb）
-#   make publish    产物汇总到 out/publish 并生成 SHA256SUMS
+#   make rootfs     组装根文件系统并导出镜像（变体取 ODIN_VARIANT，默认 gui）
+#   make rootfs-core / make rootfs-gui      显式指定变体
+#   make publish / publish-core / publish-gui   产物汇总到 out/publish + SHA256SUMS
 #   make clean      清 out/；make distclean 连内核源码树一起清
+#
+# 两个变体：core（无 GUI，服务器 / 开发基线）与 gui（带 Plasma Mobile 桌面）
+#   dtb / kernel / lk2nd 与变体无关 —— 两个变体共用同一份产物，只编一次。
+#   差别只在 rootfs 阶段装什么包，所以变体维度从 rootfs 才引入。
+#   core 是 gui 的子集 ⇒ 本地默认只编 gui（ODIN_VARIANT ?= gui）；
+#   CI 两个都编，各一条 job，共用上一步的 kernel / dtb artifact。
 #
 # 设计取向（与用户的共识）：
 #   **能写成直线命令的，直接写在这里；有真逻辑的，仍然放脚本。**
@@ -52,9 +59,11 @@ LK2ND_SRC ?= $(REPO)/tmp/lk2nd-src
 DTB_OUT    := $(OUT)/dtb
 KERNEL_OUT := $(OUT)/kernel
 LK2ND_OUT  := $(OUT)/lk2nd
-ROOTFS_OUT := $(OUT)/rootfs
 PUBLISH    := $(OUT)/publish
 STAMPS     := $(OUT)/.stamps
+# 变体相关路径用递归展开（= 而不是 :=）：rootfs-core / rootfs-gui 的 recipe
+# 运行时才会确定 ODIN_VARIANT，:= 会把解析期那个默认值钉死，两个变体就串了。
+ROOTFS_OUT = $(OUT)/rootfs-$(ODIN_VARIANT)
 
 # ---------------------------------------------------------------- 钉死的外部输入
 # 与 .github/workflows/release-build.yml 的 env 段一致，改一处要改两处
@@ -64,6 +73,13 @@ KERNEL_BRANCH ?= master
 KERNEL_SINCE  ?= 2026-02-07
 LK2ND_VER     ?= 23.1
 SUITE         ?= bookworm
+
+# ---------------------------------------------------------------- 变体
+# core（无 GUI，服务器 / 开发基线）/ gui（Plasma Mobile 桌面）。
+# 本地默认 gui：core 是它的子集，本地没必要为求证子集再花一遍 debootstrap。
+# CI 会显式跑两条：make rootfs-core 与 make rootfs-gui。
+ODIN_VARIANT  ?= gui
+VARIANTS      := core gui
 
 # ---------------------------------------------------------------- 工具链
 CROSS ?= aarch64-linux-gnu-
@@ -83,7 +99,9 @@ DTB_NAMES := msm8953-smartisan-odin \
              msm8953-smartisan-odin-ft8716-norolesw
 
 # ---------------------------------------------------------------- 目标
-.PHONY: all help print-config fetch-kernel dtb kernel lk2nd rootfs publish \
+.PHONY: all help print-config fetch-kernel dtb kernel lk2nd \
+        rootfs rootfs-core rootfs-gui \
+        publish publish-core publish-gui \
         clean distclean
 
 .DEFAULT_GOAL := all
@@ -101,6 +119,8 @@ print-config:
 	@echo "KERNEL_SHA  = $(KERNEL_SHA)"
 	@echo "LK2ND_VER   = $(LK2ND_VER)"
 	@echo "SUITE       = $(SUITE)"
+	@echo "ODIN_VARIANT= $(ODIN_VARIANT)  (可选: $(VARIANTS))"
+	@echo "ROOTFS_OUT  = $(ROOTFS_OUT)"
 	@echo "CROSS       = $(CROSS)"
 	@echo "JOBS        = $(JOBS)"
 	@echo "SUDO        = $(SUDO)"
@@ -239,23 +259,39 @@ $(STAMPS)/lk2nd: | $(STAMPS)
 # ================================================================ 根文件系统
 # 仍是脚本：debootstrap + depmod + initramfs + 用户态配置 + 镜像导出，
 # 一整条流水线，且有 mount 之类的副作用，不适合拆成 make recipe。
-rootfs: $(STAMPS)/rootfs
-$(STAMPS)/rootfs: | $(STAMPS) kernel dtb
-	@mkdir -p $(ROOTFS_OUT)
-	SUITE="$(SUITE)" $(SUDO) bash $(REPO)/tools/ci/build-rootfs.sh \
-		"$(ROOTFS_OUT)" "$(KERNEL_OUT)" "$(DTB_OUT)"
+# 变体走模式规则（% = core / gui）：两个变体的步骤完全一样，只有名字不同，
+# 用 $* 把变体名传下去即可，没必要把同一段 recipe 抄两遍。
+# 戳文件也按变体分开 —— 否则编完 core 再编 gui，make 会认为 rootfs 已最新而跳过。
+rootfs: rootfs-$(ODIN_VARIANT)
+rootfs-core: $(STAMPS)/rootfs-core
+rootfs-gui:  $(STAMPS)/rootfs-gui
+
+$(STAMPS)/rootfs-%: | $(STAMPS) kernel dtb
+	@case "$*" in \
+		core|gui) ;; \
+		*) echo "[rootfs] 未知变体: $*（可选 core 或 gui）" >&2; exit 1 ;; \
+	esac
+	@mkdir -p $(OUT)/rootfs-$*
+	SUITE="$(SUITE)" ODIN_VARIANT="$*" $(SUDO) bash $(REPO)/tools/ci/build-rootfs.sh \
+		"$(OUT)/rootfs-$*" "$(KERNEL_OUT)" "$(DTB_OUT)"
 	@mkdir -p $(STAMPS) && touch $@
 
 # ================================================================ 产物汇总
-publish: $(STAMPS)/publish
-$(STAMPS)/publish: | $(STAMPS) rootfs lk2nd
+publish: publish-$(ODIN_VARIANT)
+publish-core: $(STAMPS)/publish-core
+publish-gui:  $(STAMPS)/publish-gui
+
+$(STAMPS)/publish-%: | $(STAMPS) rootfs-% lk2nd
+	@case "$*" in \
+		core|gui) ;; \
+		*) echo "[publish] 未知变体: $*（可选 core 或 gui）" >&2; exit 1 ;; \
+	esac
 	@mkdir -p $(PUBLISH)
-	cp -f $(DTB_OUT)/*.dtb                    $(PUBLISH)/
-	cp -f $(LK2ND_OUT)/*.img                  $(PUBLISH)/
-	cp -f $(ROOTFS_OUT)/odin-debian.img        $(PUBLISH)/
-	cp -f $(ROOTFS_OUT)/odin-debian-sparse.img $(PUBLISH)/
+	cp -f $(DTB_OUT)/*.dtb       $(PUBLISH)/
+	cp -f $(LK2ND_OUT)/*.img     $(PUBLISH)/
+	cp -f $(OUT)/rootfs-$*/*.img $(PUBLISH)/
 	cd $(PUBLISH) && sha256sum * | sort -k2 > SHA256SUMS
-	@echo "[publish] 产物已汇总到 $(PUBLISH)："
+	@echo "[publish] $* 变体产物已汇总到 $(PUBLISH)："
 	@ls -l $(PUBLISH)
 	@mkdir -p $(STAMPS) && touch $@
 

@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 export DEBIAN_FRONTEND=noninteractive
+# 变体：core（无 GUI，服务器 / 开发基线）或 gui（Plasma Mobile 桌面）。
+# 由 tools/ci/build-rootfs.sh 从 make 的 ODIN_VARIANT 传下来。
+# 两个变体共用同一套基础设施（USB 救援通道、swap、扩容、用户态脚本），
+# 差别只在 gui 多装一套桌面 —— core 是它的子集。
+ODIN_VARIANT=${ODIN_VARIANT:-core}
+say() { printf '[setup-rootfs] %s\n' "$*"; }
 # 根目录可覆盖：CI 里不在 /mnt/debian，而是 debootstrap 到工作区下的某个目录
 R=${ODIN_ROOTFS:-/mnt/debian}
 [ -d "$R/etc" ] || { echo "不是 rootfs 目录: $R" >&2; exit 1; }
@@ -201,6 +207,55 @@ unmanaged-devices=interface-name:usb0
 NMC
 # 首启已有扩容/日志压力，别再被 network-online 的 90s 超时拖慢
 chroot $R systemctl disable NetworkManager-wait-online.service 2>/dev/null || true
+
+# --- 变体 gui：Plasma Mobile 桌面 ---
+# 包清单照搬真机上手工验证过的那套（Plasma Mobile + sddm + 常用工具），
+# 不是现编的：手工装过、确认能起来，这里只是把它固化进构建。
+if [ "$ODIN_VARIANT" = "gui" ]; then
+	say "变体=gui：安装 Plasma Mobile 与配套工具（这步较慢）"
+	# 装包失败必须让整个构建失败。GUI 的依赖链是全项目最长的，
+	# 静默继续只会产出一个"看着成功、实际缺组件"的镜像，等刷进真机才发现 ——
+	# 那时定位成本比现在高一个量级。所以不吞退出码，也不接 | tail
+	# （管道的退出码取最后一段，会把 apt 的失败盖掉）。
+	if ! chroot $R apt-get install -y -qq \
+		plasma-mobile plasma-mobile-tweaks \
+		sddm \
+		x11-utils xinput \
+		plasma-nm \
+		firefox-esr \
+		vim nano less file unzip zip rsync tmux screen \
+		htop btop iotop sysstat \
+		git build-essential \
+		pipewire pipewire-pulse wireplumber \
+		fonts-noto-cjk fonts-noto-color-emoji; then
+		echo "[setup-rootfs] FATAL: GUI 包没装上，构建中止（apt 的完整报错在上面）" >&2
+		exit 1
+	fi
+
+	chroot $R systemctl set-default graphical.target
+	chroot $R systemctl enable sddm.service
+
+	# 手机屏 PPI 很高，Xorg/Wayland 默认会让字小得没法看。
+	# QT_SCALE_FACTOR 放大 Qt 界面；sddm 的 EnableHiDPI 管登录界面那一块。
+	mkdir -p $R/etc/sddm.conf.d
+	cat > $R/etc/sddm.conf.d/10-odin-hidpi.conf << 'SDDMCONF'
+[X11]
+EnableHiDPI=true
+
+[Wayland]
+EnableHiDPI=true
+SDDMCONF
+	grep -q QT_SCALE_FACTOR $R/etc/environment 2>/dev/null \
+		|| echo "QT_SCALE_FACTOR=2" >> $R/etc/environment
+
+	# 注意：swap 的 sysctl（vm.swappiness / vfs_cache_pressure）**不在这里写**。
+	# 它在 dist/build/rootfs/etc/sysctl.d/99-odin-swap.conf，由
+	# apply-staging-fixes.sh 对两个变体一视同仁地部署 —— GUI 不是它的前置条件。
+	say "变体=gui：graphical.target + sddm + 2x 缩放 就位"
+else
+	say "变体=core（无 GUI）"
+fi
+
 # 蜂窝网络（移动数据）：本设备**有**基带，不是没有硬件。
 #   - SoC 是骁龙 626（MSM8953 Pro），基带是 msm8953 的 MSS
 #   - 固件在原厂 modem 分区（mba.mbn + modem.mdt + modem.b00~b20，约 43MB）

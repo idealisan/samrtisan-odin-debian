@@ -18,7 +18,17 @@ REPO=$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../.." && pwd)
 OUT=${1:?用法: build-rootfs.sh <输出目录> [内核产物目录] [DTB 产物目录]}
 KOUT=${2:-$OUT/../kernel}
 DOUT=${3:-$OUT/../dtb}
-ROOT=${ROOT:-/tmp/odin-rootfs}
+# 变体由 make 的 ODIN_VARIANT 传下来（core 无 GUI / gui 带 Plasma Mobile）。
+# 只影响两件事：装什么包（交给 setup-rootfs.sh）与产出镜像叫什么名字。
+VARIANT=${ODIN_VARIANT:-core}
+case "$VARIANT" in
+	core|gui) ;;
+	*) echo "[rootfs] 未知变体: $VARIANT（可选 core / gui）" >&2; exit 1 ;;
+esac
+# staging 根目录必须按变体分开。debootstrap 是重活，下面靠
+# `if [ ! -d "$ROOT/etc" ]` 判断是否要重来；两个变体共用一个目录时，
+# 第二个变体会直接复用第一个已经摆好的根 —— 表现为"编了 gui，出来的却是 core"。
+ROOT=${ROOT:-/tmp/odin-rootfs-$VARIANT}
 SUITE=${SUITE:-bookworm}
 
 mkdir -p "$OUT"
@@ -28,6 +38,7 @@ OUT=$(cd "$OUT" && pwd)
 say() { printf '[rootfs] %s\n' "$*"; }
 [ -f "$KOUT/vmlinuz" ] || { echo "缺内核产物: $KOUT/vmlinuz（先跑 make kernel）" >&2; exit 1; }
 
+say "变体: $VARIANT（staging: $ROOT）"
 # ---------------------------------------------------------------- 1. debootstrap
 if [ ! -d "$ROOT/etc" ]; then
   say "debootstrap $SUITE / arm64 → $ROOT"
@@ -95,7 +106,7 @@ say "  initramfs: $(stat -c%s "$ROOT/boot/initramfs.cpio.gz" 2>/dev/null || stat
 
 # ---------------------------------------------------------------- 4. 系统配置
 say "setup-rootfs.sh（用户 / 网络 / 服务）"
-ODIN_ROOTFS="$ROOT" bash "$REPO/dist/build/setup-rootfs.sh"
+ODIN_ROOTFS="$ROOT" ODIN_VARIANT="$VARIANT" bash "$REPO/dist/build/setup-rootfs.sh"
 
 say "apply-staging-fixes.sh（增量修复 + overlay + DTB + extlinux）"
 # 用 CI 刚编出来的 DTB，而不是仓库里（可能过期的）那份
@@ -136,8 +147,16 @@ if [ "$blocks" -gt "$GH_MAX" ]; then
   echo "  [rootfs] WARN: 按内容算出的初始大小 ${size_mb} MiB 超过 GitHub 上限，压到 ${GH_MAX} 块" >&2
   blocks=$GH_MAX
 fi
+# 镜像名：core 沿用历史名 odin-debian.img —— flash-all.sh 的默认路径、
+# dist/FLASH.md 与几处文档都按这个名字取，改名要连带改一堆地方却没有任何收益。
+# 其余变体加后缀（sparse 名由 build-image.sh 按 ${OUT%.img}-sparse.img 自动派生）。
+case "$VARIANT" in
+	core) IMG=odin-debian.img ;;
+	*)    IMG=odin-debian-$VARIANT.img ;;
+esac
+
 say "初始大小按内容算（pmOS 公式 ×1.2 + 50MiB）：staging ${stage_mb} MiB → ${size_mb} MiB = ${blocks} 块"
-bash "$REPO/tools/build-image.sh" "$ROOT" "$OUT/odin-debian.img" "$blocks" pmOS_root
+bash "$REPO/tools/build-image.sh" "$ROOT" "$OUT/$IMG" "$blocks" pmOS_root
 
 say "产物："
 ls -la "$OUT"
