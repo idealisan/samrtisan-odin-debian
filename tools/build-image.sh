@@ -156,7 +156,7 @@ img2simg "$OUT" "$SPARSE"
 say "img2simg done: $(du -h "$SPARSE" | cut -f1)"
 
 for f in "$OUT" "$SPARSE"; do
-  s=$(stat -c%s "$f")
+  s=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f")
   [ "$s" -lt "$ASSET_LIMIT" ] \
     || fail "$f 有 $s 字节，达到/超过 GitHub 单资产上限 $ASSET_LIMIT 字节，缩小 BLOCKS 重编"
 done

@@ -91,7 +91,7 @@ mkdir -p "$ROOT/boot"
 # 直接调用会 Permission denied / exit 126
 bash "$REPO/tools/pack_initramfs.sh" "$ISTAGE" "$ROOT/boot/initramfs.cpio.gz"
 rm -rf "$ISTAGE"
-say "  initramfs: $(stat -c%s "$ROOT/boot/initramfs.cpio.gz") 字节"
+say "  initramfs: $(stat -c%s "$ROOT/boot/initramfs.cpio.gz" 2>/dev/null || stat -f%z "$ROOT/boot/initramfs.cpio.gz") 字节"
 
 # ---------------------------------------------------------------- 4. 系统配置
 say "setup-rootfs.sh（用户 / 网络 / 服务）"

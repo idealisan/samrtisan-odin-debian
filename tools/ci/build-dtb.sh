@@ -49,7 +49,7 @@ KDIR="$KDIR" bash "$REPO/dts/build-dtb.sh"
 
 for f in "$REPO"/dts/*.dtb; do
   cp -f "$f" "$OUT/"
-  say "  $(basename "$f")  $(stat -c%s "$f") 字节"
+  say "  $(basename "$f")  $(stat -c%s "$f" 2>/dev/null || stat -f%z "$f") 字节"
 done
 
 # ---------------------------------------------------------------- 自检

@@ -79,7 +79,7 @@ for p in "$REPO"/lk2nd/0001-*.patch "$REPO"/lk2nd/0002-*.patch "$REPO"/lk2nd/000
 done
 build full
 cp "$SRC/build-lk2nd-msm8953/lk2nd.img" "$OUT/lk2nd.img"
-say "完整版: $OUT/lk2nd.img ($(stat -c%s "$OUT/lk2nd.img") 字节)"
+say "完整版: $OUT/lk2nd.img ($(stat -c%s "$OUT/lk2nd.img" 2>/dev/null || stat -f%z "$OUT/lk2nd.img") 字节)"
 
 # ------------------------------------------------- 2) 精简版（再打 0004）
 # 注意：glob 必须写在引号外面，写成 "$REPO/lk2nd/0004-*.patch" 整串被引号包住时
@@ -88,7 +88,7 @@ apply_patch "$REPO"/lk2nd/0004-*.patch
 # 增量重编即可：改的是设备表，make 会重编 QCDT 并重新打包
 build nomarkw
 cp "$SRC/build-lk2nd-msm8953/lk2nd.img" "$OUT/lk2nd-nomarkw.img"
-say "精简版: $OUT/lk2nd-nomarkw.img ($(stat -c%s "$OUT/lk2nd-nomarkw.img") 字节)"
+say "精简版: $OUT/lk2nd-nomarkw.img ($(stat -c%s "$OUT/lk2nd-nomarkw.img" 2>/dev/null || stat -f%z "$OUT/lk2nd-nomarkw.img") 字节)"
 
 # ---------------------------------------------------------------- 自检
 say "自检：精简版里不应再出现 markw"

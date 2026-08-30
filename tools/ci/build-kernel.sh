@@ -67,7 +67,7 @@ if command -v ccache >/dev/null 2>&1; then ccache -s; fi
 
 # ---------------------------------------------------------------- 产物
 cp arch/arm64/boot/Image "$OUT/vmlinuz"
-say "vmlinuz: $(stat -c%s "$OUT/vmlinuz") 字节"
+say "vmlinuz: $(stat -c%s "$OUT/vmlinuz" 2>/dev/null || stat -f%z "$OUT/vmlinuz") 字节"
 
 MODSTAGE=$(mktemp -d)
 # modules_install 同样要看得见：depmod 在这一步跑，跨架构告警（如 Bad ELF）
@@ -79,7 +79,7 @@ if ! make ARCH=arm64 CROSS_COMPILE="$CROSS" INSTALL_MOD_PATH="$MODSTAGE" modules
 fi
 tar -cf "$OUT/modules.tar" -C "$MODSTAGE" .
 rm -rf "$MODSTAGE"
-say "modules.tar: $(stat -c%s "$OUT/modules.tar") 字节"
+say "modules.tar: $(stat -c%s "$OUT/modules.tar" 2>/dev/null || stat -f%z "$OUT/modules.tar") 字节"
 
 # ---------------------------------------------------------------- 自检
 say "自检：新增驱动应编进模块或内核"
