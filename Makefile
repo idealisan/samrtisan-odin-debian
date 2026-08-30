@@ -313,9 +313,16 @@ $(STAMPS)/publish-%: | $(STAMPS) rootfs-% lk2nd
 		*) echo "[publish] 未知变体: $*（可选 core 或 gui）" >&2; exit 1 ;; \
 	esac
 	@mkdir -p $(PUBLISH)
-	cp -f $(DTB_OUT)/*.dtb       $(PUBLISH)/
-	cp -f $(LK2ND_OUT)/*.img     $(PUBLISH)/
-	cp -f $(OUT)/rootfs-$*/*.img $(PUBLISH)/
+	cp -f $(DTB_OUT)/*.dtb   $(PUBLISH)/
+	cp -f $(LK2ND_OUT)/*.img $(PUBLISH)/
+# 镜像用 cat 复制而不是 cp：GNU cp 默认 --sparse=auto，复制稀疏文件时会去
+# "打洞"（fallocate FALLOC_FL_PUNCH_HOLE），而 macOS 的 bind mount 不支持这个
+# ioctl ⇒ cp: error deallocating '...': Invalid argument，拷贝半途失败
+# （本地容器实测，留下一个 15 MB 的残file）。CI 上是 ext4，碰不到。
+# cat 只管写字节，两种文件系统上都稳。
+	for f in $(OUT)/rootfs-$*/*.img; do \
+		cat "$$f" > "$(PUBLISH)/$$(basename $$f)"; \
+	done
 	cd $(PUBLISH) && sha256sum * | sort -k2 > SHA256SUMS
 	@echo "[publish] $* 变体产物已汇总到 $(PUBLISH)："
 	@ls -l $(PUBLISH)
