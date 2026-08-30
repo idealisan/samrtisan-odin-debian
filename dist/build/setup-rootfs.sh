@@ -174,8 +174,8 @@ chroot $R apt-get update -qq
 # systemd-timesyncd 解决无 RTC 导致的时钟错乱 —— 时钟差几个月时 apt 会直接
 # 拒绝 Release 文件（"Release file ... is not valid yet"）。
 # kmod 提供 /sbin/modprobe。它不是 debootstrap minbase 的一部分，但项目里
-# 有多处依赖它：odin-wlan-fw.sh 重载 wcn36xx、odin-usb-role.sh 加载 configfs、
-# /etc/modules-load.d/*.conf 也要靠它。缺了不会报错（这些调用都带 2>/dev/null），
+# 有多处依赖它：odin-usb-role.sh 加载 configfs、/etc/modules-load.d/*.conf
+# 也要靠它。缺了不会报错（这些调用都带 2>/dev/null），
 # 只会静默失效 —— 实测真机上 command -v modprobe 为空，确认缺失。
 chroot $R apt-get install -y -qq \
 	kmod \
@@ -218,13 +218,14 @@ chroot $R systemctl mask ModemManager.service 2>/dev/null || true
 #   2. 板级射频校准数据 WCNSS_qcom_wlan_nv.bin ← persist 分区
 # （实测：modem:/image/wcnss.* 与此前手工预置的固件十个文件 md5 全等，
 #   所以"开机现取"与"预置"完全等价，还省掉了往仓库塞二进制）
-# 由 odin-wlan-fw.service 开机现取。
-install -D -m 0755 "$HERE/rootfs/usr/local/sbin/odin-wlan-fw.sh" \
-	"$R/usr/local/sbin/odin-wlan-fw.sh"
-install -D -m 0644 "$HERE/rootfs/etc/systemd/system/odin-wlan-fw.service" \
-	"$R/etc/systemd/system/odin-wlan-fw.service"
-mkdir -p "$R/etc/modules-load.d"
-chroot $R systemctl enable odin-wlan-fw.service 2>&1 | tail -2 || true
+#
+# 这件事由 **initramfs** 做（dist/build/initramfs/sbin/odin-wlan-fw.sh），
+# 不在用户态做任何 late service —— 时序上放晚了就永远差一步：
+# 内核的 qcom_wcnss_pil 约在开机 10s 就 request_firmware("wcnss.mdt")，
+# 而 systemd 的 late service 要到 25s 之后才跑，那时 remoteproc 已经停在
+# offline，补上文件也不会自己重试。详见 reports/021。
+# 只有 stage 里确实缺文件时，initramfs 才会把根临时挂为 rw 去取。
+#
 # wcn36xx / qcom_wcnss_pil 是模块，靠 udev 在 platform 设备出现时加载，
 # 这里显式列进 modules-load 更稳（不依赖时序）
 # 目录不是必然存在：/etc/modules-load.d 是 kmod 提供的，而 debootstrap

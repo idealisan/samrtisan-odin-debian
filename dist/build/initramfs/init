@@ -67,6 +67,25 @@ fi
 
 [ "$RESCUE" = "1" ] && { echo "staying in rescue shell"; exec sh; }
 
+# WCNSS（WiFi）固件与板级射频校准数据要从原厂 modem / persist 分区现取：
+# 它们不在任何 Debian 包里，也不能进版本库（二进制 + 机器相关的校准数据）。
+# 必须在这里、switch_root 之前备好 —— 内核的 qcom_wcnss_pil 在开机约 10s 就会
+# request_firmware("wcnss.mdt")，那时 systemd 刚起来，任何 late service 都还
+# 没跑（实测 persist 分区要到 25.9s 才被挂载）。差这十几秒，remoteproc 就停在
+# offline，补上文件也不会自己重试。
+# 只有确实缺文件时才把根临时挂为 rw，取完立刻 sync 并挂回 ro。
+if [ -x /sbin/odin-wlan-fw.sh ]; then
+    if /sbin/odin-wlan-fw.sh /mnt --check; then
+        echo "[initramfs] WCNSS 固件已在位"
+    else
+        echo "[initramfs] 取出 WCNSS 固件与校准数据"
+        mount -o remount,rw /mnt 2>/dev/null
+        /sbin/odin-wlan-fw.sh /mnt
+        sync
+        mount -o remount,ro /mnt 2>/dev/null
+    fi
+fi
+
 # 注意：此处不得 umount /mnt —— 根必须保持挂载态供 switch_root 使用；
 # 只读挂载由 systemd 依 fstab 重挂为 rw。
 kill %1 %2 2>/dev/null
