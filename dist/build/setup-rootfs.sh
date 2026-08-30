@@ -186,14 +186,16 @@ echo "en_US.UTF-8 UTF-8" > $R/etc/locale.gen
 chroot $R locale-gen >/dev/null 2>&1 || true
 chroot $R systemd-machine-id-setup 2>/dev/null || true
 
-# --- 时区：默认新加坡（UTC+8）---
+# --- 时区：默认 Asia/Shanghai（UTC+8）---
 # 时区**无法靠联网可靠校正**：网络只能校到 UTC（NTP 给的就是 UTC），本地偏移得靠
 # IP 地理定位之类的外部服务，既不稳定又要额外依赖。所以直接给一个明确的默认值。
 # tzdata 属于 required 优先级，debootstrap minbase 会带上，/usr/share/zoneinfo 齐全。
 # 要改：sudo timedatectl set-timezone <时区>  或  sudo dpkg-reconfigure tzdata
-echo "Asia/Singapore" > $R/etc/timezone
+# （这里原为 Asia/Singapore：同为 UTC+8 但与中国大陆的夏令时/节假日无关，
+#   设备在中国大陆使用，改成 Asia/Shanghai 更合适。）
+echo "Asia/Shanghai" > $R/etc/timezone
 rm -f $R/etc/localtime
-ln -sf /usr/share/zoneinfo/Asia/Singapore $R/etc/localtime
+ln -sf /usr/share/zoneinfo/Asia/Shanghai $R/etc/localtime
 
 # --- WiFi management (equivalent to postmarketOS: NetworkManager + wpa) ---
 sed -i 's/ main$/ main contrib non-free non-free-firmware/' $R/etc/apt/sources.list
@@ -210,12 +212,16 @@ chroot $R apt-get update -qq
 # 装包失败必须让构建失败：没有 NetworkManager / modprobe / resolved 的镜像是废的，
 # 静默继续只会产出一个"看着成功、实际不能用"的制品，等刷进真机才发现。
 # 所以这里不吞退出码（原来是 `|| echo WARN`，实测它吞掉过整批失败）。
+# util-linux-extra 提供 hwclock。minbase 里没有它，于是真机上连"看一眼 RTC 现在
+# 几点、手工把系统时间写回去"都做不到（实测 `command -v hwclock` 为空）。
+# 内核那套 11 分钟自动回写（CONFIG_RTC_SYSTOHC）之外，留个手工手段排障时很值钱。
+# 注意：续行里不能再插 # 注释 —— 反斜杠续行会把各行拼成一行，# 之后全被吃掉。
 if ! chroot $R apt-get install -y -qq \
 	kmod \
 	network-manager wpasupplicant iw wireless-tools rfkill firmware-atheros \
 	iputils-ping curl wget bind9-dnsutils net-tools traceroute tcpdump \
 	iperf3 ethtool mtr-tiny \
-	systemd-resolved systemd-timesyncd \
+	systemd-resolved systemd-timesyncd util-linux-extra \
 	nftables; then
 	echo "[setup-rootfs] FATAL: 网络/基础包没装上，构建中止（apt 的完整报错在上面）" >&2
 	exit 1
