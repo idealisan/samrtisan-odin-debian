@@ -14,11 +14,14 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(cd "$HERE/.." && pwd)"
 
 # 内核源码树位置（可用环境变量覆盖）
-KDIR="${KDIR:-/Volumes/caseSensitiveBar/linux-msm8953}"
-[ -d "$KDIR" ] || KDIR="/work/linux-msm8953"
-[ -d "$KDIR" ] || { echo "找不到内核源码树: $KDIR" >&2; exit 1; }
+#   默认指向本仓库 tmp/ 下，不再依赖仓库外的绝对路径（AGENTS.md §1.5）。
+#   注意：CI 路径 tools/ci/build-dtb.sh 会显式传 KDIR，不走这里的默认值。
+KDIR="${KDIR:-$REPO/tmp/linux-msm8953}"
+[ -d "$KDIR" ] || KDIR="/work/linux-msm8953"   # 仅在容器内手工跑时的挂载点兜底
+[ -d "$KDIR" ] || { echo "找不到内核源码树: $KDIR（可显式传 KDIR 覆盖）" >&2; exit 1; }
 
 DTC_BIN="$(command -v dtc || true)"
 [ -n "$DTC_BIN" ] || { echo "需要 dtc (apt install device-tree-compiler / brew install dtc)" >&2; exit 1; }
@@ -31,7 +34,9 @@ case "$DTC_VER" in
 esac
 
 DTS_DIR="$KDIR/arch/arm64/boot/dts/qcom"
-TMP="$(mktemp -d)"
+# 中间产物放本仓库 tmp/ 下，不用系统 $TMPDIR（AGENTS.md §1.6）
+mkdir -p "$REPO/tmp"
+TMP="$(mktemp -d "$REPO/tmp/dtbbuild-XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
 build_one() {
