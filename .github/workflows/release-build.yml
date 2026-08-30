@@ -5,7 +5,7 @@
 #
 # 三个外部依赖全部固定到具体 commit / tag，上游再动也不影响复现：
 #   · 内核        msm8953-mainline/linux  @ 05f7e89ab9731565d8a62e3b5d1ec206485eeb0b（Linux 6.19）
-#   · lk2nd       msm8916-mainline/lk2nd @ tag 23.1（设备上跑过的是
+#   · lk2nd       msm8916-mainline/lk2nd @ tag 21.0（设备上跑过的是
 #                 21.0-r0-postmarketOS，但我们的 QCDT/面板补丁只对 23.x
 #                 的 rules.mk 成立：19.x 的设备表条目与上下文完全不同，
 #                 0002 打不上去）。注意不是 msm8953-mainline/lk2nd，

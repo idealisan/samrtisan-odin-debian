@@ -1,10 +1,15 @@
 From: Smartisan ODIN mainline porting effort
-Subject: [PATCH 2/2] msm8953: add Smartisan ODIN (U2 Pro) device
+Subject: [PATCH 2/4] msm8953: add Smartisan ODIN (U2 Pro) device
 
-Map all five stock panel names to their mainline kernel
-compatibles so lk2nd replaces the placeholder compatible in the
-Linux device tree with the detected panel.
----
+Map the five stock panel names to their mainline kernel compatibles so lk2nd
+replaces the placeholder compatible in the Linux device tree with the detected
+panel.
+
+Generated against lk2nd 23.1. 注意：设备表格式在不同 release 间会变，换版本要重新生成本补丁（实测 21.0 上会冲突）。
+
+diff --git a/lk2nd/device/dts/msm8953/msm8953-smartisan-odin.dts b/lk2nd/device/dts/msm8953/msm8953-smartisan-odin.dts
+new file mode 100644
+index 0000000..690abb3
 --- /dev/null
 +++ b/lk2nd/device/dts/msm8953/msm8953-smartisan-odin.dts
 @@ -0,0 +1,38 @@
@@ -46,13 +51,15 @@ Linux device tree with the detected panel.
 +		};
 +	};
 +};
+diff --git a/lk2nd/device/dts/msm8953/rules.mk b/lk2nd/device/dts/msm8953/rules.mk
+index 4f30960..32b8f48 100644
 --- a/lk2nd/device/dts/msm8953/rules.mk
 +++ b/lk2nd/device/dts/msm8953/rules.mk
-@@ -15,6 +15,7 @@
+@@ -14,6 +14,7 @@ ADTBS += \
+ 	$(LOCAL_DIR)/msm8953-mtp.dtb \
  	$(LOCAL_DIR)/msm8953-oppo-r9s.dtb \
  	$(LOCAL_DIR)/msm8953-qrd.dtb \
- 	$(LOCAL_DIR)/msm8953-qrd-sku3.dtb \
 +	$(LOCAL_DIR)/msm8953-smartisan-odin.dtb \
+ 	$(LOCAL_DIR)/msm8953-qrd-sku3.dtb \
  	$(LOCAL_DIR)/msm8953-wingtech-wt89536.dtb \
  	$(LOCAL_DIR)/msm8953-xiaomi-common.dtb \
- 	$(LOCAL_DIR)/msm8953-xiaomi-daisy.dtb \
