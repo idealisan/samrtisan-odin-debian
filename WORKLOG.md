@@ -1191,3 +1191,36 @@ sshd 主机密钥，PC 上 known_hosts 里的旧记录失效。
 
 ### ② Makefile（下一步做）
 当前构建入口全是 `bash tools/ci/*.sh`，无 Makefile。
+
+### lk2nd 循环重启：第一轮排查结论（详见 reports/022）
+
+**推翻了两条假设，都没成立：**
+
+1. **"回退引导残留 Android 镜像"** —— 据此写了 `lk2nd/0005`。
+   `strings` 对比证实补丁**确实进了镜像**：
+   v0.9.3 是 `Reverting to android boot.`，新版是 `Reverting to fastboot.`
+   **但真机行为毫无变化，仍然循环。**
+   教训：补丁"进没进镜像"（strings 能验）和"有没有用"（行为变没变）是两回事，
+   只验前者会得出虚假的安全感。
+   另注：0005 写在 `#if WITH_LK2ND_BOOT` 块里，而该宏全树只在 aboot.c 出现 4 次、
+   没有任何 .mk 定义它 —— 若为假则补丁是死代码，这是下一步优先要确认的点。
+
+2. **"panic 重启 + 原因读不回来"** —— 查证后发现**读回路径是完整的**：
+   `msm_shared/reboot.c:84` 有 `check_hard_reboot_mode()` 的真实实现
+   （读 `PON_SOFT_RB_SPARE`，`(v & 0xFC) >> 2`，读后擦除），且 reboot.o 确实编译
+   （`ENABLE_REBOOT_MODULE := 1` 在 msm8953.mk:127/144）。
+
+**过程中的两个自我纠偏：**
+- 早期日志里"设备进入 fastboot (30s)"那几次，其实是**用户按了电源键**的结果，
+  我之前当成自动流程跑通了 —— 这是后面一连串误判的源头。
+- 查 `check_hard_reboot_mode` 时加了 `grep -i 8953` 过滤，把真正实现所在的
+  `platform/msm_shared/reboot.c` 滤掉了，一度误判"只有弱实现"。
+  **查东西别用想当然的过滤条件先剪枝。**
+
+**下一步：诊断构建。** 把 `lk2nd/project/lk2nd.mk:20` 的
+`PANIC_REBOOT_MODE ?= FASTBOOT_MODE` 改成 `NO_REBOOT`，
+`platform_halt()` 就会打印后停住不重启，panic 原因能留在屏幕上让用户读到。
+代价是这版会卡死、只能纯诊断用。
+
+**为什么迭代慢**：每验证一次 lk2nd 都要先进 fastboot，而进 fastboot 正是坏的
+⇒ 每次都要用户按电源键。修它和用它互相卡住。
