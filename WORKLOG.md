@@ -1082,3 +1082,63 @@ systemd 尚未起来、驱动（约 10s 才索取固件）也还没动作。
   两者都是内核内置（`/lib/modules/*/kernel/fs/` 里找不到它们）⇒ initramfs 可直接挂
 - `wcn36xx` / `qcom_wcnss_pil` 在 `/etc/modules-load.d/odin-wlan.conf`，
   由 `systemd-modules-load` 在 `basic.target` 之前加载 ⇒ 固件已在位，首次加载即成功
+
+---
+
+## 贰拾叁、v0.9.3 真机验收 16/16 全通过（2026-08-30）
+
+### v0.9.2 作废、改用 v0.9.3 的经过
+v0.9.2 发布后立刻自查发现：`a1fe79f` 声称"initramfs-applets.txt 补 cp 与 cmp"，
+**但那个文件根本没进提交** —— `git add -A dist/build/initramfs ...` 只匹配到
+**目录** `dist/build/initramfs/`，而 `dist/build/initramfs-applets.txt` 是它的
+**同级文件**（名字以 initramfs- 开头），不在那个目录下。既没 add、也没报错，
+提交照样成功。没有 cp ⇒ initramfs 里的固件供给会**静默失败**（脚本失败不致命）。
+
+处置（按 §3.4 新写入的版本号准则，未删旧版本）：
+1. `gh run cancel` 掐掉 v0.9.2 正在跑的构建
+2. 补提交 `ae85275`
+3. **开新号 v0.9.3** 重新发布
+4. 在 v0.9.3 说明里写明 v0.9.2 为何作废
+
+v0.9.2 的 Release 先留着，删除放统一清理轮次。
+
+### v0.9.3 CI 与刷入
+- CI run `33296547668`，**7m19s completed/success**，8 个资产
+- 7 个已下载文件 `shasum -a 256 -c SHA256SUMS` 全部 OK
+  （odin-debian-sparse.img md5 `4aa736d5567379938624924779d79c22`）
+- **下载踩坑**：直连在中途 `connection reset`（只下了 62MB/855MB）。
+  `gh release download` 不支持续传，改用
+  `curl -L -C - --retry 8 --retry-all-errors --speed-time 30 --speed-limit 1024`
+  断点续传救回。**以后下大文件一律带 `-C -` 与重试**。
+- 刷入（含 lk2nd，用户已确认）：20 fastboot 30s → 30 lk2nd ok → 40 userdata 40s
+  → 50 reboot（USB 网卡 10s）→ 60 usbnet ok → 70 ssh 40s → **80 verify 16/16，失败 0**
+
+### WiFi 修复的决定性证据（这次是真的修好了）
+```
+[   11.673944] remoteproc remoteproc0: Booting fw image wcnss.mdt, size 7324
+[   13.847119] remoteproc remoteproc0: remote processor a204000.remoteproc is now up
+[   34.823256] wcn36xx: firmware WLAN version 'WCN v2.0 RadioPhy vIris_TSMC_4.0 with 48MHz XO'
+```
+- **那句 `failed with error -2` 彻底消失** —— 驱动第一次索取就拿到了
+- 时序对比：
+  | | 供给时刻 | 索取时刻 | 结果 |
+  |---|---|---|---|
+  | 修前（v0.9.1） | 25.9s | 10.230s | 失败，且永不重试 |
+  | 修后（v0.9.3） | **~4s**（initramfs） | 11.673s | **首次即成功** |
+- `/var/log/odin-wlan-fw.log` 时间戳是 `1970-01-01 00:00:04` —— 开机第 4 秒，
+  那时还没有 systemd、时钟也没同步，正是 initramfs 阶段，与预期完全吻合
+- `remoteproc0/state = running`，`wlan0` 在 `ip link` 与 `nmcli` 里都在
+
+### 一个每次重刷都会撞到的小坑
+刷完后 SSH 报 `REMOTE HOST IDENTIFICATION HAS CHANGED` —— 新 rootfs 会重新生成
+sshd 主机密钥，PC 上 known_hosts 里的旧记录失效。
+处置：`ssh-keygen -R 172.16.42.1`（旧记录自动留档为 `known_hosts.old`），重连即可。
+
+### v0.9.3 已转正式 Release
+`gh release edit v0.9.3 --prerelease=false` → 作为阶段性标志与后续开发基准。
+
+### 下一版目标（用户指定）：lk2nd 反复重启
+**现象**：刷入 Linux 系统镜像之前，lk2nd 会反复重启，必须人工按住电源键才能停下，
+否则一直重启 ⇒ 无法自动接着刷入系统镜像 ⇒ 开发/调试循环不能完全自动走完。
+定位方向（尚未验证，仅为待查）：lk2nd 找不到可启动配置后的 reboot 策略 /
+看门狗 / `boot_into_fastboot` 未置位。见 reports/018 §零 的状态机 B 态。
