@@ -1531,3 +1531,29 @@ bookworm 的 `util-linux-extra` 根本没有这个 unit，它只带
 - **OrbStack 在本机不稳定**：这轮崩了两次，docker 守护进程消失，
   需要用 `open -a OrbStack` 拉回；之后 `docker start odin-dev`。
   长时间构建期间要留意这一点。
+
+### 补充（同一篇，重编之后又发现两条）
+
+**坑 4：rootfs 的 staging 目录跨构建复用且从不重置。**
+`tools/ci/build-rootfs.sh` 里 `ROOT=${ROOT:-/tmp/odin-rootfs-$VARIANT}`，
+靠 `if [ ! -d "$ROOT/etc" ]` 决定是否重跑 debootstrap —— 也就是说
+**这个根只会 debootstrap 一次，之后一直复用**。后果：撤掉某个安装步骤之后，
+它当初留下的文件与 `systemctl enable` 的符号链接**仍然留在下一次的镜像里**。
+这次就撞上了：撤掉 odin-swclock-offset 之后，镜像里
+`sysinit.target.wants/odin-swclock-offset-boot.service` 与
+`timers.target.wants/odin-swclock-offset-save.timer` 都还在，
+于是 fake-hwclock 与 swclock-offset **两套同时开机设时间**，谁后跑谁说了算。
+判定方法：挂载镜像看 `.wants/` 下的符号链接，而不是只看包有没有装。
+修法：`rm -rf /tmp/odin-rootfs-gui` 后重编（deb bootstrap 约 15 分钟）。
+注意 dist/build/rootfs/ 下的同名文件会被 overlay 拷进镜像，但只要没被 enable
+就是惰性的 —— 所以"文件还在"不等于"会生效"，要看 .wants。
+
+**坑 5：换内核基线会把设备树一起带坏，而且失败信息不在内核侧。**
+切到 pmOS 的 6.19.5/main 之后，DTB 编不过：
+`msm8953-smartisan-odin.dts:393 Label or path usb3_dwc3 not found`。
+原因：旧树（6.19 tag）的 `msm8953.dtsi:1479` 有 `usb3_dwc3: usb@7000000`，
+新树把这个 label 去掉了（USB 节点还在，只是没有这个 label）。
+⇒ 只比对内核配置是不够的，**设备树的 label 也是基线的一部分**。
+另外 `make dtb` 用的是裸 `patch --forward`（不是 apply-patches.sh），
+遇到"已打过"会返回非零并在 set -e 下中断；重编前要先
+`git checkout -- arch/arm64/boot/dts/qcom/Makefile` 并删掉生成的 .dts。
