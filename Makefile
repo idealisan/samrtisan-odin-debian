@@ -174,21 +174,24 @@ $(STAMPS)/dtb-$(KDIR_TAG): | $(STAMPS) fetch-kernel
 			echo "[dtb]   ❌ $$v 里没有 smartisan,odin-ft8716" >&2; exit 1; \
 		fi; \
 	done
-# 自检一律写成 `| grep -c` 再比数量，**不要**写 `| grep -q`。
-# 原因：本 Makefile 全局开了 -o pipefail（上面 .SHELLFLAGS），而 grep -q 一匹配上
-# 就退出，把上游命令撞成 SIGPIPE(141)，pipefail 会把整个管道判为失败 ⇒
-# `if 管道; then` 走进 else 分支。实测后果有两种，都很糟：
-#   · "必须搜到"的检查 ⇒ 明明搜到了却报缺失（lk2nd 的 odin 条目，本地实测触发）
-#   · "必须搜不到"的检查 ⇒ 明明搜到了却报通过（假通过，比报错更危险）
-# 这是竞态：上游是否已经写完管道决定了会不会被信号打断，所以 CI 上时好时坏。
-# grep -c 会把输入读完，不给上游留 SIGPIPE 的机会，行为确定。
-	@n=$$(dtc -I dtb -O dts "$(DTB_OUT)/msm8953-smartisan-odin-ft8716-norolesw.dtb" 2>/dev/null \
-		| grep -c "usb-role-switch"); \
-	if [ "$$n" -gt 0 ]; then \
+# 自检一律"先把输出落到文件，再 grep -q 读文件"，不要在管道上 grep。
+# 两条坑，都是实测踩出来的：
+#   · `X | grep -q PAT`：grep -q 一匹配上就退出，把上游撞成 SIGPIPE(141)，
+#     pipefail 把整个管道判为失败 ⇒ `if 管道; then` 走进 else。于是
+#     "必须搜到"的报缺失、"必须搜不到"的假通过。CI 上时好时坏（竞态）。
+#   · `n=$$(X | grep -c PAT)`：grep -c 匹配数为 0 时**退出码是 1**，而
+#     `n=$$(...)` 这个赋值的状态就是命令替换的状态 ⇒ 在 set -e 下直接把
+#     构建打断（dtb 就是这么挂的）。故自检里不要写带命令替换的赋值。
+# 落到文件则两个坑都不存在，且上游命令自身的失败也能单独判出来。
+	@dtc -I dtb -O dts "$(DTB_OUT)/msm8953-smartisan-odin-ft8716-norolesw.dtb" \
+		> "$(DTB_OUT)/.odin-dtb-check.dts" 2>/dev/null \
+		|| { echo "[dtb]   ❌ dtc 反编译失败" >&2; exit 1; }
+	@if grep -q "usb-role-switch" "$(DTB_OUT)/.odin-dtb-check.dts"; then \
 		echo "[dtb]   ❌ 安全版仍含 usb-role-switch" >&2; exit 1; \
 	else \
 		echo "[dtb]   ✅ 安全版无 usb-role-switch"; \
 	fi
+	@rm -f "$(DTB_OUT)/.odin-dtb-check.dts"
 	@mkdir -p $(STAMPS) && touch $@
 
 # ================================================================ 内核与模块
@@ -221,7 +224,7 @@ $(STAMPS)/kernel-$(KDIR_TAG): | $(STAMPS) fetch-kernel
 	@echo "[kernel]   modules.tar $$($(call SIZE,$(KERNEL_OUT)/modules.tar)) 字节"
 	@echo "[kernel] 自检：新增驱动应编出来"
 	@for drv in panel-ft8716 panel-r69006 panel-nt36672; do \
-		if [ "$$(find "$(KDIR)" -name "$$drv.ko" | grep -c .)" -gt 0 ]; then \
+		if [ -n "$$(find "$(KDIR)" -name "$$drv.ko" -print -quit)" ]; then \
 			echo "[kernel]   ✅ $$drv.ko"; \
 		else \
 			echo "[kernel]   ❌ $$drv.ko 缺失" >&2; exit 1; \
@@ -264,16 +267,19 @@ $(STAMPS)/lk2nd: | $(STAMPS)
 	cp -f "$(LK2ND_SRC)/build-lk2nd-msm8953/lk2nd.img" "$(LK2ND_OUT)/lk2nd-nomarkw.img"
 	@echo "[lk2nd]   lk2nd-nomarkw.img $$($(call SIZE,$(LK2ND_OUT)/lk2nd-nomarkw.img)) 字节"
 	@echo "[lk2nd] 自检"
-	@if [ "$$(strings "$(LK2ND_OUT)/lk2nd-nomarkw.img" | grep -c "xiaomi-markw")" -gt 0 ]; then \
+	@strings "$(LK2ND_OUT)/lk2nd-nomarkw.img" > "$(LK2ND_OUT)/.odin-strings.txt" \
+		|| { echo "[lk2nd]   ❌ strings 失败" >&2; exit 1; }
+	@if grep -q "xiaomi-markw" "$(LK2ND_OUT)/.odin-strings.txt"; then \
 		echo "[lk2nd]   ❌ 仍能搜到 xiaomi-markw" >&2; exit 1; \
 	else \
 		echo "[lk2nd]   ✅ xiaomi-markw: 0 处"; \
 	fi
-	@if [ "$$(strings "$(LK2ND_OUT)/lk2nd-nomarkw.img" | grep -c "smartisan-odin")" -gt 0 ]; then \
+	@if grep -q "smartisan-odin" "$(LK2ND_OUT)/.odin-strings.txt"; then \
 		echo "[lk2nd]   ✅ smartisan-odin: 保留"; \
 	else \
 		echo "[lk2nd]   ❌ odin 条目丢失" >&2; exit 1; \
 	fi
+	@rm -f "$(LK2ND_OUT)/.odin-strings.txt"
 	@mkdir -p $(STAMPS) && touch $@
 
 # ================================================================ 根文件系统
