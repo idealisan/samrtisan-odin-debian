@@ -26,22 +26,23 @@ Add initial support for the Smartisan ODIN (U2 Pro), an MSM8953
 
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 ---
-arch/arm64/boot/dts/qcom/Makefile                  |   1 +
- .../arm64/boot/dts/qcom/msm8953-smartisan-odin.dts | 449 +++++++++++++++++++++
+ arch/arm64/boot/dts/qcom/Makefile             |   1 +
+ .../boot/dts/qcom/msm8953-smartisan-odin.dts  | 449 ++++++++++++++++++
  2 files changed, 450 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
 
 diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
-index fa1ed791d..f782edaaf 100644
+index 6f34d5ed3..a83b6cd1a 100644
 --- a/arch/arm64/boot/dts/qcom/Makefile
 +++ b/arch/arm64/boot/dts/qcom/Makefile
-@@ -94,6 +94,7 @@ dtb-$(CONFIG_ARCH_QCOM)	+= msm8953-xiaomi-mido.dtb
- dtb-$(CONFIG_ARCH_QCOM)	+= msm8953-xiaomi-markw.dtb
- dtb-$(CONFIG_ARCH_QCOM)	+= msm8953-xiaomi-oxygen.dtb
+@@ -87,6 +87,7 @@ dtb-$(CONFIG_ARCH_QCOM)	+= msm8953-motorola-potter.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= msm8953-xiaomi-daisy.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= msm8953-xiaomi-mido.dtb
  dtb-$(CONFIG_ARCH_QCOM)	+= msm8953-xiaomi-tissot.dtb
 +dtb-$(CONFIG_ARCH_QCOM)	+= msm8953-smartisan-odin.dtb
  dtb-$(CONFIG_ARCH_QCOM)	+= msm8953-xiaomi-vince.dtb
- dtb-$(CONFIG_ARCH_QCOM)	+= msm8953-xiaomi-ysl.dtb
  dtb-$(CONFIG_ARCH_QCOM)	+= msm8956-sony-xperia-loire-kugo.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= msm8956-sony-xperia-loire-suzu.dtb
 diff --git a/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
 new file mode 100644
 index 000000000..3dc8f434d
@@ -497,3 +498,5 @@ index 000000000..3dc8f434d
 +	vdddig-supply = <&pm8953_l5>;
 +	status = "okay";
 +};
+-- 
+2.48.1
