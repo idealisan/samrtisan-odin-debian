@@ -1142,3 +1142,52 @@ sshd 主机密钥，PC 上 known_hosts 里的旧记录失效。
 否则一直重启 ⇒ 无法自动接着刷入系统镜像 ⇒ 开发/调试循环不能完全自动走完。
 定位方向（尚未验证，仅为待查）：lk2nd 找不到可启动配置后的 reboot 策略 /
 看门狗 / `boot_into_fastboot` 未置位。见 reports/018 §零 的状态机 B 态。
+
+---
+
+## 贰拾肆、v0.9.4 目标（2026-08-30，用户指定）
+
+两个目标：**① lk2nd 反复重启需人工按电源键**、**② 构建改用 Makefile**。
+历史 Release 与旧文件按用户指示**一律不清理**，留着即可。
+
+版本号规则也按用户要求改了：目标版本成功前用 `v0.9.4-<简述>` 的 Pre-release
+（如 `-lk2nd-reboot`、`-makefile`），只有最终验证通过才用干净的 `v0.9.4`。
+（用户最初提时间戳，随后改成简述后缀 —— 理由是时间戳记不住"这版在试什么"。）
+
+### ① 现象与链路
+刷入 Linux 系统镜像之前（即改名 extlinux.conf 让 lk2nd 落 fastboot 那一步），
+设备**反复重启**，必须人工按住电源键才能停 ⇒ 无法自动接着刷 ⇒ 开发循环断在这里。
+
+### 已查到的事实（lk2nd 23.1 源码 + 真机核对）
+1. **`lk2nd_scan_devices()` 找到不启动项时只是打一行日志就返回**
+   （`lk2nd/boot/boot.c:63`："Bootable file system not found. Reverting to android boot."）
+   —— 它**不会**置 `boot_into_fastboot`。
+2. 随后 aboot 走 `retry_boot:` → `boot_linux_from_mmc()`
+   （`app/aboot/aboot.c:5687`），失败才落到 `fastboot:` 标签（`aboot.c:5723`）。
+3. **boot 分区偏移 512KB 处还留着一个原厂 Android 引导镜像** —— 真机实测：
+   ```
+   offset 0      : A N D R O I D !     ← lk2nd 本体（lk2nd 也是个 Android boot image）
+   offset 524288 : A N D R O I D !     ← 残留的原厂 Android 引导镜像
+   ```
+   分区布局：`lk2nd` = 0…512KB（`getvar` 报 0x80000），`boot` = 512KB…64MB（0x3f80000），
+   两者合起来正好是 mmcblk0p21 的 64MB。
+
+⇒ **真因（待最后确认）**：lk2nd 找不到可启动 fs → 回退引导那个残留的 Android 镜像
+→ Android 起不来 → 重启 → 回到 lk2nd → **循环**。
+这解释了两件事：为什么会重启（不是停在 fastboot）、以及为什么按住电源键能停
+（`is_user_force_reset()` 分支，`aboot.c:5580` 会 `goto normal_boot`）。
+
+### 备选修法（尚未定，也未实机验证）
+- **A. `fastboot erase boot`** 清掉残留 Android 镜像 ⇒ `boot_linux_from_mmc()` 失败
+  ⇒ 干净落到 `fastboot:`。一次性改动，且 `lk2nd` 分区（0…512KB）不受影响；
+  evidence/live-device-backup/boot-partition.img 有全量备份可回退。
+  属设备侧改动，按 §7 需用户单独确认。
+- **B. 改 lk2nd** 让它在找不到可启动 fs 时直接进 fastboot，而不是回退 Android。
+  影响面大（改上游行为），但可随 CI 产物交付。
+- **C. 让 Linux 侧能 `reboot bootloader`** —— 真机有 `pon@800`，
+  `reboot_mode` + `qcom_pon` 驱动已加载，`/sys/kernel/reboot/mode` 存在但只有
+  cold/warm/hard；DT 里**没有** reboot-mode 子节点，需要补节点与魔数。
+  这条路最"正常 Linux"，但要先把 lk2nd 期望的魔数核对清楚。
+
+### ② Makefile（下一步做）
+当前构建入口全是 `bash tools/ci/*.sh`，无 Makefile。
