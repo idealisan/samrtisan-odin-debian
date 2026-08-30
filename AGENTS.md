@@ -51,9 +51,10 @@
    **凡是需要人工介入的时刻都要喊**（按住电源键进 fastboot、看屏幕读报错、
    回答选择题…），不要只在文字里等。
 
-8. **轮询/等待类的逻辑用 Python 写，不要用 shell 循环**。
-   macOS 上没有 GNU `timeout`（`gtimeout` 也没有），写成 `timeout 5 fastboot devices`
-   每次都是"command not found"，采样结果全是假数据。用 `subprocess.run(..., timeout=...)`。
+8. **别自己写 shell 轮询**。macOS 上没有 GNU `timeout`，`timeout 5 fastboot devices`
+   每次都是 command not found，采样全是假数据（我据此误判过结论）。
+   优先用现成的等待工具（如 `gh run watch`）；确实要等，用 Python 的
+   `subprocess.run(..., timeout=...)`。能一次性查就别轮询。
 
 > 补充：从 GitHub 下大文件要**显式去代理**（`env -u http_proxy -u https_proxy`），
 > 快 4.7 倍。详见 `docs/05` 第五节。
