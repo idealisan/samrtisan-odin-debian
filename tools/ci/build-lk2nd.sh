@@ -53,8 +53,16 @@ apply_patch() {
     || { echo "补丁应用失败: $p" >&2; exit 1; }
 }
 
+# LK2ND_VERSION 必须显式传：pmOS 也是这么做的（pmaports/main/lk2nd/APKBUILD 里
+#   make LK2ND_VERSION="$pkgver-r$pkgrel-postmarketos" ...
+# 这就是为什么原厂镜像上报的是 `21.0-r0-postmarketos` —— 那是构建时注入的，
+# 不是源码里写死的。不传的话版本串不可识别，排障时连"跑的是哪一份"都分不清。
 build() {
+  local variant="${1:?用法: build <变体名>}"
+  local ver="${LK2ND_VER}-${variant}-odinport"
+  say "构建 ${variant} 版（LK2ND_VERSION=${ver}）"
   if ! make -j"$(nproc)" -C "$SRC" TOOLCHAIN_PREFIX=arm-none-eabi- \
+        LK2ND_VERSION="$ver" \
         PROJECT=lk2nd-msm8953 2>&1 | tee /tmp/lk2nd-build.log; then
     echo "lk2nd 构建失败，日志见上面" >&2
     exit 1
@@ -69,7 +77,7 @@ curl -sSL "https://github.com/msm8916-mainline/lk2nd/archive/refs/tags/${LK2ND_V
 for p in "$REPO"/lk2nd/0001-*.patch "$REPO"/lk2nd/0002-*.patch "$REPO"/lk2nd/0003-*.patch; do
   apply_patch "$p"
 done
-build
+build full
 cp "$SRC/build-lk2nd-msm8953/lk2nd.img" "$OUT/lk2nd.img"
 say "完整版: $OUT/lk2nd.img ($(stat -c%s "$OUT/lk2nd.img") 字节)"
 
@@ -78,7 +86,7 @@ say "完整版: $OUT/lk2nd.img ($(stat -c%s "$OUT/lk2nd.img") 字节)"
 # 不会展开，patch 会拿到一个字面量的星号文件名然后 No such file or directory
 apply_patch "$REPO"/lk2nd/0004-*.patch
 # 增量重编即可：改的是设备表，make 会重编 QCDT 并重新打包
-build
+build nomarkw
 cp "$SRC/build-lk2nd-msm8953/lk2nd.img" "$OUT/lk2nd-nomarkw.img"
 say "精简版: $OUT/lk2nd-nomarkw.img ($(stat -c%s "$OUT/lk2nd-nomarkw.img") 字节)"
 
