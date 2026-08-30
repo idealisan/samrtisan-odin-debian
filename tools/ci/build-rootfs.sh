@@ -107,22 +107,36 @@ bash "$REPO/dist/build/apply-staging-fixes.sh" "$ROOT"
 
 # ---------------------------------------------------------------- 5. 导出镜像
 say "build-image.sh（保守特性集 + 导出 + 回读校验）"
-# 初始大小按 staging 实际内容估算：内容 + 25% 元数据余量 + 150 MiB 缓冲。
-# 这只是给 mke2fs 的**起始值**，真正定尺寸在 build-image.sh 里做（紧缩到最小
-# 再加冗余并截断文件），所以这里留点富余没关系，但也不能像从前那样写死 491520：
-# inode 表与 reserved blocks 都按这个尺寸分配，起始值给大了后面紧缩也收不回来。
+# 初始大小按 staging 实际内容估算。
+#
+# 系数照抄 postmarketOS 的 pmb/install/_install.py:41-59（get_subpartitions_size）：
+#     root = folder_size_MiB * 1.20 + 50 + extra_space
+# 它源码里那句注释很实在，一并抄下来当依据：
+#     "Estimate root partition size, then add some free space. The size
+#      calculation is not as trivial as one may think, and depending on the
+#      file system etc it seems to be just impossible to get it right."
+# 也就是 pmOS 自己承认估不准，所以给 20% + 50 MiB 余量了事。
+#
+# 我们比它多一步保险：这只是给 mke2fs 的**起始值**，真正定尺寸在 build-image.sh
+# 里做 —— 灌入后 resize2fs -M 收缩到精确最小值，再加冗余并截断文件。所以这里
+# 估大一点最多让 mke2fs 期间的 journal/inode 表稍大，不会带进最终产物。
+# 但也不能像从前那样写死 491520 块：journal 与 inode 表都按初始尺寸分配，
+# 起始值给大了，后面紧缩也收不回来（实测收完仍要 1.36 GiB）。
 #
 # 上限仍是 GitHub Release 的单个资产限制 2147483648 字节，且要求"严格小于"。
-# 注意：build-image.sh 末尾还会再校验一次，超了会直接 fail。
+# build-image.sh 末尾还会再校验一次，超了直接 fail。
 GH_MAX=$(( 2147483648 / 4096 ))   # 524287 块
-stage_kb=$(du -sk "$ROOT" 2>/dev/null | cut -f1)
-[ -n "$stage_kb" ] || stage_kb=900000
-blocks=$(( stage_kb * 125 / 100 / 4 + 150 * 1024 * 1024 / 4096 ))
+stage_mb=$(du -sm "$ROOT" 2>/dev/null | cut -f1)
+[ -n "$stage_mb" ] || stage_mb=900
+# pmOS 公式，向上取整；再兜一个下限，避免 staging 异常小时 mke2fs 都建不起来
+size_mb=$(( stage_mb * 12 / 10 + 50 ))
+[ "$size_mb" -lt 512 ] && size_mb=512
+blocks=$(( size_mb * 1024 * 1024 / 4096 ))
 if [ "$blocks" -gt "$GH_MAX" ]; then
-  warn "按内容算出的初始大小 ${blocks} 块超过 GitHub 上限，压到 ${GH_MAX} 块"
+  echo "  [rootfs] WARN: 按内容算出的初始大小 ${size_mb} MiB 超过 GitHub 上限，压到 ${GH_MAX} 块" >&2
   blocks=$GH_MAX
 fi
-say "初始大小按内容算：staging $((stage_kb/1024)) MiB → ${blocks} 块（$((blocks*4096/1048576)) MiB）"
+say "初始大小按内容算（pmOS 公式 ×1.2 + 50MiB）：staging ${stage_mb} MiB → ${size_mb} MiB = ${blocks} 块"
 bash "$REPO/tools/build-image.sh" "$ROOT" "$OUT/odin-debian.img" "$blocks" pmOS_root
 
 say "产物："
