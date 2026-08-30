@@ -77,14 +77,24 @@ udc_now() { ls /sys/class/udc 2>/dev/null | head -n1; }
 
 # ---------------------------------------------------------------- device 分支
 dnsmasq_running() {
-	# 不能只看 pidfile：pid 可能被别的进程占用，会误判成"已在运行"而永远不启动
+	# 判定依据改成"进程命令行"，不用 pidfile。原因（本次真机踩到）：
+	#   1) pidfile 有可能是空的或被别的进程占着，只看它会误判成"已在运行"
+	#      而永远不启动，或反过来一直判定"没在跑"而反复起新实例；
+	#   2) 更关键的是 **--no-daemon 模式下 dnsmasq 根本不写 pidfile**
+	#      （实测：进程跑得好好的，$PIDFILE 是 0 字节）。于是依赖 pidfile
+	#      的判定恒为假 ⟹ 每次触发都再起一个 dnsmasq ⟹ 起两个、日志一堆
+	#      "failed to create listening socket ... Address already in use"。
+	# 直接按命令行筛：进程名是 dnsmasq 且带 --interface=usb0。
+	# 注意：别写成 `pgrep ... | while read; do ... return 0; done` —— while 在管道里
+	# 会开子 shell，里面的 return 退不出函数，判定会永远返回假。用命令替换喂养
+	# for 循环，循环体在当前 shell 里跑。
 	local p
-	[ -s "$PIDFILE" ] || return 1
-	p=$(cat "$PIDFILE" 2>/dev/null)
-	[ -n "$p" ] || return 1
-	# 确认这个 pid 确实是服务于 usb0 的 dnsmasq
-	tr '\000' ' ' < "/proc/$p/cmdline" 2>/dev/null | grep -q -- "--interface=usb0" || return 1
-	kill -0 "$p" 2>/dev/null
+	for p in $(pgrep -x dnsmasq 2>/dev/null); do
+		if tr '\000' ' ' < "/proc/$p/cmdline" 2>/dev/null | grep -q -- "--interface=usb0"; then
+			return 0
+		fi
+	done
+	return 1
 }
 
 apply_device() {
@@ -185,19 +195,44 @@ apply_device() {
 	#      dnsmasq 会直接 "cannot set --bind-interfaces and --bind-dynamic" 退出。
 	#   2) 系统 dnsmasq 会占住 UDP 67（bind-dynamic 绑通配地址），导致这里起不来。
 	#      手机上没有别的用途，已在镜像里 disable 掉系统 dnsmasq。
-	dnsmasq --no-daemon --pid-file="$PIDFILE" --interface=usb0 \
-		--conf-file=/dev/null \
-		--bind-interfaces --dhcp-range=${CLIENT_IP},${CLIENT_IP_MAX},1h \
-		--dhcp-option=option:router --no-resolv --no-hosts \
-		--log-facility=/var/log/odin-dnsmasq.log &
-	dnsmasq_pid=$!
-	sleep 1
-	if kill -0 "$dnsmasq_pid" 2>/dev/null; then
-		log "device: usb0=${HOST_IP}/24 dnsmasq started (pid $dnsmasq_pid)"
+	#   3) **必须 --port=0 关掉 DNS 服务器**。实测踩到：dnsmasq 默认会去监听
+	#      172.16.42.1:53；而 udev 事件与 systemd 各会触发本脚本一次，两个实例
+	#      并发启动时第二个必然
+	#        "failed to create listening socket for 172.16.42.1: Address already in use"
+	#      叠加第一个实例又被 udev 事件收走 ⟹ 最后没有 dnsmasq 在跑，PC 拿不到
+	#      DHCP 回包、只能退回 169.254 自分配地址（本次真机实测到的正是这条链）。
+	#      我们只需要给 PC 发地址，DNS 完全用不上（--no-resolv --no-hosts 也印证
+	#      这一点），关掉它就能根除这个竞态的失败面。
+	start_dnsmasq() {
+		dnsmasq --no-daemon --pid-file="$PIDFILE" --interface=usb0 \
+			--conf-file=/dev/null \
+			--port=0 --bind-interfaces --dhcp-range=${CLIENT_IP},${CLIENT_IP_MAX},1h \
+			--dhcp-option=option:router --no-resolv --no-hosts \
+			--log-facility=/var/log/odin-dnsmasq.log &
+		# 等它把 pidfile 写完再判定，别拿 $! 直接查 —— dnsmasq 起得比 shell 拿到的
+		# pid 慢，容易出现"进程其实在跑、却判定成失败"
+		local i
+		for i in 1 2 3 4 5; do
+			sleep 1
+			dnsmasq_running && return 0
+			kill -0 $! 2>/dev/null || break   # 进程已退出，别再等
+		done
+		return 1
+	}
+
+	if start_dnsmasq; then
+		log "device: usb0=${HOST_IP}/24 dnsmasq started (pid $(cat "$PIDFILE" 2>/dev/null))"
 	else
-		log "device: dnsmasq FAILED to start; last log:"
-		tail -3 /var/log/odin-dnsmasq.log 2>/dev/null | sed 's/^/    /' | tee -a "$LOG"
-		log "device: hint: 检查 67 端口是否被别的 dnsmasq 占用"
+		# 并发启动抢端口是瞬时的，等一下再试一次；仍失败才留证据
+		log "device: dnsmasq 首次启动未成功，2s 后重试"
+		sleep 2
+		if start_dnsmasq; then
+			log "device: usb0=${HOST_IP}/24 dnsmasq 重试后启动 (pid $(cat "$PIDFILE" 2>/dev/null))"
+		else
+			log "device: dnsmasq FAILED to start; last log:"
+			tail -3 /var/log/odin-dnsmasq.log 2>/dev/null | sed 's/^/    /' | tee -a "$LOG"
+			log "device: hint: 检查 67 端口是否被别的 dnsmasq 占用"
+		fi
 	fi
 	return 0
 }

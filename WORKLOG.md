@@ -884,3 +884,78 @@ released 覆盖正式版，两者不重叠。
 ### 待跟进
 - rc2（run 33262051573）是修完后的第一轮，结果待看
 - `kernel` 与 `rootfs` 两个 job 从未跑通过，属首次验证
+
+---
+
+## 贰拾壹 [2026-08-30 00:52] ★ WiFi 打通（WCNSS / wcn36xx）
+
+### 根因
+实机上根本没有 wlan0：`msm8953.dtsi` 里 `wcnss: remoteproc@a204000` 默认
+`status = "disabled"`，我们的设备树此前也没启用它。模块（`wcn36xx.ko`、
+`qcom_wcnss_pil.ko`）和 WCNSS 固件（`wcnss.mdt` + .b00/.b01/.b02/.b04/.b06/.b09
+~.b12）其实都在，只是设备树没开门。
+
+### 配置来源（照抄能正常用 WiFi 的 markw）
+反编译 `evidence/live-device-backup/pmos-diag/boot/msm8953-xiaomi-markw.dtb`
+拿到它的实际配置，再用脚本把 phandle 解成节点名：
+```
+&wcnss      status=okay  vddpx  -> l5 (1.8V)
+&wcnss_iris compatible="qcom,wcn3660b"
+            vddxo -> l7   (1.8V)
+            vddrfa-> l19  (1.3V)
+            vddpa -> l9   (3.3V)
+            vdddig-> l5   (1.8V)
+```
+交叉验证：原厂 DTB（evidence/stock.dts）声明的 iris 四路电压正是
+1.8V / 1.3V / 3.3V / 1.8V，与本文件各 LDO 的量程区间吻合。
+
+### 还差一块：板级校准数据
+`WCNSS_qcom_wlan_nv.bin`（wcn36xx 的 WLAN_NV_FILE =
+`wlan/prima/WCNSS_qcom_wlan_nv.bin`）**原先没有**。它是每台机器不同的射频
+校准数据，任何 Debian 包都不提供，也不该进版本库。
+在 **persist 分区（mmcblk0p24，我们唯一没动过的原厂分区）** 里找到了：
+- WCNSS_qcom_wlan_nv.bin (31723 B)
+- WCNSS_wlan_dictionary.dat
+- wlan_mac.bin / wlan_random_mac.bin
+
+⇒ 新增 `odin-wlan-nv.service` + `odin-wlan-nv.sh`：开机从 persist 现取到
+`/lib/firmware/wlan/prima/`；若驱动已先加载，重新 modprobe 让它读到。
+取不到最坏只是没 WiFi，不会拖挂启动。
+
+### 实机验证
+```
+wcn36xx: firmware WLAN version 'WCN v2.0 RadioPhy vIris_TSMC_4.0 with 48MHz XO'
+wlan0 出现、rfkill 未阻塞、扫描到 31 个网络
+连上 AP 拿到 192.168.3.165；ping deb.debian.org 3 发 3 收，0% 丢包
+路由：默认走 wlan0(metric 600)，172.16.42.0/24 仍走 usb0 ⇒ USB SSH 不受影响
+```
+
+### 顺带踩的两个坑
+1. **DNS**：该路由器广播 DNS 192.168.3.1，但它根本不应答 UDP 53 ⇒
+   能 ping 通 IP 却解析不了域名。装 `systemd-resolved` 才有按序尝试后续
+   服务器的能力；连接级可用
+   `nmcli con modify <名> ipv4.ignore-auto-dns yes ipv4.dns "1.1.1.1,8.8.8.8"` 覆盖。
+2. **时钟**：设备无 RTC，时钟差几个月 ⇒ apt 拒绝 Release 文件
+   （`Release file ... is not valid yet`）。装 `systemd-timesyncd` 联网自动校时。
+
+### 交互式管理（用户要求"命令行就能扫描连接，不要改配置文件"）
+`nmcli` 本身就是交互式 CLI：
+```
+nmcli dev wifi list                       # 扫描
+nmcli dev wifi connect <SSID> password <密码>   # 连接（自动建持久连接）
+nmcli dev status / nmcli con show         # 查看
+nmcli con up|down|delete <名>             # 管理
+nmtui                                     # 文本界面
+```
+网络调试工具已按"正常 Debian 服务器"标准装齐：iputils-ping / curl / wget /
+bind9-dnsutils / net-tools / traceroute / tcpdump / iperf3 / ethtool / mtr-tiny。
+
+### CI 进展（ci-fixer 主导）
+- **lk2nd ✅ / dtb ✅ 已变绿**，kernel 仍在编（约 22 分钟），rootfs 未开始
+- ci-fixer 找出两个我漏掉的根因：
+  1. `patches/0007` 是坏补丁：hunk 头声明 383 行、正文却有 385 行（手工改过
+     compatible 却没同步行数），GNU patch 按 383 行截断 ⇒ dts 少两行没闭合
+  2. lk2nd 该钉 **tag 23.1** 而不是 19.0（0002 的 rules.mk 上下文是 23.x 的设备表）
+- 我修的：kernel job 其实是**编译成功**后死在 `cp out/kernel/vmlinuz` ——
+  脚本 `cd` 进内核树后 $OUT 相对路径失效；四个脚本的 $OUT 统一转绝对路径
+- 构建日志已全部改成 `tee` 双写，CI 页面能实时看到编译过程
