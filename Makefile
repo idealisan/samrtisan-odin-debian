@@ -68,9 +68,9 @@ ROOTFS_OUT = $(OUT)/rootfs-$(ODIN_VARIANT)
 # ---------------------------------------------------------------- 钉死的外部输入
 # 与 .github/workflows/release-build.yml 的 env 段一致，改一处要改两处
 KERNEL_REPO   ?= https://github.com/msm8953-mainline/linux.git
-KERNEL_SHA    ?= 05f7e89ab9731565d8a62e3b5d1ec206485eeb0b
-KERNEL_BRANCH ?= master
-KERNEL_SINCE  ?= 2026-02-07
+KERNEL_SHA    ?= 770e10fa15a00051eaef862e4cb2724f2f8fa568
+KERNEL_BRANCH ?= 6.19.5/main
+KERNEL_SINCE  ?= 2026-01-01
 LK2ND_VER     ?= 23.1
 SUITE         ?= bookworm
 

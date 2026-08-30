@@ -11,19 +11,18 @@ from the stock (downstream) device tree.
 
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 ---
- drivers/gpu/drm/panel/Kconfig        |  30 ++
+drivers/gpu/drm/panel/Kconfig        |  30 +++
  drivers/gpu/drm/panel/Makefile       |   3 +
- drivers/gpu/drm/panel/panel-r69006.c | 503 +++++++++++++++++++++++++++
+ drivers/gpu/drm/panel/panel-r69006.c | 503 +++++++++++++++++++++++++++++++++++
  3 files changed, 536 insertions(+)
- create mode 100644 drivers/gpu/drm/panel/panel-r69006.c
 
 diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
-index 7a83804fe..fe8600a96 100644
+index 8f12380de..8310eb690 100644
 --- a/drivers/gpu/drm/panel/Kconfig
 +++ b/drivers/gpu/drm/panel/Kconfig
-@@ -1211,3 +1211,33 @@ config DRM_PANEL_XINPENG_XPP055C272
- 	  XPP055C272 controller for 720x1280 LCD panels with MIPI/RGB/SPI
+@@ -1219,3 +1219,33 @@ config DRM_PANEL_XINPENG_XPP055C272
  	  system interfaces.
+ source "drivers/gpu/drm/panel/msm8953-generated/Kconfig"
  endmenu
 +
 +config DRM_PANEL_SMARTISAN_R69006
@@ -56,13 +55,13 @@ index 7a83804fe..fe8600a96 100644
 +	  1080x1920 video mode DSI panel found in the Smartisan ODIN (U2 Pro)
 +	  smartphone.
 diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
-index b9562a6fd..9056f48be 100644
+index cfaea4e1a..89b8c00bd 100644
 --- a/drivers/gpu/drm/panel/Makefile
 +++ b/drivers/gpu/drm/panel/Makefile
-@@ -120,3 +120,6 @@ obj-$(CONFIG_DRM_PANEL_VISIONOX_VTDR6130) += panel-visionox-vtdr6130.o
- obj-$(CONFIG_DRM_PANEL_VISIONOX_R66451) += panel-visionox-r66451.o
+@@ -122,3 +122,6 @@ obj-$(CONFIG_DRM_PANEL_VISIONOX_R66451) += panel-visionox-r66451.o
  obj-$(CONFIG_DRM_PANEL_WIDECHIPS_WS2401) += panel-widechips-ws2401.o
  obj-$(CONFIG_DRM_PANEL_XINPENG_XPP055C272) += panel-xinpeng-xpp055c272.o
+ obj-y += msm8953-generated/
 +obj-$(CONFIG_DRM_PANEL_SMARTISAN_R69006) += panel-r69006.o
 +obj-$(CONFIG_DRM_PANEL_SMARTISAN_FT8716) += panel-ft8716.o
 +obj-$(CONFIG_DRM_PANEL_SMARTISAN_NT36672) += panel-nt36672.o
@@ -575,6 +574,3 @@ index 000000000..fda042b84
 +MODULE_AUTHOR("linux-mdss-dsi-panel-driver-generator <fix@me>");
 +MODULE_DESCRIPTION("DRM driver for Smartisan ODIN panels (r69006)");
 +MODULE_LICENSE("GPL");
--- 
-2.48.1
-
