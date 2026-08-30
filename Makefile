@@ -200,23 +200,11 @@ kernel: $(STAMPS)/kernel-$(KDIR_TAG)
 $(STAMPS)/kernel-$(KDIR_TAG): | $(STAMPS) fetch-kernel
 	@mkdir -p $(KERNEL_OUT)
 	@echo "[kernel] 应用补丁 0001-0008"
-	# 打补丁这件事必须**可重跑**：改了配置、想在同一棵树上重编内核是家常便饭，
-	# 而 `patch --forward` 遇到"已应用过"会跳过并返回 1，在 set -e 下直接把构建
-	# 打断（实测：改了 CONFIG_RTC_* 之后重编，第一行就挂在这里）。
-	# 判定顺序：先试反向 —— 反向能干净应用说明这个补丁早就打过了，跳过；
-	# 否则正向打。两边都不行才是真出错（补丁与当前源码不匹配）。
-	@for p in $(sort $(wildcard $(REPO)/patches/*.patch)); do \
-		echo "[kernel]   $$(basename $$p)"; \
-		cd "$(KDIR)"; \
-		if patch -p1 --dry-run --reverse --silent < "$$p" >/dev/null 2>&1; then \
-			echo "[kernel]     已打过，跳过"; \
-		elif patch -p1 --dry-run --forward --silent < "$$p" >/dev/null 2>&1; then \
-			patch -p1 --forward --no-backup-if-mismatch < "$$p" || exit 1; \
-		else \
-			echo "[kernel]     ❌ 补丁既不能正向也不能反向应用（源码与补丁不匹配？）" >&2; \
-			exit 1; \
-		fi; \
-	done
+	# 打补丁必须**可重跑**：改了配置想在同一棵树上重编内核是家常便饭，
+	# 而 `patch --forward` 遇到"已应用过"会跳过并返回 1，在 set -e 下直接把构建打断
+	#（实测：改完 CONFIG_RTC_* 重编，第一行就挂在这里）。
+	# 判定逻辑不短（含"新建文件被后续补丁改过"这种情形），按项目约定抽成脚本。
+	bash $(REPO)/tools/ci/apply-patches.sh "$(KDIR)" "$(REPO)/patches"
 	@echo "[kernel] 配置"
 	cp -f $(REPO)/config-postmarketos-qcom-msm8953.aarch64 "$(KDIR)/.config"
 	cd "$(KDIR)" && make ARCH=arm64 CROSS_COMPILE="$(CROSS)" olddefconfig >/dev/null
