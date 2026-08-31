@@ -19,10 +19,13 @@ set -euo pipefail
 
 DIR=${1:?用法: fetch-kernel.sh <目录>}
 KERNEL_REPO=${KERNEL_REPO:-https://github.com/msm8953-mainline/linux.git}
-KERNEL_SHA=${KERNEL_SHA:-05f7e89ab9731565d8a62e3b5d1ec206485eeb0b}
-KERNEL_BRANCH=${KERNEL_BRANCH:-master}
+# 这里的默认值必须跟 Makefile 的 KERNEL_SHA / KERNEL_BRANCH / KERNEL_SINCE 一致
+# —— make 会显式传值覆盖，但直接手工跑本脚本时会用到默认值。四处钉点
+# （Makefile、本文件、workflow 的 env、文档表格）必须一起改，理由见 docs/05 第六节。
+KERNEL_SHA=${KERNEL_SHA:-770e10fa15a00051eaef862e4cb2724f2f8fa568}
+KERNEL_BRANCH=${KERNEL_BRANCH:-6.19.5/main}
 # shallow-since 的日期：钉住的那个 commit 的前一天（见 KERNEL_SINCE 注释）
-KERNEL_SINCE=${KERNEL_SINCE:-2026-02-07}
+KERNEL_SINCE=${KERNEL_SINCE:-2026-01-01}
 
 say() { printf '[fetch] %s\n' "$*"; }
 
