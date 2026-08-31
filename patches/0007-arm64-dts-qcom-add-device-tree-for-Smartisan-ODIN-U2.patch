@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,449 @@
+@@ -0,0 +1,501 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -439,18 +439,25 @@ index 000000000..3dc8f434d
 +
 +&usb3 {
 +	status = "okay";
++	dr_mode = "otg";
 +};
 +
-+&usb3_dwc3 {
-+	dr_mode = "otg";
-+
-+	ports {
-+		port@0 {
-+			usb_dwc3_hs: endpoint {
-+				remote-endpoint = <&usb_con_hs>;
-+			};
-+		};
-+	};
++/*
++ * USB Type-C 角色切换的连接关系：usb3 的 HS 端点 ↔ FUSB301 的 connector。
++ *
++ * 2026-08-31 修正（换基线带坏设备树的后遗症）：
++ *   旧基线 msm8953.dtsi 是「usb3 父节点(qcom,dwc3) + usb3_dwc3 子节点(snps,dwc3)」
++ *   两层结构，端点标签 usb_dwc3_hs 定义在子节点里，本文件用 &usb3_dwc3 引用。
++ *   新基线（pmOS msm8953 分支，6.19）已把两者合并成单个 usb3 节点
++ *   （compatible = "qcom,msm8953-dwc3", "qcom,snps-dwc3"），
++ *   且 usb_dwc3_hs 这个端点标签**由 msm8953.dtsi 内建提供**。
++ *   ⇒ &usb3_dwc3 解析不到（dtc: "Label or path usb3_dwc3 not found"，DTB 直接编不出来），
++ *     而自己再定义一次 usb_dwc3_hs 是与 dtsi 重复定义。
++ *   改法照上游标准写法（同 qrb2210-rb1.dts 的 &usb_dwc3_hs）：
++ *   端点只补 remote-endpoint，dr_mode 提到 &usb3 上。
++ */
++&usb_dwc3_hs {
++	remote-endpoint = <&usb_con_hs>;
 +};
 +
 +&gpu {
@@ -496,6 +503,51 @@ index 000000000..3dc8f434d
 +	vddrfa-supply = <&pm8953_l19>;
 +	vddpa-supply = <&pm8953_l9>;
 +	vdddig-supply = <&pm8953_l5>;
++	status = "okay";
++};
++
++/*
++ * 电池 / 充电 / 电量计 —— 参数取自原厂安卓包里的下游设备树（reports/025）
++ *
++ * 原厂 boot.img 的 DTB 里声明了两块电池（ATL / SCUD 两家供应商，靠 ID 电阻
++ * 10kΩ / 100kΩ 区分），但标称参数完全一致：
++ *   3500 mAh    qcom,nom-batt-capacity-mah
++ *   4.400 V     qcom,max-voltage-uv / smbcharger qcom,float-voltage-mv
++ *   3.400 V     qcom,fg-cutoff-voltage-mv
++ *   100 mA      smbcharger qcom,iterm-ma
++ * 只有 NTC B 值不同（3435 / 3380），而主线用固定的 SCALE_PMI_CHG_TEMP，
++ * 故这里只填一组，不必做电池识别。
++ *
++ * constant-charge-current-max-microamp **不抄**原厂的 3500 mA —— 那是
++ * PMI8950 SMBC + SMB1351 并联充电的总能力，主线没有 smb1351 驱动，
++ * 并联不可用。先按 1500 mA 保守起步（pmOS markw 用 1000 mA），
++ * 真机测过温升与输入限流后再往上调。
++ * 注意：该属性是 qcom,smbchg 绑定的**必填项**，缺失会直接 probe 失败，
++ * 连 qcom-smbchg-usb 这个 psy 都出不来。
++ * 写法上必须包在 `/ { }` 里：**不能**写成根节点闭合之后的顶层节点 ——
++ * 容器内 dtc 1.6.1 对那种写法直接报 `syntax error`（实测最小复现已验证），
++ * 包进根覆盖块则正常合并。
++ */
++/ {
++	battery: battery {
++		compatible = "simple-battery";
++
++		charge-full-design-microamp-hours = <3500000>;
++		voltage-min-design-microvolt = <3400000>;
++		voltage-max-design-microvolt = <4400000>;
++		constant-charge-current-max-microamp = <1500000>;
++		charge-term-current-microamp = <100000>;
++	};
++};
++
++&pmi8950_fg {
++	monitored-battery = <&battery>;
++	power-supplies = <&pmi8950_smbcharger>;
++	status = "okay";
++};
++
++&pmi8950_smbcharger {
++	monitored-battery = <&battery>;
 +	status = "okay";
 +};
 -- 

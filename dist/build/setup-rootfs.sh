@@ -229,12 +229,17 @@ chroot $R apt-get update -qq
 # fake-hwclock.service 的 ExecStop（关机）；前者要 cron 才跑得起来，
 # minbase 不带 cron，所以一并装上 —— 手机很少干净关机，只靠关机存盘的话
 # 一掉电或长按电源硬复位就全丢了。
+# upower 把 /sys/class/power_supply 的数据经 D-Bus 送上去（org.freedesktop.UPower），
+# KDE 的 powerdevil 与 Phosh 的状态栏电量图标都靠它 —— 内核里有了
+# qcom-battery / qcom-smbchg-usb 两个 psy，用户态没有 upower 就一个都看不到。
+# policykit-1 是 upowerd 做特权操作（挂起/休眠授权）时要的，一并装上。
 if ! chroot $R apt-get install -y -qq \
 	kmod \
 	network-manager wpasupplicant iw wireless-tools rfkill firmware-atheros \
 	iputils-ping curl wget bind9-dnsutils net-tools traceroute tcpdump \
 	iperf3 ethtool mtr-tiny \
 	systemd-resolved systemd-timesyncd util-linux-extra fake-hwclock cron \
+	upower policykit-1 \
 	nftables; then
 	echo "[setup-rootfs] FATAL: 网络/基础包没装上，构建中止（apt 的完整报错在上面）" >&2
 	exit 1

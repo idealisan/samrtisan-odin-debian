@@ -11,19 +11,23 @@
  *   从 l0-safe 切回 l0（完整版 DTB）即可恢复全部功能。
  *
  * 与完整版的差异（相对 msm8953-smartisan-odin.dts）：
- *   1) &usb3_dwc3 删除 usb-role-switch 属性
- *   2) &usb3_dwc3 删除 ports（与 usb-c-connector 相连的 OF graph 端点）
- *   3) &usb3_dwc3 的 dr_mode 由 "otg" 改为 "peripheral"
+ *   1) &usb3 删除 usb-role-switch 属性
+ *   2) &usb3 删除 ports（与 usb-c-connector 相连的 OF graph 端点）
+ *   3) &usb3 的 dr_mode 由 "otg" 改为 "peripheral"
  *   4) fusb301 删除 connector 子节点（不再驱动角色切换）
  *
  * 参考：reports/015 §二（阶段 0）、reports/014（USB 救援通道加固）
+ *
+ * 2026-08-31 修正：原来是 &usb3_dwc3 —— 换基线后（pmOS msm8953 分支，6.19）
+ * msm8953.dtsi 把 dwc3 合并进了 usb3 单个节点，usb3_dwc3 已不存在
+ * （详见 patches/0007 里 &usb3 那段的注释），故这里一并改指 &usb3。
  */
 
 /dts-v1/;
 
 #include "msm8953-smartisan-odin.dts"
 
-&usb3_dwc3 {
+&usb3 {
 	/* 注意：属性必须写在 /delete-node/ 之前，否则 dtc 报
 	 * "Properties must precede subnodes" */
 	dr_mode = "peripheral";
