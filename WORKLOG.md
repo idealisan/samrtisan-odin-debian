@@ -1557,3 +1557,112 @@ bookworm 的 `util-linux-extra` 根本没有这个 unit，它只带
 另外 `make dtb` 用的是裸 `patch --forward`（不是 apply-patches.sh），
 遇到"已打过"会返回非零并在 set -e 下中断；重编前要先
 `git checkout -- arch/arm64/boot/dts/qcom/Makefile` 并删掉生成的 .dts。
+
+---
+
+## 电池与温度适配（2026-09-01 凌晨）— 参数已落地、CI 全绿、刷入后失联
+
+### 做了什么
+
+1. **设备树**（`patches/0007`）补三个节点，四个 DTB 全部获得电量能力：
+   `/ { battery: battery { compatible = "simple-battery"; ... }; }`
+   + `&pmi8950_fg`（monitored-battery / power-supplies / status=okay）
+   + `&pmi8950_smbcharger`（monitored-battery / status=okay）。
+   数值来自原厂安卓包的下游 DTB（reports/025）：3500 mAh / 3.4 V / 4.4 V / 100 mA。
+   `constant-charge-current-max-microamp` 取 1500000，**不抄**原厂 3500 mA
+   （那是 PMI8950 SMBC + SMB1351 并联的能力，主线没有 smb1351 驱动）。
+2. **内核配置**：`CONFIG_BATTERY_PMI8994_FG=y`、`CONFIG_HWMON=y`、
+   `CONFIG_THERMAL_HWMON=y`。
+3. **用户态**：`setup-rootfs.sh` 补装 `upower` + `policykit-1`
+   （内核有 psy、没有 upower 就一个都看不到）。
+4. **顺带修两个换基线的后遗症**（都是编译 blocker，见下）。
+
+### 顺带修掉的两处（都不是这次电池改动引起的）
+
+**A. 换基线带坏设备树（WORKLOG 坑 5 的正式解法）**
+新基线 `msm8953.dtsi` 把 dwc3 合并进了 `usb3` 单节点
+（`compatible = "qcom,msm8953-dwc3","qcom,snps-dwc3"`），`usb3_dwc3` 不再存在，
+而 `usb_dwc3_hs` 这个端点标签**由 dtsi 内建提供**。
+改法照上游写法（同 `qrb2210-rb1.dts`）：`&usb3` 上加 `dr_mode = "otg"`，
+端点改用 `&usb_dwc3_hs { remote-endpoint = <&usb_con_hs>; }`。
+`dts/msm8953-smartisan-odin-norolesw.dts` 的 `&usb3_dwc3` 一并改指 `&usb3`。
+
+**B. `KERNEL_SHA` 散在五处、只同步了一处（CI 自换基线起一直是红的）**
+`eb54960` 把 Makefile 的 SHA 改成 `770e10fa`（分支 `6.19.5/main`），
+但 workflow 的 `env.KERNEL_SHA`、`fetch-kernel.sh` 默认值、
+AGENTS.md / docs/01 / docs/05 都还写着旧值 `05f7e89`。
+make 的 `?=` 不会覆盖环境变量 ⇒ workflow 的旧值静默生效 ⇒ CI 取的是另一棵树
+⇒ 补丁 0004（R69006 面板）在旧树上打不上，kernel job 卡在"应用补丁"。
+五处已全部对齐，并在 workflow 注释、fetch-kernel.sh、docs/05 第六节各写了
+"这四处必须一起改"。
+
+### 坑（这次踩的，都实测过）
+
+- **dtc 1.6.1 不接受"根节点闭合之后的顶层节点"**：
+  `battery: battery { ... };` 直接 `syntax error`。必须包进 `/ { ... };` 根覆盖块。
+  最小复现验证过：包进根覆盖块正常合并。
+- **`make dtb` 用的 GNU patch 会 fuzz，CI 用的 git apply 不会** —— 这是"本地绿、CI 红"的根源。
+  0007 的 `dts/qcom/Makefile` hunk 上下文缺了新基线多出来的
+  `markw / oxygen / ysl` 三条，GNU patch 靠 fuzz 2 蒙过去（还打印
+  "Hunk #1 succeeded at 94 with fuzz 2"），git apply 直接失败。
+  ⇒ 以后别把那句 fuzz 提示当噪音。
+- **换基线后验证补丁的快办法**（比等 30 分钟 CI 快得多）：
+  从 HEAD 把 8 个补丁涉及的原始文件抽到临时目录、`git init` 成临时仓库，
+  再按 0001→0008 顺序逐个 `git apply --check` 并落盘。本次用它一次找出了 0007。
+- **手工改 patch 必须同步 hunk 行计数**：0007 的 dts 部分 449 → 489 → 501 → 494，
+  每次增删都要重数。
+- 重编前要恢复内核树的 Makefile 与已生成的 .dts（`git checkout --` + 改名备份）。
+
+### CI 结果（run 33411566563，commit 3b509cb）
+
+dtb ✅ / kernel ✅ / lk2nd ✅ / rootfs-core ✅ / rootfs-gui ✅ / publish skipped（预期）
+
+产物核验（下载后本地验的）：
+- DTB：`battery` 节点 3500000 µAh / 3400000 µV / 4400000 µV / 1500000 µA / 100000 µA；
+  `fuel-gauge@4000` = `qcom,pmi8996-fg`，status=okay，monitored-battery=0x65，
+  power-supplies=0x66；`smbchager@1000` = `qcom,pmi8996-smbchg`，status=okay；
+  10 个 thermal zone。
+- vmlinuz 里有 `pmi8994_fg`(3 处)、`qcom-battery`、`qcom-smbchg-usb` 字符串 ⇒ 驱动已编进内核。
+- 下载走 `env -u http_proxy -u https_proxy ...`，kernel+dtb 16 秒，gui 镜像 19 分钟。
+
+### 刷入结果：镜像刷成功，但设备失联（**当前停在这里**）
+
+- `40 data`：`fastboot flash userdata odin-debian-gui-sparse.img` 成功，
+  10 个分块共 290 秒，全 OKAY。
+- `50 reboot`：`Rebooting OKAY`。
+- 之后 240 秒内 USB 网卡没出现；`60 usbnet` 想静态兜底配 `en0`，
+  但 `sudo` 要终端密码（用户不在）⇒ 失败。
+- 反复查（重启后 15 分钟内查了 4 轮）：
+  `fastboot devices` 空、`ping 172.16.42.1` 全丢、
+  `ioreg -p IOUSB` 里只有 "Xiaomi Type-C 5-in-1 Hub" / "Generic CDC" / RTL9210，
+  **没有任何 Qualcomm VID（05c6 / 18d1）的设备**。
+  镜像里也没预置 WiFi（无 *.nmconnection），所以 WiFi 这条路也不通。
+
+#### 已排除 / 待查
+
+- **已排除"Type-C 角色切换"这一路**：镜像的 `extlinux.conf` 里 `default l0-safe`，
+  用的就是安全版 DTB（`dr_mode = "peripheral"`、`/delete-property/ usb-role-switch`、
+  `/delete-node/ ports`），UDC 本应恒在、不依赖角色判定。
+- 因此更可能是：设备根本没起到能起 gadget 的阶段（内核 panic / 根分区没挂上 /
+  某个驱动 probe 卡住），或者 reboot 后掉电关机。
+- 没有串口控制台，**无法在无物理操作的情况下进一步区分**。
+  按约定（"手机状态无法操作就暂停"）停在这里。
+
+#### 下一步（需要用户动手）
+
+1. 长按电源关机 → 按住【音量减 + 电源】进原厂 fastboot，
+   让 PC 上重新出现 `fastboot devices`。
+2. 恢复手段（有备件）：
+   `fastboot flash boot evidence/live-device-backup/boot-partition.img`
+3. 起得来之后再定位：优先看串口/屏幕上的启动日志，
+   确认是内核 panic、根分区挂载失败，还是某个驱动 probe 卡住。
+
+### 遗留（本次故意没做）
+
+- `CONFIG_BATTERY_QCOM_FG=y` 是本树 Kconfig 里**不存在**的失效残留
+  （旧驱动名 qcom_fg.c，现为 pmi8994_fg.c），olddefconfig 静默丢弃它。
+  按"只增不删"暂留，未删。
+- 本次全程**没有执行任何删除/清理命令**（按用户要求），
+  临时目录 `tmp/battery-probe`、`tmp/patchcheck`、`tmp/pristine-check`、
+  `tmp/pristine-check2`、`tmp/ci-artifacts` 与两个 `.odin-bak` 备份都还在，
+  等全部完成后再统一整理。
