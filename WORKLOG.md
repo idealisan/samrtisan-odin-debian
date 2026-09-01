@@ -2394,3 +2394,68 @@ ADSP 固件已加载、数据流正常（hw_ptr 推进）、播放期间零内�
    "aw8738 驱动按 AW8738 的方式驱动了那根脚，而本机功放不认"
 3. 另一个 GPIO 线索：`qcom,spkr-sd-n-gpio = gpio96`（原厂另一处 speaker 关断脚，
    注意 sd-n 是低有效 ⇒ 正常工作时要**拉低** gpio96）⇒ 这条也要一起试
+
+### 音频：从原厂线刷包挖到了 Android 的 speaker 通路定义（重要）
+
+#### ROM 结构（之前漏看了，被 head -60 截断）
+
+`/Volumes/caseSensitiveBar/Pro_user_V4.2.5/SEKSA-mol%odin-rom-4.1.0-odin-user-20180523-005028-32g/`
+共 103 个文件。除了 boot.img / NON-HLOS.bin，**还有 `system_1.img` ~ `system_36.img`**
+（system 分区切成 36 块，squashfs，数据未压缩 ⇒ **可以直接 grep 到文件内容**）。
+另有 recovery.img / persist_1.img / splash.img / mdtp.img / 各种 .mbn。
+`apps/` 是刷机工具，`full_flash/`、`fastboot-flash/`、`nv_image/`、`sparse_images/` 都是空目录。
+
+#### 挖到的 Android mixer_paths（在 system_4.img，共 7517 个 <ctl name>）
+
+**speaker 通路定义共 9 个版本，其中 7 个完全相同，只有两步：**
+```xml
+<path name="speaker">
+    <ctl name="RX3 MIX1 INP1" value="RX1" />
+    <ctl name="SPK" value="Switch" />
+</path>
+```
+另外两个版本（不同机型）：
+```xml
+<!-- offset 59850985 -->
+<path name="speaker">
+    <ctl name="RX3 MIX1 INP1" value="RX1" />
+    <ctl name="RX3 Digital Volume" value="79" />     ← 注意是 79，不是 124
+    <ctl name="LINE_OUT" value="Switch" />
+</path>
+<!-- offset 60268837：tasha/WSA 版，本机不用 -->
+<path name="speaker">
+    <ctl name="SLIM RX1 MUX" value="AIF1_PB" />
+    <ctl name="SLIM_0_RX Channels" value="One" />
+    <ctl name="RX4 MIX1 INP1" value="RX1" />
+    <ctl name="SPK DAC Switch" value="1" />
+    <ctl name="COMP0 Switch" value="1" />
+</path>
+```
+
+#### 对本机的推断
+
+1. **`RX3 MIX1 INP1 = RX1` 与我们的做法一致**（说明 SPK 走 RX3 是对的，不是 RX1/RX2）
+2. **`SPK = Switch` 这个控件本机不存在**（`amixer sget "SPK"` 报 Unable to find；本机含 SPK 的控件**只有 `SPK DAC`**）
+   主线 msm8916-wcd-analog 把 SPK 做成了 DAPM widget（`SPK_OUT`），而 DAPM 里
+   `SPK DAC`/`SPK PA`/`SPKR_CLK`/`SPK_OUT` **都已经是 On** ⇒ 这一步应已等价满足
+3. **音量值差异值得注意**：Android 那一版用 `RX3 Digital Volume = 79`（-5dB），
+   我们一直用 124（+40dB）。但实测 **79 / 100 / 124 三个值都无效**
+   （播放时录到峰值 24 / 56 / 22，均不高于底噪 42）⇒ 音量也不是原因
+
+#### 下一步（下一轮）
+
+静态配置层面已经查无可查，剩下的只有两种可能：
+
+a) **硬件连接与我们假设的通路不符** —— 例如本机扬声器实际接在 LINE_OUT 而非 SPK
+   （Android 第二个定义就是 LINE_OUT 版）。可试把 LINE_OUT 通路拉起来
+   （DAPM 里 `LINEOUT`/`LINEOUT PA`/`LINEOUT_OUT` 现在全是 Off）
+b) **外部功放没被正确使能** —— 原厂只给了 `ext-pa-enable = gpio132`（已 out high）
+   和 `spkr-sd-n-gpio = gpio96`（**sd-n 低有效，正常工作需拉低**；这根脚本机没管过）
+
+⇒ 下一轮优先试：把 gpio96 拉低（可用 gpio-hog）+ 试 LINE_OUT 通路。
+
+#### 一个实用技巧（可复用）
+
+原厂 ROM 的 system 是 squashfs 但**数据未压缩**，所以不需要 simg2img/unsquashfs，
+直接 `grep -a` 就能搜到 XML 内容；提取某个 <path> 的完整定义用 Python 找
+`<path name="xxx">` 到 `</path>` 之间的字节即可。比先解包快得多。
