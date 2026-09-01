@@ -2022,3 +2022,26 @@ pinctrl 用 cdc_pdm_lines_act / _2_act / comp_lines_act）与 pmOS 的 ucm2 配�
 （`8953_wcd_codec@f000`），routing 里 AMIC1/AMIC2/AMIC3 分别走
 MIC BIAS External1 / Internal2 / External1。内置麦克风很可能要走
 **Internal2**（AMIC2），而不是 External —— 等 UCM 通了再逐个试。
+
+### 音频（续）：写了 UCM 初稿，但还没让内核导入成功
+
+已落盘到仓库：`dist/build/rootfs/usr/share/alsa/ucm2/smartisanodin/`
+- `smartisanodin.conf`（UseCase HiFi → HiFi.conf）
+- `HiFi.conf`（SectionVerb / Speaker / Mic / Modifier）
+
+**关键坑：UCM 目录与主文件名要匹配声卡 id，不是 model。**
+`/proc/asound/cards` 显示 `0 [smartisanodin ]: smartisan-odin - smartisan-odin`
+—— 方括号里的 `smartisanodin` 才是 id（连字符被去掉），所以目录是
+`ucm2/smartisanodin/`，主文件是 `smartisanodin.conf`。第一次写成
+`smartisan-odin/` 导致 alsaucm 报 "failed to import ... -2"。
+
+改名后**仍导入失败**（`error: failed to import hw:0 use case configuration -2`、
+`alsaucm listcards` 仍为空）⇒ 说明是 **ucm2 语法问题**，不是名字问题，
+下一轮要对照 `/usr/share/alsa/ucm2/` 里现成配置的写法逐个字段校对
+（怀疑点：SectionModifier 在 Syntax 4 下是否需要、Syntax 声明的写法）。
+
+UCM 里已经写好的关键内容（这些实测确认过，可直接复用）：
+- Speaker EnableSequence：`PRI_MI2S_RX Audio Mixer MultiMedia1`=1、
+  `SPK DAC`=1、`RX1/RX2 Digital Volume`=84
+- Mic EnableSequence：`MultiMedia2 Mixer PRI_MI2S_TX`=1、
+  `ADC2 MUX`='AMIC2'、`ADC2`=1
