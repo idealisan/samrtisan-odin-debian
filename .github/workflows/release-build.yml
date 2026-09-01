@@ -146,11 +146,36 @@ jobs:
       #     但 key 若不含配置，就会精确命中旧缓存（恢复一堆用不上的对象），
       #     又因为精确命中而不回传 ⇒ 之后每轮都是"恢复旧缓存 + 全量重编"。
       #     实测：第五轮正是撞在这个上（RTC 配置改动后仍恢复旧缓存）。
+      - name: 计算内核补丁哈希（排除纯设备树补丁）
+        id: kpatch
+        run: |
+          # 纯设备树的补丁（本项目是 0007）只改 .dts 与 dtb 的 Makefile，
+          # **不产生任何编译单元** —— 不该进内核编译的缓存键。
+          #
+          # 2026-09-01 实测：缓存键原先是 hashFiles('patches/*.patch')，
+          # 于是每改一次设备树，精确键就变 ⇒ 只能靠 restore-keys 兜底 ⇒
+          # 收尾再存一份 ~390 MB 的缓存（仓库里一度有两份内容几乎相同的
+          # 391 MB 条目，只差一个 dts 数值）。今天那轮 2 分钟是兜底救的，
+          # 兜底那份一旦被 GitHub 淘汰就会退回 35 分钟冷编。
+          #
+          # 判定方式：一个补丁改的文件**全部**在 arch/arm64/boot/dts/ 下就跳过。
+          # 这么写而不是写死 0007，是为了以后再加设备树补丁也能自动排除。
+          sel=""
+          for p in $(ls patches/*.patch | sort); do
+            if grep -E '^\+\+\+ b/' "$p" | sed 's|^\+\+\+ b/||' \
+               | grep -qv '^arch/arm64/boot/dts/'; then
+              sel="$sel $p"
+            fi
+          done
+          echo "计入内核缓存键的补丁 $(ls patches/*.patch | wc -l) 个中的 $(echo "$sel" | wc -w) 个："
+          for f in $sel; do echo "  - $f"; done
+          h=$(printf '%s\n' $sel | xargs cat 2>/dev/null | sha256sum | cut -c1-64)
+          echo "hash=$h" >> "$GITHUB_OUTPUT"
       - name: 取 ccache 缓存
         uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
-          key: kernel-ccache-v2-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-${{ hashFiles('patches/*.patch') }}-${{ hashFiles('config-postmarketos-qcom-msm8953.aarch64') }}
+          key: kernel-ccache-v2-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-${{ steps.kpatch.outputs.hash }}-${{ hashFiles('config-postmarketos-qcom-msm8953.aarch64') }}
           restore-keys: |
             kernel-ccache-v2-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-
             kernel-ccache-v2-${{ steps.toolchain.outputs.cc }}-
@@ -181,17 +206,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: 安装 debootstrap 与 arm64 模拟执行环境
+        id: debinst
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq debootstrap qemu-user-static binfmt-support \
             e2fsprogs android-sdk-libsparse-utils kmod cpio parted
           # apt 装的 binfmt 条目不一定已注册进内核，chroot 进 arm64 根之前补一次
           sudo update-binfmts --enable qemu-aarch64
+          # 基础根缓存键：debootstrap 的产物只由下面这几样决定，与变体无关，
+          # 所以 core 与 gui 两条 job 用的是**同一份**缓存。
+          #   suite / arch / --include 列表 / debootstrap 版本
+          # （镜像站不进键：不同镜像拉到的包内容应当一致，且 CI 固定用官方源）
+          inc="busybox-static,udev,ssh,sudo,systemd,iproute2,dnsmasq,parted,e2fsprogs"
+          debver=$(debootstrap --version | awk '{print $NF}' | tr -d ' ')
+          echo "basekey=odin-baseroot-v1-bookworm-arm64-${debver}-$(printf '%s' "$inc" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+      # debootstrap 是 rootfs job 的最大单项开销（core 变体实测 283 秒、占 83%），
+      # 而它的产物与变体无关 —— 缓存起来每个变体省 4~5 分钟。
+      # 打包/解包由 tools/ci/build-rootfs.sh 按 ODIN_BASE_TAR 指到的路径完成，
+      # 它在"装变体包之前"打包，所以缓存里不会混进 core/gui 的差异。
+      #
+      # 两条 job 会同时写同一个 key：actions/cache 对已存在的 key 不再重复上传，
+      # 谁先到谁生效，内容一致，无害。
+      - name: 取 debootstrap 基础根缓存
+        uses: actions/cache@v4
+        with:
+          path: /tmp/odin-baseroot.tar.gz
+          key: ${{ steps.debinst.outputs.basekey }}
       - uses: actions/download-artifact@v4
         with: { name: odin-kernel, path: out/kernel }
       - uses: actions/download-artifact@v4
         with: { name: odin-dtb, path: out/dtb }
       - name: 组装系统镜像
+        env:
+          # 传给 tools/ci/build-rootfs.sh：有这份 tar 就解开、不跑 debootstrap；
+          # 没有就跑 debootstrap 并在装变体包之前打一份出来。sudo -E 会带进 chroot 侧。
+          ODIN_BASE_TAR: /tmp/odin-baseroot.tar.gz
         run: |
           # debootstrap / chroot / mke2fs 都必须以 root 运行，由这里统一提权；
           # 跑完把产物交还给 runner，否则 upload-artifact 读不到 root 建的 0600 镜像。
@@ -201,6 +250,14 @@ jobs:
           # 的语义，正好对上；不加就会在这里把内核重编一遍（20+ 分钟）。
           sudo -E make -o kernel -o dtb rootfs-${{ matrix.variant }} OUT=out
           sudo chown -R "$(id -u):$(id -g)" out/rootfs-${{ matrix.variant }}
+          # 基础根 tar 也是 root 建的（0600），同样要交还给 runner，
+          # 否则上面那个 cache 步骤收尾时读不到它。
+          if [ -f /tmp/odin-baseroot.tar.gz ]; then
+            sudo chown "$(id -u):$(id -g)" /tmp/odin-baseroot.tar.gz
+            echo "基础根 tar: $(stat -c %s /tmp/odin-baseroot.tar.gz) 字节，已交还 runner"
+          else
+            echo "基础根 tar 不存在（本轮走的是缓存解包，或打包失败）"
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: odin-rootfs-${{ matrix.variant }}

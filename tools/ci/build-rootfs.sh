@@ -45,18 +45,52 @@ say() { printf '[rootfs] %s\n' "$*"; }
 
 say "变体: $VARIANT（staging: $ROOT）"
 # ---------------------------------------------------------------- 1. debootstrap
+#
+# 2026-09-01：debootstrap 是整个 rootfs job 最大的单项开销（core 变体实测
+# 283 秒、占 83%），但它的产物只由 suite / arch / --include 决定，**与变体无关**
+# —— 每轮重跑纯属浪费。所以在 debootstrap 之后、装变体包之前打一份 tar
+# 交给 actions/cache，下一轮直接解开。
+#
+# 两个必须遵守的约束（顺序错了就会缓存进不该缓存的东西）：
+#   1) 打包点在"装变体包"**之前** —— 否则缓存里会混进 core/gui 的差异包；
+#   2) 也在改 sources.list **之前** —— 缓存里留官方源，恢复后再按 $MIRROR 改。
+#
+# 缓存键由 workflow 计算（suite + arch + debootstrap 版本 + --include 列表，
+# 见 .github/workflows/release-build.yml）。这里只按 $ODIN_BASE_TAR 指到的路径
+# 解包 / 打包；不设这个变量就退化成原来的行为（总是 debootstrap）。
+BASE_TAR=${ODIN_BASE_TAR:-}
 if [ ! -d "$ROOT/etc" ]; then
-  say "debootstrap $SUITE / arm64 → $ROOT"
-  rm -rf "$ROOT"; mkdir -p "$ROOT"
-  # tee 双写：既实时进 CI 日志，也留一份文件。
-  # 必须写成 `if ! ... | tee` 而不是靠 set -e：后者会在管道失败的瞬间直接退出，
-  # 下面那句"debootstrap 失败"永远打印不出来。
-  if ! debootstrap --arch arm64 --variant=minbase \
-    --include=busybox-static,udev,ssh,sudo,systemd,iproute2,dnsmasq,parted,e2fsprogs \
-    "$SUITE" "$ROOT" "$MIRROR" \
-    2>&1 | tee /tmp/odin-debootstrap.log; then
-    echo "debootstrap 失败，日志见上面（同一份也留在 /tmp/odin-debootstrap.log）" >&2
-    exit 1
+  if [ -n "$BASE_TAR" ] && [ -s "$BASE_TAR" ]; then
+    say "从缓存恢复基础根: $BASE_TAR → $ROOT"
+    mkdir -p "$ROOT"
+    if ! tar -xzf "$BASE_TAR" -C "$ROOT"; then
+      echo "基础根缓存解包失败: $BASE_TAR" >&2
+      exit 1
+    fi
+    # proc / sys 是伪文件系统、不进包，但目录要在（后面 chroot 要用）
+    mkdir -p "$ROOT/proc" "$ROOT/sys"
+  else
+    say "debootstrap $SUITE / arm64 → $ROOT"
+    rm -rf "$ROOT"; mkdir -p "$ROOT"
+    # tee 双写：既实时进 CI 日志，也留一份文件。
+    # 必须写成 `if ! ... | tee` 而不是靠 set -e：后者会在管道失败的瞬间直接退出，
+    # 下面那句"debootstrap 失败"永远打印不出来。
+    if ! debootstrap --arch arm64 --variant=minbase \
+      --include=busybox-static,udev,ssh,sudo,systemd,iproute2,dnsmasq,parted,e2fsprogs \
+      "$SUITE" "$ROOT" "$MIRROR" \
+      2>&1 | tee /tmp/odin-debootstrap.log; then
+      echo "debootstrap 失败，日志见上面（同一份也留在 /tmp/odin-debootstrap.log）" >&2
+      exit 1
+    fi
+    # 打一份基础根留给后续轮次。打包失败不致命，只是本轮没留下缓存。
+    if [ -n "$BASE_TAR" ]; then
+      say "打包基础根 → $BASE_TAR（供后续 CI 轮次复用）"
+      if tar -czf "$BASE_TAR" -C "$ROOT" --exclude=./proc --exclude=./sys . 2>/dev/null; then
+        say "  基础根打包完成 $(stat -c %s "$BASE_TAR" 2>/dev/null || stat -f %z "$BASE_TAR") 字节"
+      else
+        say "  基础根打包失败（不致命，本轮只是没留下缓存）"
+      fi
+    fi
   fi
 fi
 say "rootfs 就绪: $ROOT"
