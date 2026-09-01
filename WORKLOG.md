@@ -1727,3 +1727,64 @@ fastboot"。实测是**反复重启**，不是停下 —— 最后是人工按�
 把 CI 编好的 DTB 反编译 → 改 → 重编译 → scp 到 `/boot/dtbs/qcom/` →
 改 extlinux.conf 的 fdt 指向它 → 系统内 reboot。
 （AGENTS.md 铁律 4：这只能用于探路，不能据此确认"已修好"。）
+
+---
+
+## rootfs 太慢：定位到解包那 9 分钟（2026-09-01 晚）
+
+### 数据（v0.9.4-battery 那轮 CI 的 gui rootfs 日志，job 99846158676）
+
+整段 23.6 分：
+
+| 阶段 | 耗时 | 占比 |
+|---|---|---|
+| debootstrap | 106.6s (1.8 分) | 7.5% |
+| udev + 基础包（setup-rootfs 前段） | 174.7s (2.9 分) | 12.3% |
+| **Plasma 装包（setup-rootfs 后段）** | **850.3s (14.2 分)** | **60%** |
+| build-image（mke2fs 25s + img2simg 13s + 校验 3s） | 40.7s | 2.9% |
+| 其余（checkout / 装工具 / 下上轮 artifact / 上传） | 约 250s | 17.6% |
+
+Plasma 那 850 秒内部（按分钟桶统计 dpkg 输出）：
+
+```
+11:59        约  60s   静默（fix_dns + apt-get update + 下载）
+12:00–12:08  约 540s   解包 1202 个包，同期配置只有 3 个   ← 大头
+12:09–12:12  约 240s   配置 1211 个包（postinst 在 qemu-arm64 下跑）
+```
+
+另外 `Processing triggers` 共 23 次，其中 sgml-base、libc-bin(ldconfig)、dbus
+各 3 次 —— 三批装包各触发一轮。
+
+### 结论：不是带宽问题，是 dpkg 逐包 flush
+
+**解包 1202 个包花了 9 分钟、每包约 0.45 秒**，而写入量只有几百 MB。这个数字
+只能由"每处理一个包就 flush 一次文件系统"解释（dpkg 的 safe I/O）。
+
+### 改法：给三处 apt-get install 加 force-unsafe-io
+
+统一走 `APT_OPTS="-o Dpkg::Options::=--force-unsafe-io"`。
+
+**用命令行选项，不写 `$R/etc/dpkg/dpkg.cfg.d/`**：写文件会留在镜像里，连带影响
+真机上以后 apt 升级的行为；命令行选项只在本次装包生效，镜像里不留痕迹。
+掉电一致性对这一步没意义 —— 刷进真机的是 build-image.sh 后面 mke2fs 出来的
+新镜像，不是这个临时 staging 目录。
+
+### 留到下一轮的（都算过账，不是忘了）
+
+- **合并三批装包**：能省两轮 dpkg trigger（上面那 3× 的 ldconfig/dbus/sgml-base）
+  和一到两次 apt-get update。但 udev 那批必须先于后面几个 `systemctl enable`
+  （serial-getty / odin-usb-gadget / odin-firstboot-resize），基础包那批又必须先于
+  `systemctl enable NetworkManager/cron/fake-hwclock`，合并会打乱这些先后关系，
+  风险不小。真要合，先确认 `systemctl enable` 是否真的需要对应包已安装（很可能
+  不需要，它只是在建符号链接）。
+- **三处 apt-get update**：sources.list 在它们之间没变过，理论上两处冗余；但 298
+  行那次是防御性的（前一批 systemd-resolved 的 postinst 会把 resolv.conf 换成
+  悬空链接，可能导致更早那次 update 拿到空索引）。单个收益不到 1 分钟。
+- **缓存 apt 归档**：只省那 60 秒下载，性价比低。
+- **缓存整个 gui staging**：5.7 GB，虽然有 10 GB 上限，但上传下载都很不划算。
+
+### 一条方法论
+
+这次能定位准，靠的是**先按分钟统计日志行分布**再下结论：
+一眼看出 12:00–12:08 只有 Unpacking、Setting up 几乎为零，于是矛头直接指向
+解包而不是"包太多"或"网络慢"。以后排查构建耗时都该先画这个分布。
