@@ -2507,3 +2507,54 @@ b) **外部功放没被正确使能** —— 原厂只给了 `ext-pa-enable = gp
 
 （注：设备当前跑的是 `odin-hog96.dtb【只 hog 了 gpio96】；要回到有声卡但不 hog 的状态用
 `odin-audio-test.dtb`。）
+
+## ================= 本轮收尾交接（2026-09-01 深夜，暂停） =================
+
+### 成果（三项可用，均经真机验证）
+
+1. **触摸屏** ✅ —— FocalTech FT8716，走主线 `edt-ft5x06`（`focaltech,ft8716`）。
+   已固化进 `patches/0007`（`&i2c_3` + AW8738 之外还加了 4 个 pinctrl 状态。
+   划屏能读到 `ABS_MT_POSITION_X/Y` 与 `BTN_TOUCH`，坐标落在 1080×1920 内。
+
+2. **蓝牙** ✅ —— `hci0` 本来就存在（`btqcomsmd` 内核侧是现成的），只缺用户态的 `bluez`。
+   已加进 `dist/build/setup-rootfs.sh`（基础包 `bluez`，gui 另加 `bluez-obexd`、
+   `libspa-0.2-bluetooth`、`pipewire-alsa`）。实测扫到 10 台周边设备，控制器是
+   public 地址（`02:00:67:DB:FE:B8`），**不需要**手工 `btmgmt public-addr`。
+
+3. **麦克风** ✅ —— INP3 主麦能录到人声（用户听录音确认过），INP2 是降噪副麦几乎无声。
+   采集通路（逐个试出来的）：
+   ```
+   MultiMedia2 Mixer TERT_MI2S_TX = 1     ← 关键！不是 PRI_MI2S_TX
+   DEC1 MUX = ADC2、CIC1 MUX = AMIC、ADC2 MUX = INP3
+
+### 未通
+
+- **扬声器**：链路 DAPM 全 On、数据在流（hw_ptr 推进）、增益满（RX3=124=+40dB）、
+  零报错，但物理不发声。放大 20dB 后重测仍听不到 ⇒ 之前"有一点点声音"是误听。
+- **视频 venus**：固件 HFI 握手 `-EIO`（`hfi_parser` "Unsupported property"），
+  是固件与驱动协议不匹配，不是缺文件。
+- **GPS**：需 modem（`&mpss`）+ QRTR + rmtfs/tqftpserv + ModemManager，独立大工程。
+
+### 设备当前状态（接手时注意）
+
+- 跑的是 **`odin-hog96.dtb`**（在音频版基础上只加了 gpio96 的 gpio-hog，拉低）。
+  `l0-safe` 指向它，重启后依然有效；但 `/tmp` 会被清空 ⇒ 任何播放测试都要先重新
+  传音频文件。回到不带 hog 的版本用 `odin-audio-test.dtb`。
+- 这些都是 `tmp/audio-test/` 下的**试验品**，**没有进 `patches/0007`**（除触摸屏外）。
+  麦克风与扬声器的成果要固化，需要把 `&lpass`、`&sound_card`、`audio-codec@f000`
+  的启用写进 `patches/0007` 并走 CI 验证。
+
+### 重新开工的一句话
+
+> 读 `WORKLOG.md` 最后几节，接着调 ODIN 的音频。第一件事：把 `&lpass`、
+> `&sound_card`、`audio-codec@f000` 的启用写进 `patches/0007`（麦克风这条已验证），
+> 走 CI 出正式版；扬声器按"功放型号"与"LINE_OUT 通路"两个方向继续查。
+
+### 三条方法论（本轮踩过的坑，已单独立节详述）
+
+1. `/tmp` 是 tmpfs，重启即清空 ⇒ 重启后必须先重传测试文件再信播放结果。
+2. ftrace 在这个内核上不产出数据 ⇒ 任何"追踪不到调用"都要先用必调函数做对照。
+3. dyndbg 对模块要用 `module <名> +p`，不是 `file <路径> +p`；且"没日志"推不出
+   "代码没执行"。
+
+另外：原厂 ROM 的 system 是未压缩 squashfs，直接 `grep -a` 就能搜内容，不用解包。
