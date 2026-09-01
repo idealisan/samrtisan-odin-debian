@@ -1666,3 +1666,64 @@ dtb ✅ / kernel ✅ / lk2nd ✅ / rootfs-core ✅ / rootfs-gui ✅ / publish sk
   临时目录 `tmp/battery-probe`、`tmp/patchcheck`、`tmp/pristine-check`、
   `tmp/pristine-check2`、`tmp/ci-artifacts` 与两个 `.odin-bak` 备份都还在，
   等全部完成后再统一整理。
+
+---
+
+## 触摸屏：已可用（2026-09-01 晚）
+
+### 结论
+
+触摸芯片是 **FocalTech FT8716**，与显示集成在同一颗 TDDI 上。用主线的
+`edt-ft5x06` 驱动即可，**不改内核配置、不要固件**。
+
+### 硬件参数是从原厂 DTB 里读出来的，不是猜的
+
+`evidence/stock-rom-battery/odin-stock.dts:6367` 的 `focaltech@38`：
+i2c@78b7000（主线 `&i2c_3`，BLSP1 QUP3）地址 0x38，reset gpio64 /
+irq gpio65，`vcc_i2c-supply` 由 pm8953_l6(1.8V) 供；pinctrl 的驱动强度与
+上下拉逐项对齐原厂 :1808-1895（也与主线 `msm8953-xiaomi-common.dtsi:382-431`
+一致）。同总线还有个 `novatek@01`，那是 NT36672 面板变体的备选，本机不用。
+
+`edt-ft5x06.c:1530` 有 `focaltech,ft8716`；`CONFIG_TOUCHSCREEN_EDT_FT5X06`
+本来就是 `=m`。改动只有 `patches/0007`：`&tlmm` 加 4 个 pin 状态 + 新增
+`&i2c_3` 节点。
+
+真机：`/dev/input/event3` 注册为 `generic ft5x06 (8d)`，划屏读到
+`ABS_MT_POSITION_X=589 / Y=1504 / BTN_TOUCH=1`，坐标在 1080x1920 内。
+
+### 两个非直觉的点（都踩到了）
+
+**1. "触摸 probe failed" 可能是显示那边的锅。**
+FT8716 是 TDDI，要面板先上电才响应。第一次试的时候 probe 失败，翻 dmesg
+才看到背光那边 `qcom,wled ... invalid value for 'qcom,ovp-millivolt'` 又回来了
+—— 因为我做试验 DTB 时拿的底片是**第一轮**（OVP 修复之前）的产物，
+于是背光挂 ⇒ DSI 一直等它 ⇒ 触摸跟着超时。
+换成修复后的底片重做，触摸 5.2 秒就 probe 成功（失败那次 31.9 秒还在重试）。
+
+> 教训：`tmp/ci-artifacts/` 下会同时存在多个轮次的产物，**用之前先核验关键值**，
+> 别默认它是最新的。这个坑让我多烧了一轮重启，还误报了一次"黑屏"。
+
+**2. `&i2c_3` 不再导致无限重启（旧记录已订正）。**
+`WORKLOG.md:1353` 记着"只要启用 &i2c_3 真机就无限重启"，怀疑 BLSP 受
+TrustZone 保护。但 msm8953.dtsi 里那三条 TZ 注释说的是 `&i2c_4`
+（78b8000，传感器），不是 i2c_3 —— 当时是读串了总线。
+本次实测：新基线上启用 `&i2c_3` 一切正常，没有重启（真因未追溯）。
+
+顺带两条操作经验：
+- **`fastboot reboot` 仍然起不来**，但系统内 `sudo reboot` 是通的
+  —— 以后重启走系统内，别指望 fastboot 那条。
+- **`sudo reboot` 是异步的**：命令返回后系统还活着十几秒，
+  `ping` 通不代表已经重启过，要等 sshd 重新可用才算数。
+
+### 远程进 fastboot 那条路走不通（与脚本预期不符）
+
+`flash-all.sh` 20 阶段写的是"改名 extlinux.conf ⇒ lk2nd 找不到配置会停在
+fastboot"。实测是**反复重启**，不是停下 —— 最后是人工按住
+【音量减 + 电源】才停住的。这条脚本注释与文档都需要订正。
+
+### 仍可复用的一个技巧
+
+要在真机上快速试 DTB 改动，**不用等 40 分钟 CI**：
+把 CI 编好的 DTB 反编译 → 改 → 重编译 → scp 到 `/boot/dtbs/qcom/` →
+改 extlinux.conf 的 fdt 指向它 → 系统内 reboot。
+（AGENTS.md 铁律 4：这只能用于探路，不能据此确认"已修好"。）
