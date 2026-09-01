@@ -2184,3 +2184,62 @@ TLV `dBscale-min=-84.00dB,step=1.00dB` ⇒ 124 即 **+40dB**（确认过，
    或 `q6afe` 端口没 start（查 q6afe_port_start 调用路径）
 4. 采集侧已可用（TERT_MI2S_TX + ADC2 MUX=INP3），可作对照：
    看采集时 q6asm 的日志长什么样，与播放的对比差异
+
+### 音频（续）：播放侧排查到"缓冲区不被消费"，附两条差点走错路的方法论教训
+
+#### 客观事实（全部实测）
+
+1. **麦克风已验收通过**：INP3 能录到说话声（用户听录音确认）；INP2 几乎无声（应是降噪副麦）
+2. **播放静默的确凿证据**（环回法，ffmpeg volumedetect）：
+   ```
+   不播放时（环境噪音）: mean=-72.8 dB  max=-49.0 dB
+   播放时 (QUAT_MI2S_RX): mean=-81.3 dB  max=-63.5 dB
+   播放时 (PRI_MI2S_RX) : mean=-80.8 dB  max=-62.7 dB
+   原始歌曲            : mean=-18.2 dB  max=  0.0 dB
+   ```
+   **播放时录到的电平反而比不播放时低 8 dB** ⇒ 扬声器根本没出声，不是"音量小"
+3. **DAPM 全链路 On**（debugfs 逐个确认，播放中抓取）：
+   ```
+   AFE     PRI_MI2S_RX On / Primary MI2S Playback On
+   DIGITAL AIF1 Playback On、I2S RX1 On、RX3 MIX1 On、RX3 MIX1 INP1 On、PDM_RX3 On
+   ANALOG  PDM_RX3 On、SPK DAC On、SPK PA On、SPKR_CLK On、SPK_OUT On
+   AMP     SpkAmp DRV/IN/OUT 全 On（AW8738 功放已上电）
+   ```
+4. **增益已满**：`RX3 Digital Volume` min=0 max=124，当前 124；
+   TLV `dBscale-min=-84.00dB,step=1.00dB` ⇒ 124 = **+40dB**（最大值，确认过）
+5. **PCM 卡住的现场**：
+   ```
+   hw_params: S16_LE / 2ch / 48000 / period_size 6240 / buffer_size 24960
+   status: state=RUNNING  delay=24960(=buffer_size)  avail=0
+   ```
+   ⇒ 缓冲区被填满，ADSP 一个字节都不取
+6. 播放期间 dmesg **零新增**（dmesg 本身已验证可用）
+
+#### 两条差点让我走错路的方法论教训（重要）
+
+1. **ftrace 在这个内核上不产出数据**。我追踪 `q6asm_dai_trigger` 等 7 个函数，
+   filter 全部设置成功，但 `entries-written: 0`，差点得出"q6asm 没被调用"的结论。
+   **做了对照实验才救回来**：追踪 ALSA 核心必调的 `snd_pcm_action` /
+   `snd_pcm_do_prepare`，同样是 0 ⇒ 是 ftrace 无效，不是代码没跑。
+   ⇒ **任何"追踪不到调用"的结论，都必须先用必被调用的函数做对照。**
+
+2. **dyndbg 对模块要用 `module <名> +p`，不是 `file <路径> +p`**。
+   我之前用 `file sound/soc/qcom/qdsp6/* +p` 只匹配到 **7** 条；
+   改成遍历 `lsmod` 的模块名 `module q6asm +p` 后是 **119** 条。
+   （这些驱动都是 `=m`。）
+
+   另外：`q6asm-dai.c` 里 dev_dbg 极少，所以即便 dyndbg 开对了也几乎没输出
+   —— **"没有日志"不能证明"代码没执行"**。
+
+#### 下一步（下一轮从这里开始）
+
+"缓冲区不被消费"最可能的原因，按概率：
+
+a) **BE DAI 的 hw_params/prepare 没被触发** ⇒ `q6afe_port_start()` 没跑
+   ⇒ DSP 不取数据。DAPM widget 显示 On 只代表逻辑上电，不代表 substream
+   参数已下发。要查 DPCM 的 FE↔BE 是否真连上了
+b) `msm8953_qdsp6_add_ops` 这条路径的 dai-link 与本机不匹配
+c) ADSP 固件与驱动协议不完全匹配（venus 那边已经遇到同样的固件协议问题）
+
+最靠谱的对照手段：**拿一台跑 postmarketOS 的 msm8953 机器（如 markw）导出
+全量 mixer 状态，与本机逐项 diff**。手工猜控件名的效率已经到头了。
