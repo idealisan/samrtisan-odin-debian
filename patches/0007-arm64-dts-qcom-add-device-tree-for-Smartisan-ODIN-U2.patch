@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,511 @@
+@@ -0,0 +1,587 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -437,6 +437,82 @@ index 000000000..3dc8f434d
 +		function = "gpio";
 +		drive-strength = <2>;
 +		bias-pull-up;
++	};
++
++	ts_int_active: ts-int-active-state {
++		pins = "gpio65";
++		function = "gpio";
++		drive-strength = <8>;
++		bias-pull-up;
++	};
++
++	ts_int_suspend: ts-int-suspend-state {
++		pins = "gpio65";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-pull-down;
++	};
++
++	ts_reset_active: ts-reset-active-state {
++		pins = "gpio64";
++		function = "gpio";
++		drive-strength = <8>;
++		bias-pull-up;
++	};
++
++	ts_reset_suspend: ts-reset-suspend-state {
++		pins = "gpio64";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-pull-down;
++	};
++};
++
++/* ---------------------------------------------------------------- 触摸屏
++ *
++ * ODIN 的触摸芯片是 **FocalTech FT8716**，与显示驱动集成在同一颗 TDDI 上
++ * （patches/0005 的标题就是 "FocalTech FT8716 TDDI-based 1080x1920"）。
++ * 硬件参数全部取自原厂安卓包的反编译设备树
++ * evidence/stock-rom-battery/odin-stock.dts:6367 的 focaltech@38：
++ *   i2c@78b7000（主线 &i2c_3，BLSP1 QUP3）地址 0x38，
++ *   reset gpio64 / irq gpio65，vcc_i2c 由 pm8953_l6(1.8V) 供；
++ *   pinctrl 的驱动强度与上下拉逐项对齐原厂 :1808-1895
++ *   （也和主线 msm8953-xiaomi-common.dtsi:382-431 一致）。
++ *
++ * 驱动用主线的 `edt-ft5x06`（drivers/input/touchscreen/edt-ft5x06.c:1530
++ * 有 `focaltech,ft8716`），CONFIG_TOUCHSCREEN_EDT_FT5X06 已经是 =m，
++ * **不需要动内核配置，也不需要固件**。
++ * compatible 写两个：先试精确型号，退回到 edt-ft5406 的通用行为。
++ *
++ * 2026-09-01 真机验证：/dev/input/event3 注册为 "generic ft5x06 (8d)"，
++ * 划屏能读到 ABS_MT_POSITION_X/Y 与 BTN_TOUCH，坐标在 1080x1920 内。
++ *
++ * 两点要注意：
++ *   1) 这颗 TDDI **要有面板先上电才响应**。背光（&pmi8950_wled）一旦
++ *      probe 失败，DSI 会一直等它，触摸也就跟着 probe 超时失败
++ *      —— 所以"触摸 probe failed"有时是显示那边的锅，别只盯着触摸。
++ *   2) 换屏（NT36672 等）时触摸芯片也跟着换，那要另配节点；本文件目前
++ *      写死 FT8716 一套（与 extlinux.conf 里面板写死的做法一致）。
++ */
++&i2c_3 {
++	status = "okay";
++
++	touchscreen@38 {
++		compatible = "focaltech,ft8716", "edt,edt-ft5406";
++		reg = <0x38>;
++
++		interrupt-parent = <&tlmm>;
++		interrupts = <65 IRQ_TYPE_EDGE_FALLING>;
++
++		pinctrl-names = "default", "sleep";
++		pinctrl-0 = <&ts_int_active &ts_reset_active>;
++		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
++
++		reset-gpios = <&tlmm 64 GPIO_ACTIVE_LOW>;
++		iovcc-supply = <&pm8953_l6>;
++
++		touchscreen-size-x = <1080>;
++		touchscreen-size-y = <1920>;
 +	};
 +};
 +
