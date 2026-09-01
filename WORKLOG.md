@@ -1788,3 +1788,90 @@ Plasma 那 850 秒内部（按分钟桶统计 dpkg 输出）：
 这次能定位准，靠的是**先按分钟统计日志行分布**再下结论：
 一眼看出 12:00–12:08 只有 Unpacking、Setting up 几乎为零，于是矛头直接指向
 解包而不是"包太多"或"网络慢"。以后排查构建耗时都该先画这个分布。
+
+---
+
+## 麦克风/扬声器、蓝牙、GPS、视频编解码：一轮摸底（2026-09-01 深夜）
+
+方法照旧：**先在真机上实测现状**，再对原厂 DTB 与 pmOS/主线源码，不靠猜。
+
+### 1. 蓝牙 —— 已可用（本轮搞定）
+
+内核侧本来就是好的，缺的只有用户态：
+
+- 主线 `btqcomsmd` 走 SMD 通道（`APPS_RIVA_BT_ACL` / `APPS_RIVA_BT_CMD`），
+  固件与 WiFi 共用 `wcnss.*`（odin-wlan-fw.sh 已取）
+- DTB 里 `wcnss_bt`（`qcom,wcnss-bt`）由 msm8953.dtsi 提供、默认启用
+- 真机：`hci0` 直接存在，控制器 `02:00:67:DB:FE:B8 (public)`、Powered: yes
+  —— **是 public 地址，不用手动 `btmgmt public-addr`**
+- 装上 bluez 后 20 秒扫描扫到 10 台周边设备（LYWSD03MMC 温湿度计、
+  一台 Apple 设备 RSSI -68）
+
+改的只有包清单：`bluez`（两变体）+ gui 的 `bluez-obexd`、`libspa-0.2-bluetooth`、
+`pipewire-alsa`。**没动 DTB、没加固件、没加 udev 规则。**
+
+### 2. 音频（内置扬声器 + 麦克风）—— 路径清楚，本轮只摸清没动手
+
+- 现状：`cat /proc/asound/cards` → `--- no soundcards ---`；
+  `devices_deferred` 里 `c0f0000.codec msm8916-wcd-digital-codec: failed to get mclk`
+- 真因：**`&lpass`（ADSP remoteproc，msm8953.dtsi:3076）没启用** ⇒
+  `q6afecc` 时钟控制器没注册 ⇒ codec 拿不到 mclk。
+  mclk 是 LPASS 内部产生的 9.6MHz，**不是某个 GPIO** —— 所以不是 pin 配错
+- 三个节点在我们 DTB 里全是 disabled：`remoteproc@c200000`(ADSP)、
+  `sound-card@c051000`、`remoteproc@4080000`(modem)
+- 硬件（原厂 DT）：无独立 wcd9xxx / slimbus（tasha、wcd9xxx-irq、audio_ext_clk
+  全 disabled），用 PM8953 下 `8953_wcd_codec@f000`，digital 基址 `0xc0f0000`。
+  **本机无耳机孔**，只有 `qcom,msm-ext-pa = "primary"` 一路外部功放
+- 固件：`adsp.mdt` + `adsp.b03/b04/b05/b10/b13` 在 **modem:/image/**（不在 dsp 分区！
+  dsp 分区里全是 Android 的用户态 DSP 库：DTS_HPX、DolbyMobile、fastrpc_shell…）
+- 待定：内置扬声器功放是不是 AW8738。原厂只给 `ext-pa-enable = gpio132`，
+  markw 用 `awinic,aw8738` 挂 gpio96 —— 要对一下
+
+修法：启用 `&lpass` → 固件脚本取 adsp.* → 启用 `&sound_card`（model/routing/pinctrl）
+→ 用户态 `alsa-ucm-conf` + `alsa-utils`。顺序不能颠倒。
+
+### 3. 视频编解码（venus）—— 看似简单，实际卡在固件握手
+
+- 节点 `venus@1d00000` 默认已启用，`CONFIG_VIDEO_QCOM_VENUS=m` 已开，
+  模块 `venus_core` 等已加载 —— **看起来只差固件**
+- 实测把 `venus.mdt` + `venus.b00~b04` 从 modem:/image/ 拷进 /lib/firmware 后，
+  `venus.mdt failed with error -2` 确实消失了，**但冒出新错误**：
+  ```
+  qcom-venus 1d00000.venus: Unsupported property: 0
+  qcom-venus 1d00000.venus: probe with driver qcom-venus failed with error -5
+  ```
+- `Unsupported property` 是 `hfi_parser.c:383` 的 `dev_warn_once`（只打一次，
+  实际可能有多个属性不认识）；`-5` = `-EIO`，来自 `hfi.c` 的 HFI 命令封装
+  ⇒ **是固件握手失败**：这版 venus 固件（2018 年 Android 7.1）的能力表/初始化
+  协议与主线 venus 驱动对不上。**不是缺文件的问题**，要单独立项排查，别当"简单活"
+
+### 4. GPS —— 大工程，不在这轮
+
+- 主线没有 QCOM 的 GNSS 驱动（`drivers/gnss/Kconfig` 只有 MTK/SiRF/u-blox），
+  本机 `CONFIG_GNSS` 也未开 ⇒ **内核 GNSS 子系统这条路不存在**
+- 定位由基带跑，经 **QRTR 上的 QMI LOC 服务**暴露给 AP。
+  本机 `&mpss`(modem) 未启用 ⇒ 没有 QRTR/QMI
+- 需要：启用 `&mpss`（脚本注释说要 `pll-supply = <&pm8953_l7>`）+ modem 固件
+  （mba.mbn、modem.mdt + b05~b20 都在 modem:/image/）+ `rmtfs`/`tqftpserv`
+  + ModemManager/libqmi/geoclue。**Debian 有没有现成的 rmtfs/tqftpserv 包未确认**
+- `gpsd` 不适用（没有串口 GPS，也没有 /dev/gnss*）
+- 注意：pmOS wiki 说 msm8953 GPS=Works，但那次取证里 QRTR 根本没起来，
+  不能当作本机已通的证据
+
+### 5. 一条很实用的操作技巧：让设备上网
+
+设备本身只有 USB 那条 172.16.42.0/24，没有外网。用 SSH 远程端口转发把本机的
+代理给它即可（本机 10808 上有代理）：
+
+```sh
+ssh -f -N -R 10808:127.0.0.1:10808 user@172.16.42.1
+apt-get -o Acquire::http::Proxy=http://127.0.0.1:10808 install bluez
+```
+
+实测 6.3 MB 走 13 秒。以后要在真机上现场装包排查都靠这个。
+
+踩到的两个坑：
+- 无网络时 `apt-get update` **不会超时退出**，会一直挂着占住
+  `/var/lib/apt/lists/lock`，之后所有 apt 都报 lock 错误 —— 要 `pkill -9 apt-get`
+- sshd 没设 MaxStartups（默认 10:30:60），密集轮询时会被概率性丢连接，
+  表现为间歇性 `Permission denied (publickey,password)`，**不是密码错**，等一会重试即可
