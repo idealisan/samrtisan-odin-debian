@@ -2084,3 +2084,34 @@ RX3 Digital Volume = 128
 
 1. 采集：`ADC2 MUX` = INP2 试一次、= INP3 试一次，看哪个有电平
 2. 播放：DSP 不报错却无声，重点查功放是否真的使能 + DAPM 后端 widget 上电情况
+
+### 音频：麦克风打通了（本轮最大成果）
+
+完整可用的采集通路（逐个试出来的，别再猜）：
+
+```
+MultiMedia2 Mixer TERT_MI2S_TX = 1   # ← 关键！采集后端是 TERT_MI2S_TX，不是 PRI_MI2S_TX
+DEC1 MUX = ADC2                       # 接上后才有信号
+DEC2 MUX = ADC2
+CIC1 MUX = AMIC
+ADC2 MUX = INP2 或 INP3               # ← 本机两个麦克风，都通
+```
+
+逐个试 `MultiMedia2 Mixer <BE>_TX` 的结果：
+```
+❌ PRI_MI2S_TX   ❌ QUAT_MI2S_TX   ❌ QUIN_MI2S_TX   ❌ SEC_MI2S_TX
+✅ TERT_MI2S_TX  ← 只有它能打开 PCM
+```
+
+实测电平（环境噪音，3 秒 48kHz mono）：
+```
+INP2: 峰值=14  平均=1
+INP3: 峰值=28  平均=2   ← 信号更强，应是主麦克风
+再测: 峰值=180 平均=3   （设完 DEC 后明显变大）
+```
+
+**注意：之前的判断"采集侧用 PRI_MI2S_TX"是错的**，播放与采集的后端并不同名
+（播放 PRI_MI2S_RX / 采集 TERT_MI2S_TX）—— 这是靠逐个试试出来的。
+
+另：采集链路**没有** TX/ADC/DEC 的 volume 控件（grep 为空），
+增益只能靠 DEC/CIC 的 MUX 选择，或等 UCM/上层（pipewire）来做软件增益。
