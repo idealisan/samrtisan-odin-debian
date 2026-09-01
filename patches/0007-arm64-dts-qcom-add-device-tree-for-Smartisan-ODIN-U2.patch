@@ -18,9 +18,9 @@ Add initial support for the Smartisan ODIN (U2 Pro), an MSM8953
 - Volume keys, console UART, ramoops
 
 背光与 GPU 两处按实机结果修正：
-- &pmi8950_wled 去掉 qcom,external-pfet / qcom,cabc，qcom,ovp-millivolt
-  由 29500 改为 29600（29500 不在 qcom-wled.c 的合法值表内，probe -EINVAL
-  会导致背光设备创建失败，整条显示链路断掉）
+- &pmi8950_wled 去掉 qcom,external-pfet / qcom,cabc；qcom,ovp-millivolt
+  取值见正文注释（2026-09-01 换基线后定为 29500，此前一段时间写的是 29600，
+  两张合法表的取值不同，写错会 probe -EINVAL、整条显示链路断掉）
 - 新增 &gpu { status = "okay"; }（msm8953.dtsi 里 gpu 默认 disabled，
   不启用会 "msm_mdp: no GPU device was found"）
 
@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,501 @@
+@@ -0,0 +1,511 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -216,17 +216,27 @@ index 000000000..3dc8f434d
 +	 * 现对齐真机已验证可用的 markw 配置（只有下面三项，实测出 backlight 正常）。
 +	 */
 +	/*
-+	 * 取值必须落在 drivers/video/backlight/qcom-wled.c 的值表内（WLED4，
-+	 * 即 qcom,pmi8950-wled），否则 probe 直接 -EINVAL：
-+	 *   qcom,ovp-millivolt       合法表 = { 31100, 29600, 19600, 18100 }
-+	 *                            原写 29500 不在表内 ⇒ "invalid value for
-+	 *                            'qcom,ovp-millivolt'" ⇒ 背光失败 ⇒ 整条
-+	 *                            显示链路断（无 /dev/dri、黑屏）
++	 * 取值必须落在 drivers/video/backlight/qcom-wled.c 的值表内，否则 probe
++	 * 直接 -EINVAL ⇒ 背光设备创建失败 ⇒ panel@0 拿不到 backlight ⇒ 整条
++	 * 显示链路断（无 /dev/dri、黑屏）。
++	 *
++	 * 2026-09-01 修正：换基线后这个值被翻回了 29500。
++	 *   qcom-wled.c:1465 规定 `qcom,pmi8950-wled` 走的是 **pmi8994 那套**配置，
++	 *   不是 WLED4 那套 —— 两张表的 ovp 值不同：
++	 *     wled4_ovp_values[]        = { 31100, 29600, 19600, 18100 }
++	 *     pmi8994_wled_ovp_values[] = { 31000, 29500, 19400, 17800 }  ← 本机型用这张
++	 *   本项目历史上先写 29500（被当时那张表拒）改成 29600；换基线后映射切到
++	 *   pmi8994 表，29600 又被拒，真机报错就是
++	 *     qcom,wled 200f000.spmi:pmic@3:leds@d800: invalid value for 'qcom,ovp-millivolt'
++	 *     qcom,wled ... probe with driver qcom,wled failed with error -22
++	 *   ⇒ 背光起不来 ⇒ DSI 在 devices_deferred 里一直等背光 ⇒ msm_drm 不绑定。
++	 *   注意：pmic@3 本身是启用的（pmi8950.dtsi 里没写 status），别往那边查。
++	 *
 +	 *   qcom,current-limit-microamp 合法表 = { 0, 2500, ... 20000 ... 30000 }
 +	 *   qcom,num-strings             合法范围 = 1 .. max_string_count(4)
 +	 */
 +	qcom,current-limit-microamp = <20000>;
-+	qcom,ovp-millivolt = <29600>;
++	qcom,ovp-millivolt = <29500>;
 +	qcom,num-strings = <2>;
 +
 +	label = "backlight";
