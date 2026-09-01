@@ -2045,3 +2045,42 @@ UCM 里已经写好的关键内容（这些实测确认过，可直接复用）�
   `SPK DAC`=1、`RX1/RX2 Digital Volume`=84
 - Mic EnableSequence：`MultiMedia2 Mixer PRI_MI2S_TX`=1、
   `ADC2 MUX`='AMIC2'、`ADC2`=1
+
+### 音频（再续）：播放侧控件已全通，但仍无声；采集侧找到两处错误
+
+#### 播放侧：控件全设上了，且 DSP 不再报错
+
+设完这四个后，播放**不再产生 "q6asm_dai_prepare: stream reg failed -22"**
+（此前每次播放必现）⇒ DSP 侧路由已通：
+```
+PRI_MI2S_RX Audio Mixer MultiMedia1 = on     # AFE 通路（q6routing）
+SPK DAC Switch = on                          # 注意是 SPK DAC，不是 EAR
+RX3 MIX1 INP1  = RX1                         # 可选值 ZERO/IIR1/IIR2/RX1/RX2/RX3
+RX3 Digital Volume = 128
+```
+
+**关于听筒 vs 外放（用户的提醒，已核实）**：
+含 EAR/SPK 的控件**只有 `EAR_S` 和 `SPK DAC` 两个** —— 没有 "EAR DAC"，
+所以设 `SPK DAC` 走的就是**外放扬声器**，不是听筒。这点没搞错。
+
+**但真机仍然听不到声音**。DSP 不报错 ≠ 有声音，下一步要查：
+- AW8738 功放是否真的被拉起来（gpio132 虽是 out high，但 aux-devs 是否生效）
+- 是否需要走 `PIN_SWITCH` / `AUX PCM` 而不是 PDM
+- codec 侧 `SPK` 之后到外部功放的 DAPM widget 有没有上电
+
+#### 采集侧：两处明确错误（下次直接改）
+
+1. **`ADC2 MUX` 的可选值是 `ZERO / INP2 / INP3`，不是 AMIC2**
+   —— 之前 `cset name="ADC2 MUX" 'AMIC2'` 匹配失败，值落在 0（ZERO，即静音）。
+   正确值是 **INP2 或 INP3**（正好对应用户说的本机有两个麦克风，要分别试）
+2. **`ADC1` / `ADC2` / `ADC3` 这些控件根本不存在**（设了返回空），
+   之前脚本里对它们 cset 全是无效操作
+3. 控件里**没有任何含 AMIC / MIC BIAS 名字的项** ⇒ routing 里的
+   "MIC BIAS External1/Internal2" 是 DAPM 静态路由，不是独立 mixer 控件
+4. `Audio Mixer MultiMedia2` 结尾的控件**只有 RX 方向** ⇒ 采集侧必须用
+   `MultiMedia2 Mixer <BE>_TX`（这个写法是对的）
+
+#### 下一步（按顺序）
+
+1. 采集：`ADC2 MUX` = INP2 试一次、= INP3 试一次，看哪个有电平
+2. 播放：DSP 不报错却无声，重点查功放是否真的使能 + DAPM 后端 widget 上电情况
