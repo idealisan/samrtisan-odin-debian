@@ -2459,3 +2459,51 @@ b) **外部功放没被正确使能** —— 原厂只给了 `ext-pa-enable = gp
 原厂 ROM 的 system 是 squashfs 但**数据未压缩**，所以不需要 simg2img/unsquashfs，
 直接 `grep -a` 就能搜到 XML 内容；提取某个 <path> 的完整定义用 Python 找
 `<path name="xxx">` 到 `</path>` 之间的字节即可。比先解包快得多。
+
+### ⚠️ 我测试中的严重错误（必读，别再犯）
+
+**`/tmp` 是 tmpfs，重启即清空。** 我多次重启设备后直接跑 `aplay /tmp/song.wav`，而文件早已不存在 —— `aplay` 报
+`No such file or directory` 后立刻退出。**那些"播放"全是空放**，据此得出的
+"链路全通但不出声"里，至少有一批数据是废的。
+
+**修正后的重测（文件确实在，5.7MB，aplay 正常显示 Playing）：**
+```
+底噪（不播放）  : 峰值=11 平均=0
+播放时录到      : 峰值=10 平均=0
+```
+⇒ **结论不变：扬声器确实不响。** 但从此以后，**每次重启后第一件事必须是重新上传测试音频**，
+并用 `ls -l` 确认，再相信播放结果。
+
+顺带记一个诊断手法：判断"播放到底有没有真的跑"，看 aplay 是否立刻返回 + 是否有 `Playing WAVE` 输出，
+以及 `hw_ptr` 是否推进（详见前面一节）。
+
+### 本轮其它实测结论
+
+1. **gpio-hog 抢 gpio132 会让整个声卡消失**（`no soundcards`）
+   ⇒ 反证 `aw8738` 驱动确实在依赖 `mode-gpios = <&tlmm 132>`。
+2. **只 hog gpio96（拉低）不会破坏声卡**，重启后 `smartisan-odin` 正常注册；但也没带来声音。
+3. 该内核**没开 sysfs GPIO**（`/sys/class/gpio` 不存在），也没有 `gpioset`/libgpiod 工具
+   ⇒ 运行期改 GPIO 电平只能靠设备树的 `gpio-hog`。
+4. Android 的 speaker 通路（从原厂 ROM 挖出）是 `RX3 MIX1 INP1=RX1` + `SPK=Switch`；
+   本机有前者、**没有 `SPK` 控件**（只有 `SPK DAC`），但 DAPM 里 SPK 全链已 On。
+
+### 收尾时的总状态
+
+| 项 | 状态 |
+|---|---|
+| 触摸屏 | ✅ 可用（FT8716 + 主线 edt-ft5x06） |
+| 蓝牙 | ✅ 可用（hci0 + bluez，扫到 10 台） |
+| 麦克风 | ✅ 可用（INP3 主麦，用户听录音确认） |
+| 扬声器 | ❌ 未通：静态链路全 On、数据流动、增益满、零报错，但物理不发声 |
+| 视频 venus | ❌ 固件 HFI 握手 -EIO（协议不匹配） |
+| GPS | ⏸ 需 modem + QRTR + rmtfs/tqftpserv |
+
+### 扬声器剩下的两个方向（下一轮）
+
+1. **功放型号** —— 原厂 DT 只有一个 `ext-pa-enable=gpio132`，没有型号；
+   `awinic,aw8738` 是我们照抄 markw 的。请拆机看功放丝印。
+2. **LINE_OUT 通路** —— Android 的第二版 speaker 定义走 `LINE_OUT` 而非 SPK；
+   DAPM 里 `LINEOUT`/`LINEOUT PA`/`LINEOUT_OUT` 现在全 Off，值得拉起来试。
+
+（注：设备当前跑的是 `odin-hog96.dtb【只 hog 了 gpio96】；要回到有声卡但不 hog 的状态用
+`odin-audio-test.dtb`。）
