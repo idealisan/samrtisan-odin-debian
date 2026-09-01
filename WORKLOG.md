@@ -1911,3 +1911,45 @@ apt-get -o Acquire::http::Proxy=http://127.0.0.1:10808 install bluez
 
 注：本轮所有改动都在 `tmp/audio-test/`（试验 DTB 与脚本），**还没进 patches/0007**。
 等真机出声后再固化。
+
+### 音频：打通了 PCM，但播放几乎无声、采集录到全零（进展 + 现状）
+
+#### 关键突破：PCM 打不开的根因是 q6routing 没设，不是 DTB 问题
+
+之前 `aplay` 一直 `Invalid argument`。逐个试探后确认：**设上 AFE 端口通路就能打开**。
+
+- 播放侧控件命名：`<端口>_RX Audio Mixer MultiMediaN`
+  可用端口：PRI_MI2S_RX / QUAT_MI2S_RX / QUIN_MI2S_RX / TERT_MI2S_RX /
+  SEC_MI2S_RX / PRIMARY_TDM_RX_0..7 / DISPLAY_PORT_RX 等
+- 采集侧命名是**反的**：`MultiMediaN Mixer <端口>_TX`
+  （PORT_TX Audio Mixer MultiMediaN 这种写法不存在，设了返回空）
+
+设上 `PRI_MI2S_RX Audio Mixer MultiMedia1` = on 后：
+`aplay -D plughw:0,0` 在 44100/48000、S16_LE、2 声道下**都能打开**。
+
+#### 现状（都还差最后一步）
+
+- **播放**：speaker-test 跑完 rc=0、缓冲区分配正常（buffer_size=130560），
+  但真机只听到"很短暂的、很小的震动声"，几乎听不见。
+  音量不是原因：`RX1/RX2 Digital Volume` 当前 = **84**，该控件
+  `dBscale-min=-84.00dB, step=1.00dB`，所以 84 就是 **0dB 满音量**。
+  ⇒ 怀疑是**外部功放（AW8738）没真正打开**：`snd_soc_aw8738` 模块是加载了，
+  但 aux-devs / mode-gpios(gpio132) 是否真的把功放使能，还没验证。
+  下一步：确认 AW8738 的 mode 引脚电平；对比 markw（它用 gpio96 + awinic,mode=<5>）。
+- **采集**：`MultiMedia2 Mixer PRI_MI2S_TX` = on 后 arecord 能开、能录满 3 秒
+  （288044 字节 = 3×48000×2+44，长度完全正确），**但内容是全零**
+  （144000 个样本，峰值 0、平均 0）⇒ 通路设了但音频没进来。
+  下一步：MIC BIAS / AMIC 输入选择（`ADC1/ADC2/ADC3`、MIC BIAS External1/Internal2）
+  还没设；markw 的 routing 里有 "AMIC2", "MIC BIAS Internal2"，本机是内置麦克风，
+  很可能要走 Internal2 而不是 External。
+
+#### 还要补的（与 markw 的差异）
+
+markw 的 `&sound_card` 比我多两条路由：`MM_DL3`→MultiMedia3 Playback、
+`MM_DL4`→MultiMedia4 Playback。实测 **device 2（MultiMedia3）确实打不开**，
+正好对上 —— 补上这两条应该就能用。
+
+#### 一条重要的操作经验
+
+`aplay -l` 偶尔会报 "no soundcards found"，但 `/proc/asound/cards` 里卡是在的
+—— 是瞬时状态，重跑就好，别当成"声卡没了"。
