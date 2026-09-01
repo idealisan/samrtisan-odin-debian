@@ -2115,3 +2115,72 @@ INP3: 峰值=28  平均=2   ← 信号更强，应是主麦克风
 
 另：采集链路**没有** TX/ADC/DEC 的 volume 控件（grep 为空），
 增益只能靠 DEC/CIC 的 MUX 选择，或等 UCM/上层（pipewire）来做软件增益。
+
+### 音频（终）：播放后端确认 + 找到"假播放"现象；我的测试脚本自己污染过结果
+
+#### 播放后端确认：是 PRI_MI2S_RX，不是 TERT（纠正上一节的猜测）
+
+上一节我推断"采集用 TERT_MI2S_TX，播放可能也该用 TERT_MI2S_RX"——**实测证明是错的**：
+```
+PRI_MI2S_RX: aplay 能开 PCM、state=RUNNING 稳定保持 10 秒
+TERT_MI2S_RX: 连 PCM 都打不开（state 为空）
+```
+播放与采集的后端确实不同名，但**不是对称的那一对**：
+- 播放 → `PRI_MI2S_RX Audio Mixer MultiMedia1`
+- 采集 → `MultiMedia2 Mixer TERT_MI2S_TX`
+
+#### 真正的核心现象：PCM "假播放"，缓冲区塞满但 DSP 不消费
+
+播放中读 `/proc/asound/card0/pcm0p/sub0/status`：
+```
+state: RUNNING
+delay: 24960        ← 正好等于 buffer_size
+avail: 0            ← 缓冲区被填满，一个字节都没被取走
+avail_max: 18720    ← 曾经释放过约 3 个 period，之后就停了
+```
+hw_params 正常（S16_LE / 2ch / 48000 / period 6240 / buffer 24960），
+dmesg 期间无报错。也就是 **aplay 不报错、状态 RUNNING，但 ADSP 不取数据**。
+
+对照内核机制（`q6asm-dai.c` 的 `event_handler`，见 lkml 2025-10 的
+"q6asm-dai: schedule all available frames" 补丁讨论）：
+```
+ASM_CLIENT_EVENT_CMD_RUN_DONE     → 送第一块数据
+ASM_CLIENT_EVENT_DATA_WRITE_DONE  → snd_pcm_period_elapsed() 推进 ALSA 指针
+```
+**只有 DSP 回 DATA_WRITE_DONE，ALSA 指针才推进**。avail=0 即"DSP 没回报"。
+
+#### DAPM 全链路确认为 On（断点不在上电）
+
+播放中逐个读 debugfs：
+```
+AFE     PRI_MI2S_RX On / Primary MI2S Playback On
+DIGITAL AIF1 Playback On / I2S RX1 On / RX3 MIX1 On / RX3 MIX1 INP1 On / PDM_RX3 On
+ANALOG  PDM_RX3 On / SPK DAC On / SPK PA On / SPKR_CLK On / SPK_OUT On
+AMP     SpkAmp DRV/IN/OUT 全 On（aw8738 功放已上电）
+```
+增益也已拉满：`RX3 Digital Volume` min=0 **max=124**，当前 124；
+TLV `dBscale-min=-84.00dB,step=1.00dB` ⇒ 124 即 **+40dB**（确认过，
+124 就是最大，不是"小数字"）。听筒/外放也确认过：含 EAR/SPK 的控件
+只有 `EAR_S` 与 `SPK DAC` 两个，无 EAR DAC，设 SPK DAC 走的是外放。
+
+#### ⚠️ 我自己踩的坑：测试脚本会污染结果
+
+`be.sh` / `sample.sh` 每轮循环都把"其它后端" `cset ... 0`，
+最后一遍把 **PRI_MI2S_RX 也清掉了**，导致后续 aplay 报
+`q6asm_dai_prepare: stream reg failed -22`、看起来"回到起点"。
+**教训：这类"清掉其它后端"的循环，收尾后必须把目标后端恢复。**
+现在已恢复（`PRI_MI2S_RX Audio Mixer MultiMedia1 = 1`），
+播放返回码 124（跑满 7 秒被 timeout 中断，无报错）。
+
+#### 下一步（按顺序，别再瞎试后端了）
+
+1. 用 dyndbg 抓 q6asm/q6afe/q6adm 日志。注意这些是**模块**，
+   `file ... +p` 匹配不到，要用 `module <名> +p`。相关模块名：
+   `q6asm q6asm_dai q6afe q6afe_dai q6afe_clocks q6adm q6routing q6core
+    snd_q6dsp_common snd_soc_apq8016_sbc snd_soc_msm8916_digital`
+2. 重点看有没有 `ASM_CLIENT_EVENT_DATA_WRITE_DONE` / `CMD_RUN_DONE`
+   —— 若没有，说明 DSP 侧 stream 没真正 run（查 q6asm_run 的返回）
+3. 若 DSP 始终不回报，怀疑 AFE 端口的采样率/时钟配置没下发，
+   或 `q6afe` 端口没 start（查 q6afe_port_start 调用路径）
+4. 采集侧已可用（TERT_MI2S_TX + ADC2 MUX=INP3），可作对照：
+   看采集时 q6asm 的日志长什么样，与播放的对比差异
