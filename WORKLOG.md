@@ -1953,3 +1953,72 @@ markw 的 `&sound_card` 比我多两条路由：`MM_DL3`→MultiMedia3 Playback�
 
 `aplay -l` 偶尔会报 "no soundcards found"，但 `/proc/asound/cards` 里卡是在的
 —— 是瞬时状态，重跑就好，别当成"声卡没了"。
+
+### 音频：根因锁定 —— 缺 UCM profile（内核日志自己给了诊断）
+
+#### 决定性证据
+
+内核打印：
+```
+MultiMedia1: ASoC: no backend DAIs enabled for MultiMedia1, possibly missing
+ALSA mixer-based routing or UCM profile
+```
+**内核自己把诊断写出来了**：缺 mixer-based routing 或 UCM profile。
+
+#### 完整因果链（从现象到源码）
+
+1. 现象：aplay 报 "Playing WAVE ..." 看着成功，但一点声音都没有；
+   arecord 能录满时长但内容全零
+2. dmesg：`q6asm-dai ... q6asm_dai_prepare: stream reg failed ret:-22`
+3. 定位源码 `sound/soc/qcom/qdsp6/q6asm-dai.c:265`：失败的是
+   **`q6routing_stream_open()`**，不是 open/format 的问题
+4. `q6routing.c:375` 的判定：
+   ```c
+   session = &routing_data->sessions[stream_id - 1];
+   if (session->port_id < 0) {
+       dev_err(..., "Routing not setup for MultiMedia%d Session\n", ...);
+       return -EINVAL;          // 就是那个 -22
+   }
+   ```
+   `session->port_id` 由 mixer 控件 `<BE>_RX Audio Mixer MultiMediaN` 设置
+5. **但手工 `amixer cset` 只填了 port_id，没有让 DAPM 把 backend DAI 使能**
+   —— 所以 backend 仍 disabled，`q6routing_stream_open` 之后一路失败。
+   内核那句 "no backend DAIs enabled" 说的正是这个
+
+#### 已排除的（别再查一遍）
+
+- 音量：`RX1/RX2 Digital Volume = 84`，该控件 `min=-84dB step=1dB`
+  ⇒ 84 = **0dB 满音量**，不是音量的锅
+- 功放：`aw8738` 驱动已绑定（`/sys/bus/platform/drivers/aw8738/audio-amplifier`），
+  **gpio132 = out high**（驱动已把 mode 脚拉高），功放是使能的
+- ADM 侧 `MultiMedia1 Mixer PRI_MI2S_RX`：**该控件不存在**。
+  `MultiMediaN Mixer <端口>` 只有 TX 方向（采集），播放方向只有
+  `<端口>_RX Audio Mixer MultiMediaN` 这一种写法
+
+#### 控件命名（已实测确认，很有用）
+
+- 播放：`<端口>_RX Audio Mixer MultiMediaN`
+  可用端口：PRI_MI2S_RX / QUAT_MI2S_RX / QUIN_MI2S_RX / TERT_MI2S_RX /
+  SEC_MI2S_RX / PRIMARY_TDM_RX_0..7 / DISPLAY_PORT_RX ...
+- 采集（**命名是反的**）：`MultiMediaN Mixer <端口>_TX`
+  （`PRI_MI2S_TX Audio Mixer MultiMedia2` 这种写法不存在，设了返回空）
+- 含 SPK 的控件实际**只有 `SPK DAC` 一个**（不是 SPK DAC Switch）
+
+#### 下一步（就一件事）
+
+**写 UCM profile**，声卡名 `smartisan-odin`（UCM 按声卡名匹配），
+或引进 pmOS 那套 `alsa-ucm-conf`（msm8953-mainline 的 fork，
+bookworm 自带包里没有 msm8953 profile）。
+
+UCM 要做的两件事：
+1. 设 mixer 控件（`<BE>_RX Audio Mixer MultiMediaN` = on）
+2. **设 DAPM 路由把 backend DAI 使能** —— 这一步手工 amixer 做不到，是当前的卡点
+
+可参照 `msm8953-xiaomi-markw.dts` 的 `&sound_card`（model = "xiaomi-markw"、
+aux-devs = <&speaker_amp>、audio-routing 含 MM_DL1/DL3/DL4、
+pinctrl 用 cdc_pdm_lines_act / _2_act / comp_lines_act）与 pmOS 的 ucm2 配置。
+
+关于多麦克风（用户的提醒）：本机原厂 DT 里 codec 只有一套
+（`8953_wcd_codec@f000`），routing 里 AMIC1/AMIC2/AMIC3 分别走
+MIC BIAS External1 / Internal2 / External1。内置麦克风很可能要走
+**Internal2**（AMIC2），而不是 External —— 等 UCM 通了再逐个试。
