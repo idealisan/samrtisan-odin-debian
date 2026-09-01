@@ -1,0 +1,15 @@
+[Unit]
+Description=Provision Qualcomm venus video codec firmware from factory modem partition
+Documentation=file:/usr/local/sbin/odin-venus-fw.sh
+# 正确时序在 initramfs（switch_root 之前）里已经做过一遍，这里是兜底：
+# venus 是模块，缺固件 probe 失败后不会自己重试，所以必要时重载一次。
+After=local-fs.target systemd-modules-load.service
+
+[Service]
+Type=oneshot
+# 取不到最坏只是没有硬件编解码，绝不能因为这一步把启动拖住或搞挂
+ExecStart=/usr/local/sbin/odin-venus-fw.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

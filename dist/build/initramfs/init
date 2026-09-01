@@ -86,6 +86,21 @@ if [ -x /sbin/odin-wlan-fw.sh ]; then
     fi
 fi
 
+# venus（视频硬编解码）固件同样是 modem:/image/ 里的 PIL 映像，同样的时序要求：
+# qcom-venus 是 platform 驱动，开机早期就会被 udev 加载并立刻 request_firmware
+# ("venus.mdt")。必须在这里备好，让驱动的第一次请求就成功。
+if [ -x /sbin/odin-venus-fw.sh ]; then
+    if /sbin/odin-venus-fw.sh /mnt --check; then
+        echo "[initramfs] venus 固件已在位"
+    else
+        echo "[initramfs] 取出 venus 固件"
+        mount -o remount,rw /mnt 2>/dev/null
+        /sbin/odin-venus-fw.sh /mnt
+        sync
+        mount -o remount,ro /mnt 2>/dev/null
+    fi
+fi
+
 # 注意：此处不得 umount /mnt —— 根必须保持挂载态供 switch_root 使用；
 # 只读挂载由 systemd 依 fstab 重挂为 rw。
 kill %1 %2 2>/dev/null

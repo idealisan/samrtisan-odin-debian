@@ -258,6 +258,16 @@ chroot $R apt-get update -qq
 # 缺的只有用户态 bluetoothd —— 装上即能用：20 秒扫描实测扫到 10 台周边设备。
 # 不需要蓝牙固件（与 WiFi 共用 wcnss.*，已由 odin-wlan-fw.sh 提供）、
 # 不需要 btattach、不需要额外的 udev 规则。
+#
+# ffmpeg + v4l-utils：venus 硬件编解码的用户态入口。
+# 主线 qcom-venus 暴露的是 **V4L2 M2M** 设备（/dev/videoX，decoder 与 encoder
+# 各一个），不是 VA-API —— 裸机上没有 mesa 后端会去接管它，所以 FFmpeg 走
+#   ffmpeg -c:v h264_v4l2m2m            （解码）
+#   ffmpeg -c:v h264_v4l2m2m            （编码）
+# v4l-utils 提供 v4l2-ctl，用来列格式（v4l2-ctl -d /dev/videoX --list-formats）
+# 与排查 —— 排查硬件编解码时它是唯一的"看得见"的工具。
+# 另注：pmOS 的 mesa-venus 是 VirtIO-GPU 的 Vulkan 驱动（给虚拟机用的），
+# 与裸机的 qcom venus 同名不同物，别装。
 if ! chroot $R apt-get install -y -qq $APT_OPTS \
 	kmod \
 	network-manager wpasupplicant iw wireless-tools rfkill firmware-atheros \
@@ -266,6 +276,7 @@ if ! chroot $R apt-get install -y -qq $APT_OPTS \
 	systemd-resolved systemd-timesyncd util-linux-extra fake-hwclock cron \
 	upower policykit-1 \
 	bluez \
+	ffmpeg v4l-utils \
 	nftables; then
 	echo "[setup-rootfs] FATAL: 网络/基础包没装上，构建中止（apt 的完整报错在上面）" >&2
 	exit 1
@@ -298,6 +309,11 @@ chroot $R systemctl enable cron.service
 chroot $R systemctl enable NetworkManager.service
 chroot $R systemctl enable odin-swap.service 2>/dev/null || true
 chroot $R systemctl enable wpa_supplicant.service 2>/dev/null || true
+# venus 固件的正确时序在 initramfs（switch_root 之前，见
+# dist/build/initramfs/sbin/odin-venus-fw.sh）；这里启的是用户态兜底：
+# 已刷好的机器里那个 initramfs 还没有这段，而 venus 是模块，缺固件导致
+# probe 失败后不会自己重试 —— 由 odin-venus-fw.sh 取完固件再重载一次。
+chroot $R systemctl enable odin-venus-fw.service 2>/dev/null || true
 
 # --- USB 救援通道保护（reports/013 的 P0-2） ---
 # /etc/network/interfaces 不存在 ⇒ Debian 默认 [ifupdown] managed=false 保护不到

@@ -1,0 +1,33 @@
+diff --git a/drivers/media/platform/qcom/venus/hfi_parser.c b/drivers/media/platform/qcom/venus/hfi_parser.c
+--- a/drivers/media/platform/qcom/venus/hfi_parser.c
++++ b/drivers/media/platform/qcom/venus/hfi_parser.c
+@@ -385,9 +385,28 @@
+ 			break;
+ 		}
+ 
+-		if (ret < 0 || rem_bytes < ret)
++		if (ret < 0)
+ 			return HFI_ERR_SYS_INSUFFICIENT_RESOURCES;
+ 
++		/*
++		 * 固件能力表可能在最后一个属性处被截断（Smartisan ODIN / msm8953
++		 * 的 venus 固件实测如此：SYS_INIT_DONE 报 size=2576，而末条
++		 * HFI_PROPERTY_PARAM_CAPABILITY_SUPPORTED 声明 1 条 capability
++		 * 需要 20 字节，实际只剩 12 字节）。
++		 *
++		 * 这是一个按剩余字节数推进的 TLV 遍历；当某条属性的声明长度超出
++		 * 报文余量时，唯一合理的处置是把它当作属性表的结束 —— 已经解析
++		 * 出来的能力全部有效，不该因为末尾这一条残缺就放弃整个 core init
++		 * （原逻辑 return 一个错误码，会让 hfi_core_init() 返回 -EIO，
++		 * venus 直接 probe 失败，硬件编解码整体不可用）。
++		 */
++		if (rem_bytes < ret) {
++			dev_warn_once(core->dev,
++				      "truncated property %#x: need %d bytes, %u left\n",
++				      property, ret, rem_bytes);
++			break;
++		}
++
+ 		words += ret / sizeof(u32);
+ 		rem_bytes -= ret;
+ 	}
