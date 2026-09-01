@@ -2243,3 +2243,58 @@ c) ADSP 固件与驱动协议不完全匹配（venus 那边已经遇到同样的
 
 最靠谱的对照手段：**拿一台跑 postmarketOS 的 msm8953 机器（如 markw）导出
 全量 mixer 状态，与本机逐项 diff**。手工猜控件名的效率已经到头了。
+
+### 音频（再续）：修正一个自己的错误判断 + 静态配置全部查完
+
+#### 修正：此前"ADSP 不消费数据"是**错的**
+
+精确采样（每 2 秒一次，共 7 次）：
+```
+t=1s  hw_ptr:43679    appl_ptr:68639    delay=24960
+t=3s  hw_ptr:237119   appl_ptr:262079   delay=24960
+t=5s  hw_ptr:430559   appl_ptr:455519   delay=24960
+t=7s  hw_ptr:630239   appl_ptr:655199   delay=24960
+```
+**hw_ptr 稳定推进**（每 2 秒约 +96000 帧 ≈ 48000×2），appl_ptr−hw_ptr 恒为
+buffer_size=24960。
+
+⇒ 数据在**正常流动**，DSP 在消费。我之前看到 `avail=0` 就断定"卡住"是**误读**：
+aplay 会持续把缓冲区喂满，avail=0 只是"满"，不是"停滞"。
+
+教训：**判断 PCM 是否推进要看 hw_ptr 的变化，不能只看 avail/delay 的瞬时值。**
+
+#### 静态配置已全部查完，全部正常
+
+| 项 | 状态 |
+|---|---|
+| AFE | `PRI_MI2S_RX` On、`Primary MI2S Playback` On |
+| DIGITAL | `AIF1 Playback` On、`I2S RX1` On、`RX3 MIX1` On、`RX3 MIX1 INP1` On、`PDM_RX3` On |
+| ANALOG | `PDM_RX3` On、`SPK DAC` On、`SPK PA` On、`SPKR_CLK` On、`SPK_OUT` On |
+| AMP | `SpkAmp DRV/IN/OUT` 全 On（AW8738 已上电） |
+| 增益 | `RX3 Digital` = 124 = **+40dB**（min 0 max 124，100%） |
+| 静音 | `RX3 Mute` = **off** |
+| 错误 | 播放期间 dmesg 零新增（dmesg 本身已验证可用） |
+| 数据 | hw_ptr 稳定推进 |
+
+**注意控件名带后缀**：`amixer cget name="RX3 Mute"` 取不到值，真实名字是
+`RX3 Mute Switch`（numid=18）。`amixer sget "RX3 Mute"` 可以模糊匹配。
+（RX1 Mute Switch=16、RX2 Mute Switch=17、RX3 Mute Switch=18）
+
+另：`EAR` / `EAR_S` / `EAR PA` / `PDM_RX1` / `PDM_RX2` 全是 **Off**
+⇒ 听筒通路没开，当前只走 SPK，方向没错。
+
+#### 结论
+
+静态配置与数据流都正常，但扬声器物理上不发声（环回录音已证实）。
+剩余怀疑集中在 **AFE→PDM→SPK 的时钟/格式**，以及 **AW8738 的 mode 引脚
+（gpio132）电平是否真的满足工作要求**（当前是 out high，但 AW8738 不同
+mode 对应不同增益/工作模式，`awinic,mode` 我照 markw 填的 5）。
+
+#### 下一轮建议（按性价比）
+
+1. **最直接：拿一台能正常出声的 pmOS msm8953（如 markw）导出全量 mixer
+   状态，与本机 `amixer -c 0 contents` 的输出做 diff。** 手工猜控件名的
+   办法到这里已经到头了（1118 个控件）。
+2. 检查 PDM 时钟：`RXD_PDM_CLK` / `PDM_CLK` 是否与 48kHz 匹配；
+   可试改播放采样率（8k/16k/44.1k/48k）看有无变化。
+3. 核对 AW8738 的 datasheet，确认 mode 引脚电平对应的工作模式。
