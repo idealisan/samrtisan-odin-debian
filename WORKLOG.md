@@ -1875,3 +1875,39 @@ apt-get -o Acquire::http::Proxy=http://127.0.0.1:10808 install bluez
   `/var/lib/apt/lists/lock`，之后所有 apt 都报 lock 错误 —— 要 `pkill -9 apt-get`
 - sshd 没设 MaxStartups（默认 10:30:60），密集轮询时会被概率性丢连接，
   表现为间歇性 `Permission denied (publickey,password)`，**不是密码错**，等一会重试即可
+
+### 音频：已推进到"声卡出来但 PCM 打不开（本轮到这）
+
+在真机上按"本地快速改 DTB → scp → 重启"迭代，三步走完：
+
+1. 启用 `&lpass`（remoteproc@c200000，ADSP）。**ADSP 起来了**：
+   `remoteproc1 state=running fw=adsp.mdt`。原来的
+   `c0f0000.codec failed to get mclk` 随之消失（mclk 由 LPASS 内部产生）
+2. 部署 adsp 固件：`adsp.mdt` + `adsp.b00~b13` 共 15 个文件，从
+   **modem:/image/** 拷到 /lib/firmware（dsp 分区里没有这些，全是 Android
+   用户态 DSP 库，别去 dsp 分区找。下一步要写成常驻脚本，别靠手工 cp。
+
+剩余问题：
+
+- 声卡能注册：`0 [smartisanodin]: smartisan-odin`，
+  `/dev/snd` 有 pcmC0D0p / pcmC0D1c / pcmC0D2p / pcmC0D4c / pcmC0D4p、comprC0D3。
+  `devices_deferred` 已清空。
+- **但 PCM 打不开**：`Playback open error: -22 (Invalid argument)`，
+  `arecord` 同样 -EINVAL。这通常是 **q6routing 通路没设（UCM 的活）：
+  MultiMedia1 → AFE 端口的 mixer 控件没设，PCM 就无法打开/silent。
+  pmOS 侧这一步由 `alsa-ucm-conf`（msm8953-mainline 的 fork）完成，
+  bookworm 自带包里**大概率没有 msm8953 profile（未确认）。
+
+下一步（按顺序）：
+1. 试直接手工设 mixer 通路（amixer 设 "MultiMedia1 Mixer" → 对应 AFE 端口），
+   确认能出声，就知道缺的是 UCM 而不是 DTB。
+2. 若确认是 UCM：要么把 pmOS 那份 ucm2 配置引进来，要么写一个最小 UCM profile
+   （声卡名 `smartisan-odin`，注意 UCM 是按声卡名匹配的）。
+3. 与 markw 的 `&sound_card` 对齐差异：它比我多 `MM_DL3`→MultiMedia3 Playback、
+   `MM_DL4`→MultiMedia4 Playback，并在 `&wcd_codec` 里 `/delete-property/ qcom,gnd-jack-type-normally-open` + 设 mbhc 阈值。本机**无耳机孔**，要确认 MBHC 不会误判
+   插入（误判会把声音送到不存在的耳机通路 → 扬声器无声）。
+4. 扬声器功放：`snd_soc_aw8738` **已加载**（说明 AW8738 猜对了，gpio132 也对
+   —— 但要出声后才知道功放是否真的被打开。
+
+注：本轮所有改动都在 `tmp/audio-test/`（试验 DTB 与脚本），**还没进 patches/0007**。
+等真机出声后再固化。
