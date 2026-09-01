@@ -2347,3 +2347,50 @@ AW8738），plus `mode-gpios = <&tlmm 132>`、`awinic,mode = <5>` —— 全是�
 音量（RX3=124=+40dB 满）、静音（RX3 Mute=off）、采样率（8/16/44.1/48k）、
 播放后端（PRI/SEC/QUAT/QUIN/TERT_MI2S_RX 全试）、DAPM 全链路 On、
 ADSP 固件已加载、数据流正常（hw_ptr 推进）、播放期间零内核报错。
+
+### 音频：查原厂 ROM，确认"功放型号是我们臆想的"（重要）
+
+#### 原厂 ROM 在哪
+
+`/Volumes/caseSensitiveBar/Pro_user_V4.2.5/SEKSA-mol%odin-rom-4.1.0-odin-user-20180523-005028-32g/`
+只有分区镜像（boot.img / NON-HLOS.bin / system 相关是空目录），**没有 mixer_paths.xml**
+（apps/ 是刷机工具，sparse_images/ 空）。
+
+#### 从原厂 DTB（evidence/stock-rom-battery/odin-stock.dts）查到的
+
+```
+8329:  qcom,ext-pa-enable = <0xbe 0x84 0x00>       ← 0x84 = 132 ⇒ gpio132，引脚没错 ✓
+9728:  qcom,msm-ext-pa = "primary"
+9734:  启用的 sound 节点（msm8952-audio-codec）的 qcom,audio-routing：
+       "RX_BIAS","MCLK" / "SPK_RX_BIAS","MCLK" / "INT_LDO_H","MCLK" /
+       "MIC BIAS External","Handset Mic" / "MIC BIAS External2","Headset Mic" /
+       "MIC BIAS External","Secondary Mic" /
+       "AMIC1","MIC BIAS External" / "AMIC2","MIC BIAS External2" /
+       "AMIC3","MIC BIAS External"
+       ⇒ **只定义了 MIC 与 BIAS，没有任何到 speaker 的通路**
+9764:  sound-9335（tasha）节点 status = "disabled"
+9770:  那个 disabled 节点里才有 "SpkrLeft IN","SPK1 OUT"
+9791:  qcom,wsa-aux-dev-prefix = "SpkrLeft"（也在 disabled 节点里）
+6562-6584: qcom,spkr-sd-n-gpio = <0xbe 0x60 0x00>   ← 0x60 = 96（另一处 speaker 关断脚）
+2391:  pinctrl 里有 ext_pa_en_default
+```
+
+#### 结论
+
+1. **gpio132 引脚正确**，之前没搞错
+2. **原厂没有功放型号、没有 aux-dev、没有 wsa 前缀（那些都在 disabled 的 tasha 节点里）**
+   —— 只有一个 `ext-pa-enable = gpio132` 使能脚
+3. **所以设备树里的 `awinic,aw8738`（连 `awinic,mode = <5>` 一起照抄 pmOS markw）是我们臆想的**
+4. 原厂启用的通路上，speaker 输出靠 codec 内部固定（"SPK_RX_BIAS" → SPK），
+   外部功放只由一个 GPIO 使能
+
+#### 下一步（下一轮第一件事）
+
+1. **去掉设备树里的 aw8738 节点与 `aux-devs = <&spk_amp>`**，改成一个单纯的
+   GPIO 使能（主线常见做法：`gpio-leds` 或 `spk-amp-gpio`，
+   要查 apq8016_sbc.c 到底支持什么；若不支持，可用 `gpio-hog` 让 gpio132
+   开机即拉高 —— 这样最简单，也能立刻验证）
+2. 用 `gpio-hog` 让 gpio132 常高后播放测试：若出声，就证明问题一直是
+   "aw8738 驱动按 AW8738 的方式驱动了那根脚，而本机功放不认"
+3. 另一个 GPIO 线索：`qcom,spkr-sd-n-gpio = gpio96`（原厂另一处 speaker 关断脚，
+   注意 sd-n 是低有效 ⇒ 正常工作时要**拉低** gpio96）⇒ 这条也要一起试
