@@ -2558,3 +2558,84 @@ b) **外部功放没被正确使能** —— 原厂只给了 `ext-pa-enable = gp
    "代码没执行"。
 
 另外：原厂 ROM 的 system 是未压缩 squashfs，直接 `grep -a` 就能搜内容，不用解包。
+
+## ================= 2026-09-02 凌晨：视频硬编解码（venus） =================
+
+- **00:22 T1 完成** — 定位到 venus probe -EIO 的真因：固件回的 SYS_INIT_DONE
+  属性表**尾部一条被截断 8 字节**，而主线 `hfi_parser()` 把"声明长度超出报文余量"
+  当成致命错误，直接放弃整个 core init，前面已解析的 78 条能力全部作废。
+
+- 要点
+  - 手段：给 venus 驱动临时加报文转储与解析跟踪（**只改 `tmp/linux-msm8953`，
+    不进 `patches/`**，原文件留 `*.odin-bak`），抓到固件原始回包，离线用 Python
+    逐 word 复现 `hfi_parser` 的游标推进 —— 与真机 89 步 trace **逐步对齐**，
+    无一处游标不符。
+  - 回包：`hdr.size=2576 pkt_type=0x20001 error_type=0x0 num_properties=76`，
+    payload 2560 字节 / 640 word；驱动共走 89 步（真属性 79 个 + 零字 10 个）。
+  - 断点（报文最后 4 word，0x0a00 起）：
+    ```
+    07 10 00 00  01 00 00 00  14 00 00 00  10 00 00 00
+    ↑CAPABILITY  ↑num=1       ↑type=LCU_SIZE  ↑min=16
+                              ← 缺 max 与 step_size，共 8 字节 →
+    ```
+    `rem_bytes=12 < ret=20` ⇒ `return HFI_ERR_SYS_INSUFFICIENT_RESOURCES`
+    ⇒ `core->error != HFI_ERR_NONE` ⇒ `hfi_core_init()` 返回 `-EIO`（hfi.c:73）。
+  - 修法（`patches/0009`）：这个情形当作属性表结束，`break` 出循环 +
+    `dev_warn_once`，已解析的能力继续有效。TLV 遍历在"余量不足"时只能这么办。
+  - `Unsupported property: 0` 只是 `dev_warn_once` 的**噪音**，不是致命错；
+    那些 0 是固件插在属性之间的零填充（3 处：4/4/2 个 word），驱动走 default
+    分支 1 word 1 word 地蹭过去，不受影响。别再被它带偏。
+
+- **00:36 T1 附带结论** — **更正**旧判断"固件与驱动协议不匹配"：协议是对的，
+  属性表也逐条解析成功了，只是末尾一条残缺。固件文件本身也**完全正确** ——
+  真机 `/lib/firmware/venus.*` 与原厂 ROM 的 `NON-HLOS.bin`（裸 FAT16）
+  里 `/IMAGE/VENUS.MDT + VENUS.B00~B04` md5 逐个相等（b02 `f9fb73a1…`、
+  mdt `afb36166…`）。`venus.b04` 只有 32 字节（`0xdeadadd0` 填充），极易漏掉。
+
+- **00:47 T1 附带结论** — 两条**被排除**的怀疑（别再查）：
+  1. `msm8953.dtsi` 的 venus 节点定义了 `venus_opp_table` 却没有
+     `operating-points-v2`（sdm845 有）—— **不是问题**。原因：V3 走
+     `core_get_v1`，它只 `devm_pm_opp_set_clkname()`，从不 `dev_pm_opp_of_add_table()`
+     （后者只在 `res->opp_pmdomain` 存在时才调，而 msm8953 没有 cx 电源域）；
+     而 OPP 核心对**空表**有专门兜底（`drivers/opp/core.c:1435`）：
+     `if (!_get_opp_count(opp_table)) return config_clks(...)`，
+     即 `dev_pm_opp_set_rate()` 退化成 `clk_set_rate()`。所以时钟能调。
+  2. HFI 版本要用 1XX 还是 3XX —— **用 3XX，不要改**。原厂 DT 明写
+     `qcom,hfi-version = "3xx"`，且 `qcom,reg-presets` 三组寄存器与主线
+     `msm8953_reg_preset[]` 逐字对应（主线就是照这份抄的）。
+
+- **00:43 T2 完成** — 补 venus 固件的供给机制（此前是手工拷进 /lib/firmware 的）
+  - `dist/build/initramfs/sbin/odin-venus-fw.sh` + `init` 里的钩子 —— 正确时序：
+    venus 是 platform 驱动，开机早期就被 udev 加载并立刻 `request_firmware`，
+    必须落在 `switch_root` **之前**（与 `odin-wlan-fw.sh` 同源同理，见 reports/021）。
+  - `dist/build/rootfs/usr/local/sbin/odin-venus-fw.sh` + `odin-venus-fw.service`
+    —— 用户态兜底。venus 是模块，缺固件导致 probe 失败后不会自己重试，
+    取完固件重载即可；这条兜底让"已经刷好的机器"也能拿到能力。
+  - 段文件数量随 ROM 版本可能变，两个脚本都**不写死列表**，把 `modem:/image/`
+    下所有 `venus.*` 都搬过去（大小写不敏感，FAT 目录项是大写 `VENUS.MDT`，
+    挂载后小写也可用）；校验只认 `venus.mdt`（段表在里面，qcom_mdt 按表取段）。
+
+- **00:45 T3 完成** — 用户态：venus 暴露的是 **V4L2 M2M**（decoder/encoder 各占
+  一个 `/dev/videoX`），**不是 VA-API**。装 `ffmpeg` + `v4l-utils`，
+  FFmpeg 用 `-c:v h264_v4l2m2m` 调用。
+  ⚠️ pmOS 的 `mesa-venus` 是 VirtIO-GPU 的 Vulkan 驱动（给虚拟机用的），
+  与裸机 qcom venus **同名不同物**，不要装。
+  另加体检脚本 `dist/build/rootfs/usr/local/sbin/odin-video-check.sh`
+  （看固件/设备/格式 + 真跑一次编码再解回来）。
+
+- **⚠️ 踩坑（我自己造的事故，必读）** — 调试代码里为了看环形队列状态，在
+  `venus_isr_thread` 里 deref 了 `hdev->queues[IFACEQ_MSG_IDX].qhdr`，结果
+  **空指针 Oops**（`q->q_size` 在结构里偏移正好 0xc，报错地址就是 `0000000c`），
+  IRQ 线程 `irq/84-venus` 死掉；随后 `insmod` 卡在 D 状态（core->lock 被死掉的
+  线程握着），`sudo reboot` 被它挡住没能完成 —— 设备停在"网络在（ping 通）、
+  SSH 已停（connection refused）、telnet 救援端口也没开"的**半关机**状态，
+  只能长按电源键。**已语音提醒。**
+  教训：给内核加调试打印时，**不要 deref 那些"应该非 NULL"的内部指针**；
+  而且这种半死状态比整机重启难收拾得多 —— 一旦 `rmmod`/`insmod` 卡住，
+  后面所有验证都做不了，先想清楚再下手。
+
+- 待办（设备回来后）
+  1. 重传 `venus-core.ko`（已编好、只含 0009 的正式修复，无调试代码），
+     `rmmod` + `insmod`，看 probe 是否成功、`/dev/videoX` 是否出现；
+  2. 装 `ffmpeg` `v4l-utils`，跑 `odin-video-check.sh` 真编一帧再解回来；
+  3. 把结论补进 reports/029，走 CI 出正式版。
