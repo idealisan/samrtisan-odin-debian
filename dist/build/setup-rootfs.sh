@@ -250,6 +250,14 @@ chroot $R apt-get update -qq
 # KDE 的 powerdevil 与 Phosh 的状态栏电量图标都靠它 —— 内核里有了
 # qcom-battery / qcom-smbchg-usb 两个 psy，用户态没有 upower 就一个都看不到。
 # policykit-1 是 upowerd 做特权操作（挂起/休眠授权）时要的，一并装上。
+#
+# bluez：WCNSS 那颗芯片的蓝牙在内核侧是**现成的** —— 主线 `btqcomsmd` 走 SMD
+# 通道，DTB 里 `wcnss_bt`（`qcom,wcnss-bt`）由 msm8953.dtsi 提供且默认启用，
+# 真机 `hci0` 直接就出来，控制器还能从 WCNSS 拿到 public BD 地址
+#（实测 02:00:67:DB:FE:B8，不需要手动 `btmgmt public-addr`）。
+# 缺的只有用户态 bluetoothd —— 装上即能用：20 秒扫描实测扫到 10 台周边设备。
+# 不需要蓝牙固件（与 WiFi 共用 wcnss.*，已由 odin-wlan-fw.sh 提供）、
+# 不需要 btattach、不需要额外的 udev 规则。
 if ! chroot $R apt-get install -y -qq $APT_OPTS \
 	kmod \
 	network-manager wpasupplicant iw wireless-tools rfkill firmware-atheros \
@@ -257,6 +265,7 @@ if ! chroot $R apt-get install -y -qq $APT_OPTS \
 	iperf3 ethtool mtr-tiny \
 	systemd-resolved systemd-timesyncd util-linux-extra fake-hwclock cron \
 	upower policykit-1 \
+	bluez \
 	nftables; then
 	echo "[setup-rootfs] FATAL: 网络/基础包没装上，构建中止（apt 的完整报错在上面）" >&2
 	exit 1
@@ -326,7 +335,8 @@ if [ "$ODIN_VARIANT" = "gui" ]; then
 		vim nano less file unzip zip rsync tmux screen \
 		htop btop iotop sysstat \
 		git build-essential \
-		pipewire pipewire-pulse wireplumber \
+		pipewire pipewire-pulse wireplumber pipewire-alsa \
+		bluez-obexd libspa-0.2-bluetooth \
 		fonts-noto-cjk fonts-noto-color-emoji; then
 		echo "[setup-rootfs] FATAL: GUI 包没装上，构建中止（apt 的完整报错在上面）" >&2
 		exit 1
