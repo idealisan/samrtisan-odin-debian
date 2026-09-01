@@ -1,6 +1,23 @@
 #!/bin/bash
 set -e
 export DEBIAN_FRONTEND=noninteractive
+
+# dpkg 解包时默认每处理一个包就 flush 一次文件系统。
+#
+# 实测（2026-09-01，gui 变体，电池那轮 CI 的日志）：装 Plasma 那一段总共
+# 850 秒，其中**约 540 秒在解包** —— 1202 个包、每包约 0.45 秒，而真正写入
+# 的数据只有几百 MB。这个数字不是 I/O 带宽决定的，就是逐包 flush 的开销。
+# 顺带一提，剩下的时间里配置（postinst，跑在 qemu-arm64 模拟下）约 240 秒、
+# 下载约 60 秒。
+#
+# 这里的目标是一个**构建完就导出成镜像**的临时 staging 目录，不是要长期运行
+# 的系统，掉电一致性对这一步没有意义 —— 刷进真机的是 build-image.sh 后面
+# mke2fs 出来的新镜像，不是这个目录。
+#
+# 用 apt 命令行选项传，而不是写 $R/etc/dpkg/dpkg.cfg.d/：后者会留在镜像里，
+# 连带影响真机上以后 apt 升级的行为；命令行选项只在本次装包生效，镜像里不留痕。
+APT_OPTS="-o Dpkg::Options::=--force-unsafe-io"
+
 # 变体：core（无 GUI，服务器 / 开发基线）或 gui（Plasma Mobile 桌面）。
 # 由 tools/ci/build-rootfs.sh 从 make 的 ODIN_VARIANT 传下来。
 # 两个变体共用同一套基础设施（USB 救援通道、swap、扩容、用户态脚本），
@@ -50,7 +67,7 @@ FSTAB
 
 # --- ensure udev is installed (provides systemd-udevd, rules, net naming) ---
 chroot $R apt-get update -qq
-chroot $R apt-get install -y -qq udev
+chroot $R apt-get install -y -qq $APT_OPTS udev
 
 # marker for initramfs fallback scan
 touch $R/.odin-debian
@@ -233,7 +250,7 @@ chroot $R apt-get update -qq
 # KDE 的 powerdevil 与 Phosh 的状态栏电量图标都靠它 —— 内核里有了
 # qcom-battery / qcom-smbchg-usb 两个 psy，用户态没有 upower 就一个都看不到。
 # policykit-1 是 upowerd 做特权操作（挂起/休眠授权）时要的，一并装上。
-if ! chroot $R apt-get install -y -qq \
+if ! chroot $R apt-get install -y -qq $APT_OPTS \
 	kmod \
 	network-manager wpasupplicant iw wireless-tools rfkill firmware-atheros \
 	iputils-ping curl wget bind9-dnsutils net-tools traceroute tcpdump \
@@ -300,7 +317,7 @@ if [ "$ODIN_VARIANT" = "gui" ]; then
 	# 静默继续只会产出一个"看着成功、实际缺组件"的镜像，等刷进真机才发现 ——
 	# 那时定位成本比现在高一个量级。所以不吞退出码，也不接 | tail
 	# （管道的退出码取最后一段，会把 apt 的失败盖掉）。
-	if ! chroot $R apt-get install -y -qq \
+	if ! chroot $R apt-get install -y -qq $APT_OPTS \
 		plasma-mobile plasma-mobile-tweaks \
 		sddm \
 		x11-utils xinput \
