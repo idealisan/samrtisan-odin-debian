@@ -60,7 +60,7 @@ new file mode 100644
 index 000000000..6f075051b
 --- /dev/null
 +++ b/drivers/usb/typec/fusb301.c
-@@ -0,0 +1,421 @@
+@@ -0,0 +1,426 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Fairchild/ON Semiconductor FUSB301 Type-C port controller driver
@@ -489,4 +489,3 @@ index 000000000..6f075051b
 +MODULE_LICENSE("GPL");
 -- 
 2.48.1
-
