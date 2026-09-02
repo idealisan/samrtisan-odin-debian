@@ -414,6 +414,7 @@ chroot $R systemctl mask ModemManager.service 2>/dev/null || true
 # minbase 只装 required 优先级的包，kmod 不在其中
 mkdir -p "$R/etc/modules-load.d"
 echo -e "wcn36xx\nqcom_wcnss_pil" > "$R/etc/modules-load.d/odin-wlan.conf"
+echo "fusb301" > "$R/etc/modules-load.d/odin-usb.conf"
 
 # --- enable ssh ---
 chroot $R systemctl enable ssh.service
