@@ -137,51 +137,221 @@ jobs:
           echo "cc=$ccid" >> "$GITHUB_OUTPUT"
           echo "编译器身份: $ccid"
           ccache -z
-      # 缓存键五段：格式版本 + 编译器身份 + 内核 SHA + 补丁内容 + 内核配置。
-      #   v2 —— ccache 规则（compiler_check / hash_dir）变更后的新格式，与 v1 条目
-      #         互不通用，必须换 key 才能摆脱那份冻结的旧缓存。
-      #   内核 SHA + 补丁哈希 —— 任一方变了缓存自然失效；不能为了命中率牺牲正确性。
-      #   内核配置 —— 这一项最容易漏，漏了后果和"编译器身份"那次一样：
-      #     改 .config 会改变 autoconf.h，几乎所有编译单元都要重编；
-      #     但 key 若不含配置，就会精确命中旧缓存（恢复一堆用不上的对象），
-      #     又因为精确命中而不回传 ⇒ 之后每轮都是"恢复旧缓存 + 全量重编"。
-      #     实测：第五轮正是撞在这个上（RTC 配置改动后仍恢复旧缓存）。
-      - name: 计算内核补丁哈希（排除纯设备树补丁）
-        id: kpatch
+      # ccache 的对象按哈希落在 0..f 十六个目录。每个目录单独缓存：
+      #   · key 不再包含补丁/配置总哈希，ccache 自己按预处理输入判断对象是否可用；
+      #   · run_id 只用于写入新快照，避免 actions/cache 精确命中后永远冻结；
+      #   · 构建后只保存发生变化的目录，修改一个源文件不会重新上传整棵 ccache。
+      - name: 准备 ccache 分片
+        id: ccache
         run: |
-          # 纯设备树的补丁（本项目是 0007）只改 .dts 与 dtb 的 Makefile，
-          # **不产生任何编译单元** —— 不该进内核编译的缓存键。
-          #
-          # 2026-09-01 实测：缓存键原先是 hashFiles('patches/*.patch')，
-          # 于是每改一次设备树，精确键就变 ⇒ 只能靠 restore-keys 兜底 ⇒
-          # 收尾再存一份 ~390 MB 的缓存（仓库里一度有两份内容几乎相同的
-          # 391 MB 条目，只差一个 dts 数值）。今天那轮 2 分钟是兜底救的，
-          # 兜底那份一旦被 GitHub 淘汰就会退回 35 分钟冷编。
-          #
-          # 判定方式：一个补丁改的文件**全部**在 arch/arm64/boot/dts/ 下就跳过。
-          # 这么写而不是写死 0007，是为了以后再加设备树补丁也能自动排除。
-          sel=""
-          for p in $(ls patches/*.patch | sort); do
-            if grep -E '^\+\+\+ b/' "$p" | sed 's|^\+\+\+ b/||' \
-               | grep -qv '^arch/arm64/boot/dts/'; then
-              sel="$sel $p"
-            fi
+          mkdir -p "$HOME/.cache/ccache"/{0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f}
+          ccache --set-config=max_size=320M
+          for shard in 0 1 2 3 4 5 6 7 8 9 a b c d e f; do
+            touch "$HOME/.cache/ccache/.before-$shard"
           done
-          echo "计入内核缓存键的补丁 $(ls patches/*.patch | wc -l) 个中的 $(echo "$sel" | wc -w) 个："
-          for f in $sel; do echo "  - $f"; done
-          h=$(printf '%s\n' $sel | xargs cat 2>/dev/null | sha256sum | cut -c1-64)
-          echo "hash=$h" >> "$GITHUB_OUTPUT"
-      - name: 取 ccache 缓存
-        uses: actions/cache@v4
+
+      - name: 取 ccache 分片 0
+        uses: actions/cache/restore@v4
         with:
-          path: ~/.cache/ccache
-          key: kernel-ccache-v2-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-${{ steps.kpatch.outputs.hash }}-${{ hashFiles('config-postmarketos-qcom-msm8953.aarch64') }}
-          restore-keys: |
-            kernel-ccache-v2-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-
-            kernel-ccache-v2-${{ steps.toolchain.outputs.cc }}-
-            kernel-ccache-v2-
+          path: ~/.cache/ccache/0
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-0-${{ github.run_id }}
+          restore-keys: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-0-
+      - name: 取 ccache 分片 1
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache/1
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-1-${{ github.run_id }}
+          restore-keys: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-1-
+      - name: 取 ccache 分片 2
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache/2
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-2-${{ github.run_id }}
+          restore-keys: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-2-
+      - name: 取 ccache 分片 3
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache/3
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-3-${{ github.run_id }}
+          restore-keys: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-3-
+      - name: 取 ccache 分片 4
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache/4
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-4-${{ github.run_id }}
+          restore-keys: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-4-
+      - name: 取 ccache 分片 5
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache/5
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-5-${{ github.run_id }}
+          restore-keys: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-5-
+      - name: 取 ccache 分片 6
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache/6
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-6-${{ github.run_id }}
+          restore-keys: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-6-
+      - name: 取 ccache 分片 7
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache/7
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-7-${{ github.run_id }}
+          restore-keys: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-7-
+      - name: 取 ccache 分片 8
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache/8
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-8-${{ github.run_id }}
+          restore-keys: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-8-
+      - name: 取 ccache 分片 9
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache/9
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-9-${{ github.run_id }}
+          restore-keys: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-9-
+      - name: 取 ccache 分片 a
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache/a
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-a-${{ github.run_id }}
+          restore-keys: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-a-
+      - name: 取 ccache 分片 b
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache/b
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-b-${{ github.run_id }}
+          restore-keys: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-b-
+      - name: 取 ccache 分片 c
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache/c
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-c-${{ github.run_id }}
+          restore-keys: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-c-
+      - name: 取 ccache 分片 d
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache/d
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-d-${{ github.run_id }}
+          restore-keys: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-d-
+      - name: 取 ccache 分片 e
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache/e
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-e-${{ github.run_id }}
+          restore-keys: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-e-
+      - name: 取 ccache 分片 f
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache/f
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-f-${{ github.run_id }}
+          restore-keys: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-f-
       - name: 编译内核与模块
         run: make kernel OUT=out
+      - name: 找出发生变化的 ccache 分片
+        id: changed_shards
+        run: |
+          for shard in 0 1 2 3 4 5 6 7 8 9 a b c d e f; do
+            if find "$HOME/.cache/ccache/$shard" -type f -newer "$HOME/.cache/ccache/.before-$shard" -print -quit | grep -q .; then
+              echo "shard_$shard=true" >> "$GITHUB_OUTPUT"
+            fi
+          done
+      - name: 保存 ccache 分片 0
+        if: steps.changed_shards.outputs.shard_0 == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache/0
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-0-${{ github.run_id }}
+      - name: 保存 ccache 分片 1
+        if: steps.changed_shards.outputs.shard_1 == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache/1
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-1-${{ github.run_id }}
+      - name: 保存 ccache 分片 2
+        if: steps.changed_shards.outputs.shard_2 == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache/2
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-2-${{ github.run_id }}
+      - name: 保存 ccache 分片 3
+        if: steps.changed_shards.outputs.shard_3 == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache/3
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-3-${{ github.run_id }}
+      - name: 保存 ccache 分片 4
+        if: steps.changed_shards.outputs.shard_4 == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache/4
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-4-${{ github.run_id }}
+      - name: 保存 ccache 分片 5
+        if: steps.changed_shards.outputs.shard_5 == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache/5
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-5-${{ github.run_id }}
+      - name: 保存 ccache 分片 6
+        if: steps.changed_shards.outputs.shard_6 == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache/6
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-6-${{ github.run_id }}
+      - name: 保存 ccache 分片 7
+        if: steps.changed_shards.outputs.shard_7 == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache/7
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-7-${{ github.run_id }}
+      - name: 保存 ccache 分片 8
+        if: steps.changed_shards.outputs.shard_8 == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache/8
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-8-${{ github.run_id }}
+      - name: 保存 ccache 分片 9
+        if: steps.changed_shards.outputs.shard_9 == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache/9
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-9-${{ github.run_id }}
+      - name: 保存 ccache 分片 a
+        if: steps.changed_shards.outputs.shard_a == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache/a
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-a-${{ github.run_id }}
+      - name: 保存 ccache 分片 b
+        if: steps.changed_shards.outputs.shard_b == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache/b
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-b-${{ github.run_id }}
+      - name: 保存 ccache 分片 c
+        if: steps.changed_shards.outputs.shard_c == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache/c
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-c-${{ github.run_id }}
+      - name: 保存 ccache 分片 d
+        if: steps.changed_shards.outputs.shard_d == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache/d
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-d-${{ github.run_id }}
+      - name: 保存 ccache 分片 e
+        if: steps.changed_shards.outputs.shard_e == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache/e
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-e-${{ github.run_id }}
+      - name: 保存 ccache 分片 f
+        if: steps.changed_shards.outputs.shard_f == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache/f
+          key: kernel-ccache-v3-${{ steps.toolchain.outputs.cc }}-${{ env.KERNEL_SHA }}-shard-f-${{ github.run_id }}
       - uses: actions/upload-artifact@v4
         with:
           name: odin-kernel
@@ -219,7 +389,7 @@ jobs:
           # （镜像站不进键：不同镜像拉到的包内容应当一致，且 CI 固定用官方源）
           inc="busybox-static,udev,ssh,sudo,systemd,iproute2,dnsmasq,parted,e2fsprogs"
           debver=$(debootstrap --version | awk '{print $NF}' | tr -d ' ')
-          echo "basekey=odin-baseroot-v1-bookworm-arm64-${debver}-$(printf '%s' "$inc" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+          echo "basekey=odin-baseroot-v2-bookworm-arm64-${debver}-$(printf '%s' "$inc" | sha256sum | cut -c1-16)-${{ hashFiles('tools/ci/build-rootfs.sh') }}" >> "$GITHUB_OUTPUT"
       # debootstrap 是 rootfs job 的最大单项开销（core 变体实测 283 秒、占 83%），
       # 而它的产物与变体无关 —— 缓存起来每个变体省 4~5 分钟。
       # 打包/解包由 tools/ci/build-rootfs.sh 按 ODIN_BASE_TAR 指到的路径完成，
@@ -236,11 +406,26 @@ jobs:
         with: { name: odin-kernel, path: out/kernel }
       - uses: actions/download-artifact@v4
         with: { name: odin-dtb, path: out/dtb }
+      # 包安装阶段在 gui 日志中耗时约 15 分钟（1200+ 个 arm64 包）。
+      # 缓存“包安装完成、配置脚本尚未再次运行”的 staging 层；键只绑定真正
+      # 影响该层的脚本、initramfs、DTB 和内核产物，改文档或发布逻辑不会失配。
+      - name: 计算 rootfs staging 层键
+        id: stagekey
+        run: |
+          kernel_hash="$(sha256sum out/kernel/vmlinuz out/kernel/modules.tar out/dtb/*.dtb | sha256sum | cut -c1-16)"
+          echo "key=odin-rootfs-stage-v1-${{ matrix.variant }}-${kernel_hash}-${{ hashFiles('tools/ci/build-rootfs.sh', 'dist/build/setup-rootfs.sh', 'dist/build/initramfs/**', 'dist/build/initramfs-applets.txt', 'dist/build/rootfs/**', 'tools/pack_initramfs.sh', 'tools/build-image.sh') }}" >> "$GITHUB_OUTPUT"
+      - name: 取 rootfs staging 层缓存
+        id: stage_cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/odin-rootfs-${{ matrix.variant }}
+          key: ${{ steps.stagekey.outputs.key }}
       - name: 组装系统镜像
         env:
           # 传给 tools/ci/build-rootfs.sh：有这份 tar 就解开、不跑 debootstrap；
           # 没有就跑 debootstrap 并在装变体包之前打一份出来。sudo -E 会带进 chroot 侧。
           ODIN_BASE_TAR: /tmp/odin-baseroot.tar.gz
+          ODIN_STAGE_CACHE_HIT: ${{ steps.stage_cache.outputs.cache-hit }}
         run: |
           # debootstrap / chroot / mke2fs 都必须以 root 运行，由这里统一提权；
           # 跑完把产物交还给 runner，否则 upload-artifact 读不到 root 建的 0600 镜像。
@@ -250,6 +435,10 @@ jobs:
           # 的语义，正好对上；不加就会在这里把内核重编一遍（20+ 分钟）。
           sudo -E make -o kernel -o dtb rootfs-${{ matrix.variant }} OUT=out
           sudo chown -R "$(id -u):$(id -g)" out/rootfs-${{ matrix.variant }}
+          # cache action 由 runner 用户收尾；staging 内有 root 创建的文件，先交还读取权限。
+          if [ -d "/tmp/odin-rootfs-${{ matrix.variant }}" ]; then
+            sudo chown -R "$(id -u):$(id -g)" "/tmp/odin-rootfs-${{ matrix.variant }}"
+          fi
           # 基础根 tar 也是 root 建的（0600），同样要交还给 runner，
           # 否则上面那个 cache 步骤收尾时读不到它。
           if [ -f /tmp/odin-baseroot.tar.gz ]; then

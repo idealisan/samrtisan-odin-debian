@@ -25,6 +25,7 @@ case "$VARIANT" in
 	core|gui) ;;
 	*) echo "[rootfs] 未知变体: $VARIANT（可选 core / gui）" >&2; exit 1 ;;
 esac
+STAGE_CACHE_HIT=${ODIN_STAGE_CACHE_HIT:-false}
 # staging 根目录必须按变体分开。debootstrap 是重活，下面靠
 # `if [ ! -d "$ROOT/etc" ]` 判断是否要重来；两个变体共用一个目录时，
 # 第二个变体会直接复用第一个已经摆好的根 —— 表现为"编了 gui，出来的却是 core"。
@@ -94,6 +95,9 @@ if [ ! -d "$ROOT/etc" ]; then
   fi
 fi
 say "rootfs 就绪: $ROOT"
+if [ "$STAGE_CACHE_HIT" = true ]; then
+  say "从 staging 层缓存恢复，跳过内核安装、initramfs 生成和全部 apt 安装"
+fi
 
 # 镜像站对已存在的 staging 同样要生效：上一行可能被跳过（debootstrap 过一次就不再
 # 重来），但后续 chroot 里的 apt 仍应走镜像站。导出前会还原，见第 6 节。
@@ -102,6 +106,9 @@ if [ "$MIRROR" != "http://deb.debian.org/debian" ] && [ -f "$ROOT/etc/apt/source
 	say "sources.list 指向镜像站: $MIRROR"
 fi
 
+# staging 层缓存覆盖到 setup-rootfs 完成之后；命中时只重跑下面的增量修复、
+# 导出卫生和镜像生成，避免再次启动 qemu-arm64 下的 dpkg/postinst。
+if [ "$STAGE_CACHE_HIT" != true ]; then
 # ---------------------------------------------------------------- 2. 内核模块 + vmlinuz
 say "安装内核模块与 vmlinuz"
 mkdir -p "$ROOT/boot"
@@ -153,6 +160,10 @@ say "  initramfs: $(stat -c%s "$ROOT/boot/initramfs.cpio.gz" 2>/dev/null || stat
 # ---------------------------------------------------------------- 4. 系统配置
 say "setup-rootfs.sh（用户 / 网络 / 服务）"
 ODIN_ROOTFS="$ROOT" ODIN_VARIANT="$VARIANT" bash "$REPO/dist/build/setup-rootfs.sh"
+
+else
+  say "staging 层缓存已包含包和基础配置"
+fi
 
 say "apply-staging-fixes.sh（增量修复 + overlay + DTB + extlinux）"
 # 用 CI 刚编出来的 DTB，而不是仓库里（可能过期的）那份
