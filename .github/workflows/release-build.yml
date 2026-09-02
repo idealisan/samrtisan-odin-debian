@@ -75,8 +75,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: 安装 dtc
         run: sudo apt-get update -qq && sudo apt-get install -y -qq device-tree-compiler
+      - name: 取 DTB 产物缓存
+        id: dtb_cache
+        uses: actions/cache@v4
+        with:
+          path: out/dtb
+          key: odin-dtb-v1-${{ env.KERNEL_SHA }}-${{ hashFiles('patches/0007-*.patch', 'dts/*.dts', 'dts/build-dtb.sh') }}
       - name: 编译四个 DTB
         # 走 make：构建逻辑在 Makefile 里，CI 与本地同一条路径
+        env:
+          ODIN_DTB_CACHE_HIT: ${{ steps.dtb_cache.outputs.cache-hit }}
         run: make dtb OUT=out
       - uses: actions/upload-artifact@v4
         with:
@@ -90,8 +98,29 @@ jobs:
       - uses: actions/checkout@v4
       - name: 安装 ARM32 裸机工具链
         run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-arm-none-eabi device-tree-compiler libfdt-dev make
+      - name: 取 lk2nd 产物缓存
+        id: lk2nd_cache
+        uses: actions/cache@v4
+        with:
+          path: out/lk2nd
+          key: odin-lk2nd-v1-${{ env.LK2ND_VER }}-${{ hashFiles('Makefile', 'lk2nd/*.patch') }}
       - name: 构建完整版与精简版
-        run: make lk2nd OUT=out
+        env:
+          ODIN_LK2ND_CACHE_HIT: ${{ steps.lk2nd_cache.outputs.cache-hit }}
+        run: |
+          if [ "$ODIN_LK2ND_CACHE_HIT" = true ]; then
+            echo "[lk2nd] 命中产物缓存，跳过下载与编译"
+            mkdir -p out/.stamps
+            touch out/.stamps/lk2nd
+          fi
+          make lk2nd OUT=out
+      - name: 校验缓存的 lk2nd 产物
+        run: |
+          test -s out/lk2nd/lk2nd.img
+          test -s out/lk2nd/lk2nd-nomarkw.img
+          strings out/lk2nd/lk2nd-nomarkw.img > /tmp/lk2nd-strings.txt
+          ! grep -q "xiaomi-markw" /tmp/lk2nd-strings.txt
+          grep -q "smartisan-odin" /tmp/lk2nd-strings.txt
       - uses: actions/upload-artifact@v4
         with:
           name: odin-lk2nd

@@ -155,16 +155,22 @@ $(STAMPS)/fetch-$(KDIR_TAG): | $(STAMPS)
 dtb: $(STAMPS)/dtb-$(KDIR_TAG)
 $(STAMPS)/dtb-$(KDIR_TAG): | $(STAMPS) fetch-kernel
 	@mkdir -p $(DTB_OUT)
-	@echo "[dtb] 应用设备树补丁 0007"
-	if [ ! -f "$(KDIR)/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts" ]; then \
-		cd "$(KDIR)" && patch -p1 --forward --no-backup-if-mismatch \
-			< $(firstword $(wildcard $(REPO)/patches/0007-*.patch)); \
+	if [ "$${ODIN_DTB_CACHE_HIT:-false}" = true ] && \
+		[ -s "$(DTB_OUT)/msm8953-smartisan-odin.dtb" ] && \
+		[ -s "$(DTB_OUT)/msm8953-smartisan-odin-ft8716.dtb" ]; then \
+		echo "[dtb] 命中产物缓存，跳过预处理与 dtc"; \
 	else \
-		echo "[dtb]   已打过，跳过"; \
+		echo "[dtb] 应用设备树补丁 0007"; \
+		if [ ! -f "$(KDIR)/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts" ]; then \
+			cd "$(KDIR)" && patch -p1 --forward --no-backup-if-mismatch \
+				< $(firstword $(wildcard $(REPO)/patches/0007-*.patch)); \
+		else \
+			echo "[dtb]   已打过，跳过"; \
+		fi; \
+		echo "[dtb] 编译四个 DTB"; \
+		KDIR="$(KDIR)" bash $(REPO)/dts/build-dtb.sh; \
+		cp -f $(addprefix $(REPO)/dts/,$(addsuffix .dtb,$(DTB_NAMES))) $(DTB_OUT)/; \
 	fi
-	@echo "[dtb] 编译四个 DTB"
-	KDIR="$(KDIR)" bash $(REPO)/dts/build-dtb.sh
-	cp -f $(addprefix $(REPO)/dts/,$(addsuffix .dtb,$(DTB_NAMES))) $(DTB_OUT)/
 	@echo "[dtb] 自检"
 	@for v in ft8716 ft8716-norolesw; do \
 		f="$(DTB_OUT)/msm8953-smartisan-odin-$$v.dtb"; \
