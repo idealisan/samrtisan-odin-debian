@@ -122,8 +122,8 @@ exFAT 或 NTFS。**
 
 | label | DTB | 用途 |
 |---|---|---|
-| `l0-safe`（首刷默认） | `msm8953-smartisan-odin-ft8716-norolesw.dtb` | USB 固定 device，UDC 恒在，SSH 不依赖 Type-C 判定；代价：无 OTG |
-| `l0` | `msm8953-smartisan-odin-ft8716.dtb` | 完整版：Type-C 角色切换 + OTG host |
+| `l0`（默认） | `msm8953-smartisan-odin-ft8716.dtb` | 完整版：按 Type-C 方向自动切换 USB 网卡或 OTG host |
+| `l0-safe` | `msm8953-smartisan-odin-ft8716-norolesw.dtb` | USB 固定 device，UDC 恒在，SSH 不依赖 Type-C 判定；代价：无 OTG |
 
 用的是**面板写死 FT8716** 的那一对 DTB（`*-ft8716*`），不是自动识别版：写死之后面板
 是否点亮与 lk2nd 选中哪个 QCDT 条目无关，排障面小很多。自动识别的一对也随镜像发布，
@@ -183,9 +183,8 @@ sudo sed -i 's/^default .*/default l0/' /extlinux/extlinux.conf && sudo reboot
 1. **备份**：当前可启动的 boot 分区与 postmarketOS `/boot`。
 2. 刷 `lk2nd.img` → boot 分区（64M）；刷 `odin-debian-sparse.img` → userdata。
    顺序不能反（lk2nd 负责挂载 userdata 找到 `/extlinux/extlinux.conf`）。
-3. **首刷默认进 `l0-safe`**：无 OTG，但 UDC 恒在，SSH 一定能拿到。
-4. 拿到 SSH 后确认整机（扩容、WiFi、基带、音频、振动、按键），再把 default 改成
-   `l0` 重启，验证 Type-C 角色切换与 OTG。
+3. **默认进 `l0`**：连接电脑时提供 USB 网络，连接 OTG Hub/U 盘时切换为 host。
+4. 若完整角色切换异常，可将 default 改成 `l0-safe` 重启，恢复固定 USB 网络救援模式。
 5. 屏幕观察顺序：panel driver 绑定 → DRM connector → fb0 → 背光。
    **屏幕能否点亮取决于 lk2nd 是否选中 odin 条目**（见 §七 已知限制第 1 条）。
 6. USB 观察顺序：CC attach → role=host → VBUS 5V → 枚举 → `/run/media/sdX`。

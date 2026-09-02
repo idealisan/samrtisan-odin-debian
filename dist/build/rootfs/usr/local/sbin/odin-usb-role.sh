@@ -71,7 +71,15 @@ want_role() {
 	for f in /sys/class/typec/*/data_role; do
 		[ -r "$f" ] || continue
 		r=$(cat "$f" 2>/dev/null)
-		[ "$r" = "host" ] && { echo host; return; }
+		case "$r" in
+			host|*"[host]"*) echo host; return ;;
+		esac
+	done
+	# The ODIN PMIC exposes the cable role through extcon when the FUSB301
+	# typec class device is unavailable or has not probed yet.
+	for f in /sys/class/extcon/*/state; do
+		[ -r "$f" ] || continue
+		grep -qx 'USB-HOST=1' "$f" && { echo host; return; }
 	done
 	echo device
 }

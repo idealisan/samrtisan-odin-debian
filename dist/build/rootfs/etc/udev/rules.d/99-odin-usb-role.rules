@@ -28,3 +28,6 @@ SUBSYSTEM=="udc", ACTION=="remove", TAG+="systemd", ENV{SYSTEMD_WANTS}=odin-usb-
 
 # Type-C data_role 变化为辅触发器
 SUBSYSTEM=="typec", ACTION=="change", TAG+="systemd", ENV{SYSTEMD_WANTS}=odin-usb-gadget.service
+
+# ODIN PMIC extcon 在 FUSB301 尚未注册或未提供 typec class 时报告角色
+SUBSYSTEM=="extcon", ACTION=="change", TAG+="systemd", ENV{SYSTEMD_WANTS}=odin-usb-gadget.service
