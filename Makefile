@@ -106,7 +106,7 @@ DTB_NAMES := msm8953-smartisan-odin \
 # 报错是 `cd: /xxx: No such file or directory`，离真因有十万八千里。
 #
 # CI 上只有一棵树，永远不会遇到；本地必须给 dtb 与 kernel 各用一棵树
-# （dtb 只打 0007，kernel 打 0001-0008，共用一棵会撞"0007 已应用"），
+# （dtb 只打 0007，kernel 打全部补丁，共用一棵会撞"0007 已应用"），
 # 这个坑是必然踩到的。见 docs/05 第一节。
 KDIR_TAG := $(subst /,_,$(abspath $(KDIR)))
 
@@ -168,7 +168,7 @@ $(STAMPS)/dtb-$(KDIR_TAG): | $(STAMPS) fetch-kernel
 			echo "[dtb]   已打过，跳过"; \
 		fi; \
 		echo "[dtb] 编译四个 DTB"; \
-		KDIR="$(KDIR)" bash $(REPO)/dts/build-dtb.sh; \
+		KDIR="$(KDIR)" bash $(REPO)/dts/build-dtb.sh && \
 		cp -f $(addprefix $(REPO)/dts/,$(addsuffix .dtb,$(DTB_NAMES))) $(DTB_OUT)/; \
 	fi
 	@echo "[dtb] 自检"
@@ -197,15 +197,32 @@ $(STAMPS)/dtb-$(KDIR_TAG): | $(STAMPS) fetch-kernel
 	else \
 		echo "[dtb]   ✅ 安全版无 usb-role-switch"; \
 	fi
+	@if grep -Eq "fcs,fusb301|qcom,pmi8950-smbchg-otg" "$(DTB_OUT)/.odin-dtb-check.dts"; then \
+		echo "[dtb]   ❌ 安全版仍含已移除的重复 USB 驱动节点" >&2; exit 1; \
+	fi
+	@rm -f "$(DTB_OUT)/.odin-dtb-check.dts"
+	@dtc -I dtb -O dts "$(DTB_OUT)/msm8953-smartisan-odin-ft8716.dtb" \
+		> "$(DTB_OUT)/.odin-dtb-check.dts" 2>/dev/null \
+		|| { echo "[dtb]   ❌ 完整版 dtc 反编译失败" >&2; exit 1; }
+	@if [ "$$(awk '/usb-role-switch/{n++} END{print n+0}' "$(DTB_OUT)/.odin-dtb-check.dts")" -ne 2 ]; then \
+		echo "[dtb]   ❌ 完整版应有 SMBCHG consumer + DWC3 provider 两个 usb-role-switch" >&2; exit 1; \
+	fi
+	@if ! grep -q "otg-vbus" "$(DTB_OUT)/.odin-dtb-check.dts"; then \
+		echo "[dtb]   ❌ 完整版缺 SMBCHG 原生 OTG regulator 子节点" >&2; exit 1; \
+	fi
+	@if grep -Eq "fcs,fusb301|qcom,pmi8950-smbchg-otg" "$(DTB_OUT)/.odin-dtb-check.dts"; then \
+		echo "[dtb]   ❌ 完整版仍含已移除的重复 USB 驱动节点" >&2; exit 1; \
+	fi
+	@echo "[dtb]   ✅ 完整版 SMBCHG → DWC3 role switch 接线正确"
 	@rm -f "$(DTB_OUT)/.odin-dtb-check.dts"
 	@mkdir -p $(STAMPS) && touch $@
 
 # ================================================================ 内核与模块
-# 0001-0008 全打：CI 的价值之一就是持续证明这些补丁仍适用于钉死的 commit。
+# 全部补丁都打：CI 的价值之一就是持续证明它们仍适用于钉死的 commit。
 kernel: $(STAMPS)/kernel-$(KDIR_TAG)
 $(STAMPS)/kernel-$(KDIR_TAG): | $(STAMPS) fetch-kernel
 	@mkdir -p $(KERNEL_OUT)
-	@echo "[kernel] 应用补丁 0001-0008"
+	@echo "[kernel] 应用全部补丁"
 	# 打补丁必须**可重跑**：改了配置想在同一棵树上重编内核是家常便饭，
 	# 而 `patch --forward` 遇到"已应用过"会跳过并返回 1，在 set -e 下直接把构建打断
 	#（实测：改完 CONFIG_RTC_* 重编，第一行就挂在这里）。
@@ -226,6 +243,14 @@ $(STAMPS)/kernel-$(KDIR_TAG): | $(STAMPS) fetch-kernel
 	cd "$(KDIR)" && make ARCH=arm64 CROSS_COMPILE="$(CROSS)" \
 		INSTALL_MOD_PATH="$(KERNEL_OUT)/modstage" modules_install 2>&1 \
 		| tee /tmp/odin-modules-install.log
+	# Debian uses merged-/usr. Never publish a top-level lib/ directory:
+	# extracting such an archive over / can replace /lib -> usr/lib and
+	# immediately break dynamic binaries and PAM.
+	rm -f "$(KERNEL_OUT)"/modstage/lib/modules/*/build \
+	      "$(KERNEL_OUT)"/modstage/lib/modules/*/source
+	mkdir -p "$(KERNEL_OUT)/modstage/usr/lib"
+	mv "$(KERNEL_OUT)/modstage/lib/modules" "$(KERNEL_OUT)/modstage/usr/lib/"
+	rmdir "$(KERNEL_OUT)/modstage/lib"
 	tar -cf "$(KERNEL_OUT)/modules.tar" -C "$(KERNEL_OUT)/modstage" .
 	rm -rf "$(KERNEL_OUT)/modstage"
 	@echo "[kernel]   modules.tar $$($(call SIZE,$(KERNEL_OUT)/modules.tar)) 字节"
@@ -259,6 +284,7 @@ $(STAMPS)/lk2nd: | $(STAMPS)
 	done
 	@echo "[lk2nd] 构建完整版"
 	make -j"$(JOBS)" -C "$(LK2ND_SRC)" TOOLCHAIN_PREFIX=arm-none-eabi- \
+		CCACHE="$(if $(shell command -v ccache 2>/dev/null),ccache,)" \
 		LK2ND_VERSION="$(LK2ND_VER)-full-odinport" PROJECT=lk2nd-msm8953 2>&1 \
 		| tee /tmp/lk2nd-build-full.log
 	cp -f "$(LK2ND_SRC)/build-lk2nd-msm8953/lk2nd.img" "$(LK2ND_OUT)/lk2nd.img"
@@ -269,8 +295,10 @@ $(STAMPS)/lk2nd: | $(STAMPS)
 		patch -p1 --forward --no-backup-if-mismatch -d "$(LK2ND_SRC)" < "$$p"; \
 	done
 	make -j"$(JOBS)" -C "$(LK2ND_SRC)" TOOLCHAIN_PREFIX=arm-none-eabi- \
+		CCACHE="$(if $(shell command -v ccache 2>/dev/null),ccache,)" \
 		LK2ND_VERSION="$(LK2ND_VER)-nomarkw-odinport" PROJECT=lk2nd-msm8953 2>&1 \
 		| tee /tmp/lk2nd-build-nomarkw.log
+	@command -v ccache >/dev/null 2>&1 && ccache -s || true
 	cp -f "$(LK2ND_SRC)/build-lk2nd-msm8953/lk2nd.img" "$(LK2ND_OUT)/lk2nd-nomarkw.img"
 	@echo "[lk2nd]   lk2nd-nomarkw.img $$($(call SIZE,$(LK2ND_OUT)/lk2nd-nomarkw.img)) 字节"
 	@echo "[lk2nd] 自检"

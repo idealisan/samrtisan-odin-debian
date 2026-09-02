@@ -116,7 +116,8 @@ install -m 0644 "$KOUT/vmlinuz" "$ROOT/boot/vmlinuz"
 TMPMOD=$(mktemp -d)
 tar -xf "$KOUT/modules.tar" -C "$TMPMOD"
 mkdir -p "$ROOT/usr/lib/modules"
-cp -a "$TMPMOD"/lib/modules/. "$ROOT/usr/lib/modules/"
+test -d "$TMPMOD/usr/lib/modules"
+cp -a "$TMPMOD"/usr/lib/modules/. "$ROOT/usr/lib/modules/"
 rm -rf "$TMPMOD"
 KVER=$(ls "$ROOT/usr/lib/modules" | head -1)
 say "  内核版本: $KVER"

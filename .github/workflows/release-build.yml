@@ -94,10 +94,29 @@ jobs:
   # ------------------------------------------------- lk2nd（刷 boot 分区那个）
   lk2nd:
     runs-on: ubuntu-latest
+    env:
+      CCACHE_DIR: /tmp/odin-ccache-lk2nd
     steps:
       - uses: actions/checkout@v4
       - name: 安装 ARM32 裸机工具链
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-arm-none-eabi device-tree-compiler libfdt-dev make
+        id: lk2nd_toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-arm-none-eabi device-tree-compiler libfdt-dev make ccache
+          ccache --set-config=max_size=512M
+          ccache --set-config=compression=true
+          ccache --set-config=compiler_check=content
+          ccache --set-config=hash_dir=false
+          ccbin=$(command -v arm-none-eabi-gcc)
+          ccid="$(arm-none-eabi-gcc -dumpversion)-$(md5sum "$ccbin" | cut -c1-8)"
+          echo "cc=$ccid" >> "$GITHUB_OUTPUT"
+          ccache -z
+      - name: 取 lk2nd 编译对象缓存
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: lk2nd-ccache-v1-${{ steps.lk2nd_toolchain.outputs.cc }}-${{ env.LK2ND_VER }}-${{ github.run_id }}
+          restore-keys: lk2nd-ccache-v1-${{ steps.lk2nd_toolchain.outputs.cc }}-${{ env.LK2ND_VER }}-
       - name: 取 lk2nd 产物缓存
         id: lk2nd_cache
         uses: actions/cache@v4
@@ -114,6 +133,12 @@ jobs:
             touch out/.stamps/lk2nd
           fi
           make lk2nd OUT=out
+      - name: 保存 lk2nd 编译对象缓存
+        if: steps.lk2nd_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: lk2nd-ccache-v1-${{ steps.lk2nd_toolchain.outputs.cc }}-${{ env.LK2ND_VER }}-${{ github.run_id }}
       - name: 校验缓存的 lk2nd 产物
         run: |
           test -s out/lk2nd/lk2nd.img
@@ -174,7 +199,6 @@ jobs:
         id: ccache
         run: |
           mkdir -p "$HOME/.cache/ccache"/{0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f}
-          ccache --set-config=max_size=320M
           for shard in 0 1 2 3 4 5 6 7 8 9 a b c d e f; do
             touch "$HOME/.cache/ccache/.before-$shard"
           done
@@ -418,7 +442,7 @@ jobs:
           # （镜像站不进键：不同镜像拉到的包内容应当一致，且 CI 固定用官方源）
           inc="busybox-static,udev,ssh,sudo,systemd,iproute2,dnsmasq,parted,e2fsprogs"
           debver=$(debootstrap --version | awk '{print $NF}' | tr -d ' ')
-          echo "basekey=odin-baseroot-v2-bookworm-arm64-${debver}-$(printf '%s' "$inc" | sha256sum | cut -c1-16)-${{ hashFiles('tools/ci/build-rootfs.sh') }}" >> "$GITHUB_OUTPUT"
+          echo "basekey=odin-baseroot-v3-bookworm-arm64-${debver}-$(printf '%s' "$inc" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
       # debootstrap 是 rootfs job 的最大单项开销（core 变体实测 283 秒、占 83%），
       # 而它的产物与变体无关 —— 缓存起来每个变体省 4~5 分钟。
       # 打包/解包由 tools/ci/build-rootfs.sh 按 ODIN_BASE_TAR 指到的路径完成，
@@ -442,7 +466,21 @@ jobs:
         id: stagekey
         run: |
           kernel_hash="$(sha256sum out/kernel/vmlinuz out/kernel/modules.tar out/dtb/*.dtb | sha256sum | cut -c1-16)"
-          echo "key=odin-rootfs-stage-v1-${{ matrix.variant }}-${kernel_hash}-${{ hashFiles('tools/ci/build-rootfs.sh', 'dist/build/setup-rootfs.sh', 'dist/build/initramfs/**', 'dist/build/initramfs-applets.txt', 'dist/build/rootfs/**', 'tools/pack_initramfs.sh', 'tools/build-image.sh') }}" >> "$GITHUB_OUTPUT"
+          # hashFiles follows filesystem entries and fails on the intentionally
+          # unresolved initramfs switch_root symlink. Hash Git's blob IDs,
+          # modes, and paths instead; this also includes symlink targets.
+          rootfs_inputs_hash="$(
+            git ls-files -s -- \
+              tools/ci/build-rootfs.sh \
+              dist/build/setup-rootfs.sh \
+              dist/build/initramfs \
+              dist/build/initramfs-applets.txt \
+              dist/build/rootfs \
+              tools/pack_initramfs.sh \
+              tools/build-image.sh \
+            | sha256sum | cut -c1-16
+          )"
+          echo "key=odin-rootfs-stage-v1-${{ matrix.variant }}-${kernel_hash}-${rootfs_inputs_hash}" >> "$GITHUB_OUTPUT"
       - name: 取 rootfs staging 层缓存
         id: stage_cache
         uses: actions/cache@v4

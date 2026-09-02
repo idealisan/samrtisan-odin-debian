@@ -68,19 +68,25 @@ echo "dtc:    $DTC_BIN (v$DTC_VER)"
 echo
 
 echo "[1/4] 完整版 msm8953-smartisan-odin.dtb"
-build_one "$DTS_DIR/msm8953-smartisan-odin.dts" "$HERE/msm8953-smartisan-odin.dtb"
+build_one "$DTS_DIR/msm8953-smartisan-odin.dts" "$TMP/msm8953-smartisan-odin.dtb"
 
 echo "[2/4] 安全版 msm8953-smartisan-odin-norolesw.dtb"
-build_one "$HERE/msm8953-smartisan-odin-norolesw.dts" "$HERE/msm8953-smartisan-odin-norolesw.dtb"
+build_one "$HERE/msm8953-smartisan-odin-norolesw.dts" "$TMP/msm8953-smartisan-odin-norolesw.dtb"
 
 # 面板写死版：给"boot 分区仍是未精简 lk2nd"的场景用（lk2nd 不会替换占位
 # compatible，就由 DTB 自己直接指定面板）。刷入精简版 lk2nd 后应切回上面两个。
 echo "[3/4] 面板写死 FT8716（完整版）msm8953-smartisan-odin-ft8716.dtb"
-build_one "$HERE/msm8953-smartisan-odin-ft8716.dts" "$HERE/msm8953-smartisan-odin-ft8716.dtb"
+build_one "$HERE/msm8953-smartisan-odin-ft8716.dts" "$TMP/msm8953-smartisan-odin-ft8716.dtb"
 
 echo "[4/4] 面板写死 FT8716（安全版）msm8953-smartisan-odin-ft8716-norolesw.dtb"
 build_one "$HERE/msm8953-smartisan-odin-ft8716-norolesw.dts" \
-	"$HERE/msm8953-smartisan-odin-ft8716-norolesw.dtb"
+	"$TMP/msm8953-smartisan-odin-ft8716-norolesw.dtb"
+
+# Publish only after all four builds succeed. A failed build must never leave
+# old DTBs looking like fresh output.
+for f in "$TMP"/*.dtb; do
+	install -m 0644 "$f" "$HERE/$(basename "$f")"
+done
 
 echo
 echo "=== 面板写死版自检（应含 smartisan,odin-ft8716、无占位独留）==="

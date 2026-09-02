@@ -13,13 +13,12 @@ msm8953-mainline 内核（Linux 6.19，github.com/msm8953-mainline/linux）编�
 > **完整使用说明见 [docs/](docs/README.md)**：
 > [复现构建](docs/01-复现构建.md) ｜ [刷入指南](docs/02-刷入指南.md) ｜ [系统使用](docs/03-系统使用.md)
 
-## 一、补丁清单（odin-port/patches/0001–0008）
+## 一、补丁清单
 
 | # | 补丁 | 内容 |
 |---|------|------|
 | 1 | dt-bindings: vendor-prefixes | 新增 `smartisan` 厂商前缀 |
-| 2 | usb: typec: FUSB301 | Type-C CC 控制器驱动（I2C 0x25，中断 GPIO38），输出 typec class + usb role switch |
-| 3 | regulator: SMBCHG OTG | PMI8950 充电器 OTG boost 5V 稳压器（bat-if 外设 0x1200 + 寄存器 0x42 BIT0），供 host 模式 VBUS |
+| 2 | dt-bindings: qcom,smbchg | 记录 SMBCHG 到 DWC3 的 `usb-role-switch` phandle |
 | 4 | drm/panel: R69006 | R69006 1080p 面板，命令模式（原厂首选）+ 视频模式两个 compatible |
 | 5 | drm/panel: FT8716 | FocalTech FT8716 TDDI 1080p 视频模式面板 + Sharp 模组变体 |
 | 6 | drm/panel: NT36672 | Novatek NT36672 1080p 视频模式面板 |
@@ -86,8 +85,8 @@ r69006 的 cmd/video 两个变体**不在 aboot 的 strap 逻辑里**（原厂�
 ## 三、USB 外接存储链路
 
 ```
-USB-C 插入 OTG/U盘 → FUSB301 CC 检测(IRQ) → role switch → HOST
-  → dwc3-qcom 切 host → SMBCHG OTG boost 输出 5V VBUS
+USB-C 插入 OTG/U盘 → PMI8950 SMBCHG USB-ID 检测 → role switch → HOST
+  → dwc3-qcom 切 host + SMBCHG 原生 OTG regulator 输出 5V VBUS
   → xHCI 枚举 → usb-storage/UAS → /dev/sda1
 ```
 
@@ -157,8 +156,8 @@ sudo sed -i 's/^default .*/default l0/' /extlinux/extlinux.conf && sudo reboot
 **构建侧**
 - 全量构建通过：Image（30MB）、modules、全部 DTBs（Docker arm64 本机构建）
 - 新驱动 W=1 零警告；DTB 通过 dtc schema 校验（无 error/warning）
-- odin DTB 反编译复核：panel@0 占位节点、fusb301@25、otg-vbus 稳压器、
-  connector 图形端点接线均正确
+- odin DTB 反编译复核：panel@0 占位节点、SMBCHG 原生 `otg-vbus` 子节点，
+  以及 SMBCHG consumer → DWC3 provider 的 role-switch phandle 均正确
 - 安全版 DTB 自检：`usb-role-switch`=0、`usb-c-connector`=0、`dr_mode="peripheral"`
 
 **QEMU 回归**（`odin-qemu/test-automount.sh`，见 `reports/017`）

@@ -65,21 +65,19 @@ mount -t configfs none /sys/kernel/config 2>/dev/null
 [ -d /sys/kernel/config/usb_gadget ] || { log "configfs unavailable, skip"; exit 0; }
 
 # ------------------------------------------------------- 当前应有的角色
-# Type-C 判 host 才切 host；没有 typec 子系统（安全版 DTB / QEMU）则恒 device
+# PMIC SMBCHG extcon 是 ODIN 的角色来源；Type-C class 保留作兼容兜底。
 want_role() {
 	local f r
+	for f in /sys/class/extcon/*/state; do
+		[ -r "$f" ] || continue
+		grep -qx 'USB-HOST=1' "$f" && { echo host; return; }
+	done
 	for f in /sys/class/typec/*/data_role; do
 		[ -r "$f" ] || continue
 		r=$(cat "$f" 2>/dev/null)
 		case "$r" in
 			host|*"[host]"*) echo host; return ;;
 		esac
-	done
-	# The ODIN PMIC exposes the cable role through extcon when the FUSB301
-	# typec class device is unavailable or has not probed yet.
-	for f in /sys/class/extcon/*/state; do
-		[ -r "$f" ] || continue
-		grep -qx 'USB-HOST=1' "$f" && { echo host; return; }
 	done
 	echo device
 }

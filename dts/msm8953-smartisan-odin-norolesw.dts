@@ -14,7 +14,7 @@
  *   1) &usb3 删除 usb-role-switch 属性
  *   2) &usb3 删除 ports（与 usb-c-connector 相连的 OF graph 端点）
  *   3) &usb3 的 dr_mode 由 "otg" 改为 "peripheral"
- *   4) fusb301 删除 connector 子节点（不再驱动角色切换）
+ *   4) SMBCHG 删除到 DWC3 role switch 的连接
  *
  * 参考：reports/015 §二（阶段 0）、reports/014（USB 救援通道加固）
  *
@@ -35,8 +35,6 @@
 	/delete-node/ ports;
 };
 
-&i2c_6 {
-	typec-controller@25 {
-		/delete-node/ connector;
-	};
+&pmi8950_smbcharger {
+	/delete-property/ usb-role-switch;
 };

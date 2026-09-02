@@ -8,8 +8,8 @@ Add initial support for the Smartisan ODIN (U2 Pro), an MSM8953
 (Snapdragon 625) smartphone:
 
 - eMMC and microSD storage
-- USB Type-C with dual-role support via FUSB301 CC controller,
-  including OTG VBUS from the SMBCHG boost converter for host mode
+- USB Type-C dual-role support using the PMI8950 SMBCHG USB/ID detection
+  and its integrated OTG VBUS regulator
 - Display: MDSS/DSI0/14nm PHY with WLED backlight and LAB/IBB
   bias regulators. The panel compatible is a placeholder that is
   filled in by lk2nd based on the panel detected at boot; drivers
@@ -27,8 +27,8 @@ Add initial support for the Smartisan ODIN (U2 Pro), an MSM8953
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 ---
  arch/arm64/boot/dts/qcom/Makefile             |   1 +
- .../boot/dts/qcom/msm8953-smartisan-odin.dts  | 449 ++++++++++++++++++
- 2 files changed, 450 insertions(+)
+ .../boot/dts/qcom/msm8953-smartisan-odin.dts  | 518 ++++++++++++++++++
+ 2 files changed, 519 insertions(+)
  create mode 100644 arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
 
 diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,587 @@
+@@ -0,0 +1,518 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -114,43 +114,6 @@ index 000000000..3dc8f434d
 +	vdda-phy-dpdm-supply = <&pm8953_l13>;
 +
 +	status = "okay";
-+};
-+
-+&i2c_6 {
-+	status = "okay";
-+
-+	typec-controller@25 {
-+		compatible = "fcs,fusb301";
-+		reg = <0x25>;
-+
-+		interrupts-extended = <&tlmm 38 IRQ_TYPE_LEVEL_LOW>;
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&typec_int_default>;
-+
-+		vbus-supply = <&usb_otg_vbus>;
-+
-+		connector {
-+			compatible = "usb-c-connector";
-+			label = "USB-C";
-+			power-role = "dual";
-+			data-role = "dual";
-+			self-powered;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port@0 {
-+					reg = <0>;
-+
-+					usb_con_hs: endpoint {
-+						remote-endpoint = <&usb_dwc3_hs>;
-+					};
-+				};
-+			};
-+		};
-+	};
 +};
 +
 +&mdss {
@@ -381,19 +344,6 @@ index 000000000..3dc8f434d
 +	status = "okay";
 +};
 +
-+&spmi_bus {
-+	pmic@2 {
-+		usb_otg_vbus: otg-vbus {
-+			compatible = "qcom,pmi8950-smbchg-otg";
-+			reg = <0x1200 0x100>;
-+
-+			regulator-name = "smbcharger-otg-vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+		};
-+	};
-+};
-+
 +&tlmm {
 +	gpio-reserved-ranges = <0 4>, <16 4>, <135 4>;
 +
@@ -432,12 +382,6 @@ index 000000000..3dc8f434d
 +		bias-pull-down;
 +	};
 +
-+	typec_int_default: typec-int-default-state {
-+		pins = "gpio38";
-+		function = "gpio";
-+		drive-strength = <2>;
-+		bias-pull-up;
-+	};
 +
 +	ts_int_active: ts-int-active-state {
 +		pins = "gpio65";
@@ -528,24 +472,6 @@ index 000000000..3dc8f434d
 +	dr_mode = "otg";
 +};
 +
-+/*
-+ * USB Type-C 角色切换的连接关系：usb3 的 HS 端点 ↔ FUSB301 的 connector。
-+ *
-+ * 2026-08-31 修正（换基线带坏设备树的后遗症）：
-+ *   旧基线 msm8953.dtsi 是「usb3 父节点(qcom,dwc3) + usb3_dwc3 子节点(snps,dwc3)」
-+ *   两层结构，端点标签 usb_dwc3_hs 定义在子节点里，本文件用 &usb3_dwc3 引用。
-+ *   新基线（pmOS msm8953 分支，6.19）已把两者合并成单个 usb3 节点
-+ *   （compatible = "qcom,msm8953-dwc3", "qcom,snps-dwc3"），
-+ *   且 usb_dwc3_hs 这个端点标签**由 msm8953.dtsi 内建提供**。
-+ *   ⇒ &usb3_dwc3 解析不到（dtc: "Label or path usb3_dwc3 not found"，DTB 直接编不出来），
-+ *     而自己再定义一次 usb_dwc3_hs 是与 dtsi 重复定义。
-+ *   改法照上游标准写法（同 qrb2210-rb1.dts 的 &usb_dwc3_hs）：
-+ *   端点只补 remote-endpoint，dr_mode 提到 &usb3 上。
-+ */
-+&usb_dwc3_hs {
-+	remote-endpoint = <&usb_con_hs>;
-+};
-+
 +&gpu {
 +	/*
 +	 * 2026-08-29 实机补漏：msm8953.dtsi 里 gpu@1c00000 默认 status="disabled"，
@@ -634,7 +560,12 @@ index 000000000..3dc8f434d
 +
 +&pmi8950_smbcharger {
 +	monitored-battery = <&battery>;
++	usb-role-switch = <&usb3>;
 +	status = "okay";
++
++	otg-vbus {
++		regulator-name = "smbcharger-otg-vbus";
++	};
 +};
 -- 
 2.48.1
