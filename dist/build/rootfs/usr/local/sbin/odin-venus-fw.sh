@@ -25,6 +25,8 @@ set -u
 DEST=/lib/firmware
 LOG=/var/log/odin-venus-fw.log
 VENUS_LIB=/usr/local/lib/odin/venus-devs.sh
+# "重建 venus probe" 的已重试标记 —— 保证只重试一次，不每开机都撞（见文末 §2）
+RETRIED=/var/lib/odin-venus-retried
 
 say() { echo "$(date -Is) $*" >> "$LOG" 2>/dev/null; }
 
@@ -115,12 +117,34 @@ have_fw || {
 # 驱动若早已因缺固件而 probe 失败，它不会自己重试 —— 重建一次让它再来。
 # 这一步与"这次有没有新拷到固件"无关：固件早就齐全、但 probe 一直失败的机器
 # 同样需要它（那正是本服务存在的意义）。
+#
+# ⚠️ 但**只重试一次**（靠 $RETRIED 标记），不能每次开机都重试：
+#   重建 probe 就是让 venus 固件重新 boot 一次，而"venus 相关操作卡在不可中断
+#   状态、连 reboot 都被挡住、设备停在'网络在、SSH 已停'的半关机状态"在本机
+#   有实锤记录（reports/029 §7）。每次开机都去撞一次，等于把一个小概率的
+#   启动失败放大成每开机必赌一次。重试一次拿不到，就交给人工 —— 日志里会
+#   写明怎么再给它一次机会。
 if venus_up; then
 	say "venus 已就绪：$(odin_venus_devs | tr '\n' ' ')"
+	# 起来了就清掉标记：将来万一又坏了，还能再自动重试一次
+	rm -f "$RETRIED" 2>/dev/null
 	exit 0
 fi
 
-say "venus 未就绪，尝试重建 probe"
+if [ ! -s "$DEST/venus.mdt" ]; then
+	say "venus 未就绪，且固件也不在位 —— 重建 probe 只会再失败一次，跳过"
+	exit 0
+fi
+
+if [ -e "$RETRIED" ]; then
+	say "venus 未就绪，但已重试过一次（标记 $RETRIED）—— 不再每开机都撞一次"
+	say "要再试一次：sudo rm -f $RETRIED && sudo systemctl restart odin-venus-fw"
+	exit 0
+fi
+
+say "venus 未就绪且固件在位 —— 重建一次 probe"
+mkdir -p /var/lib 2>/dev/null
+: > "$RETRIED" 2>/dev/null
 venus_reload
 
 # 编解码两个子模块绑定 venus 注册的 video-decoder/video-encoder 平台设备，

@@ -6,7 +6,13 @@ date
 echo
 findfs
 grep
+# head 必须留着：init 的 usb_up()（UDC=$(ls /sys/class/udc | head -n1)，initramfs
+# 救援通道）、以及两个取固件脚本的 part_dev()（sed ... | head -1）都在用它。
+# 缺了它这些行全是 "not found"，而且脚本失败不致命 ⇒ 静默失效，看不出原因。
+head
 ip
+# kill 在 busybox ash 里是内建，留一条只是保险（init 末尾 kill %1 %2）
+kill
 ln
 ls
 mdev

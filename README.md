@@ -121,12 +121,20 @@ exFAT 或 NTFS。**
 
 | label | DTB | 用途 |
 |---|---|---|
-| `l0`（默认） | `msm8953-smartisan-odin-ft8716.dtb` | 完整版：按 Type-C 方向自动切换 USB 网卡或 OTG host |
-| `l0-safe` | `msm8953-smartisan-odin-ft8716-norolesw.dtb` | USB 固定 device，UDC 恒在，SSH 不依赖 Type-C 判定；代价：无 OTG |
+| `l0` | `msm8953-smartisan-odin-ft8716.dtb` | 完整版：按 Type-C 方向自动切换 USB 网卡或 OTG host |
+| `l0-safe`（首刷默认） | `msm8953-smartisan-odin-ft8716-norolesw.dtb` | USB 固定 device，UDC 恒在，SSH 不依赖 Type-C 判定；代价：无 OTG |
+
+**首刷默认 `l0-safe`。** 原因：`l0` 依赖 Type-C 角色切换，而这条链路在 2026-09-02
+被整体重写过（`fc3e971`：删掉 FUSB301 与 SMBCHG OTG boost 两个内核补丁共 665 行、
+新增 `qcom-smbchg` 的 `usb-role-switch` 补丁、改设备树 89 行与内核配置），
+**没有真机验证记录**。SSH 是本机唯一的远程生命线 —— 角色切换不工作 ⇒ 无 `usb0`
+⇒ 无 `172.16.42.1` ⇒ 无 SSH，而无屏设备这时只剩 UART。
 
 用的是**面板写死 FT8716** 的那一对 DTB（`*-ft8716*`），不是自动识别版：写死之后面板
 是否点亮与 lk2nd 选中哪个 QCDT 条目无关，排障面小很多。自动识别的一对也随镜像发布，
 换屏后把 `fdt` 改回去即可。
+
+拿到 SSH、确认整机可用后再切完整版（有 OTG）：
 
 ```sh
 sudo sed -i 's/^default .*/default l0/' /extlinux/extlinux.conf && sudo reboot
