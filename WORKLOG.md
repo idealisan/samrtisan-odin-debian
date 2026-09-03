@@ -2769,3 +2769,88 @@ b) **外部功放没被正确使能** —— 原厂只给了 `ext-pa-enable = gp
     唯一真问题：README 第 193 行"默认进 l0"与首刷默认 l0-safe 政策自相矛盾，已改。
   - **踩坑/补记**：WORKLOG 此前记 fc3e971"零验证记录"的担忧经源码核对可排除；
     但真机验证（fastboot 刷入后实跑）仍待补，本机 Windows 缺 fastboot 驱动暂未刷。
+
+## ================= 2026-09-03 傍晚：v0.9.4-venus-applets 实刷 + venus 真机验证 =================
+
+### 刷机：v0.9.4-venus-applets core 实刷真机，**验收 16/16 全通过**
+
+- 从原厂 fastboot 起（`serialno 67dbfeb9`、`version 0.5`、只导出 cache/userdata/system
+  三个分区、**没有 lk2nd 分区**），全程 4m23s：
+  - `30 boot`：刷 `lk2nd` 分区失败（`partition table doesn't exist`）→ 自动回退
+    `fastboot flash boot` → OKAY。**这正是原厂 fastboot 下的正确刷法**
+    （`docs/02:156`、`reports/018:191` 都是这么写的），所以那条 warn 是正常的，
+    不是故障。
+  - `40 data`：sparse 分 3 块共 77.6s；`50 reboot` → USB 网卡 15s；
+    `70 ssh` 90s；`80 verify` **16/16，失败 0**；根分区 112G（已扩容）。
+- **这是 v0.9.4-* 系列第一次真机验收**，结束了自 09-01 电池版"刷入后失联"以来
+  的无验证状态。
+
+### venus：补丁 0009 在真机上成立，reports/029 §7 的判据全部满足
+
+- dmesg 只有一条 `truncated property 0x1007: need 20 bytes, 12 left`，
+  **没有 probe 失败** —— 与 0009 的预期逐字吻合。
+- `/dev/video0` = `qcom-venus-decoder`、`/dev/video1` = `qcom-venus-encoder`
+  （本镜像里 CAMSS 没开，摄像头不再占 video0~5）。
+- initramfs 取固件成功（日志：`已取 venus.b00~b04 + venus.mdt ← modem`），
+  证明 1365629 补的 `head` applet 生效了 —— 没有它 venus 与 WiFi 固件都取不到。
+- 解码能力：H264 / HEVC / VP8 / VP9 / VC1 / MPEG4 / MPEG2 / H263 / XVID。
+  编码能力：H264 / VP8 / HEVC / MPEG4 / H263。
+
+### 用户实际用法：硬件编码必须加 `-pix_fmt nv12`，否则打不开编码器
+
+用户原命令失败的真实原因是**三个独立问题叠在一起**，逐个排除（证据
+`evidence/venus/final-commands.txt`）：
+
+| 变体 | 结果 |
+|---|---|
+| 原命令 | ❌ `Could not find a valid device` |
+| 只改音频 `-c:a aac` | ❌ `Encoder requires nv12 pixel format` |
+| 只加 `-pix_fmt nv12` | ❌ `Could not write header`（pcm_s16le 不能进 mp4） |
+| **video 组 + 两项都改** | ✅ 2539744 字节 / 7.3s |
+
+1. **`user` 不在 `video` 组**：`/dev/video*` 是 `root:video 660`，
+   `video:x:44:` 组成员为空 ⇒ ffmpeg 打不开设备 ⇒ 报 "Could not find a valid device"
+   （它把打不开的设备直接跳过，报错信息完全不提权限）。已在真机上
+   `usermod -aG video user` 验证通过，**还没进构建流程**。
+2. **源是 `yuvj420p` 时 ffmpeg 不会自动转成 nv12**，必须显式 `-pix_fmt nv12`。
+   对照：用 lavfi 生成 `yuv420p` 时 ffmpeg 会自动插 `auto_scale` 转成 nv12，
+   所以这个问题在合成源测试里**暴露不出来**。
+3. `-c:a copy` 把 `pcm_s16le` 塞进 mp4 不合法，与 venus 无关（软件编码同样报错）。
+
+### 实测能跑通的档位（`-pix_fmt nv12`，源 1920x1440 HEVC）
+
+- 硬件**解码** ✅：`ffmpeg -c:v hevc_v4l2m2m -i in.mov -f rawvideo -pix_fmt nv12 out.raw`
+  → 149 帧 617932800 字节，**2.5 秒**。
+- 硬件**编码** ✅：1920x1440 / 1280x720 / 854x480 / 640x480 / 320x240 全通过。
+- 硬件编码 ❌：**1920x1080 稳定段错误**（rc=139，连续 3 次复现；内核侧无任何消息）。
+- 硬解 + 硬编在同一条命令里（全硬件转码）❌ 段错误；分开跑各自都正常。
+
+### 一次未定位的重启（19:41:38）
+
+- 现象：SSH 断连，`up 1 min`。**不是** panic —— pstore 空、无 Oops、
+  无 Call trace、无 `/dev/watchdog`；电池 61% / 4.07V / 28°C、温度 44~49°C，
+  电池与热都正常。
+- 已排除：
+  - 纯 CPU 满载（8 路 `sha256sum` 跑 25s）→ 不重启；
+  - 1920x1080 的段错误本身（`dmesg -w` 全程跟踪，零内核消息）→ 不重启；
+  - 死亡那一刻正在跑的软件 HEVC 解码（干净状态下原样重跑）→ 618MB 正常产出。
+- **唯一的相关前置状态**：19:28:50 有
+  `qcom-venus 1d00000.venus: wait for cpu and video core idle fail (-110)`
+  （我强杀了一个正占着编码器的 ffmpeg 留下的），19:36:21 我 unbind 时又触发
+  `WARNING: venus/core.c:540 venus_remove+0xd8 x0=-22(-EINVAL)`
+  （上游 `WARN_ON(ret < 0)`，`pm_runtime_get_sync` 返回 -EINVAL，**无害**）。
+- 结论：**根因没抓到**。已复现不出来。唯一可复用的线索是"venus 被强杀后进入
+  卡死态"这个高危前置条件 —— 与 reports/029 §7 记的"卡 D 状态、只能长按电源键"
+  是同一类。以后调试 venus 时不要强杀 ffmpeg。
+
+### 踩坑
+
+- **`odin_sudo` 走的是 `sh`，而 Debian 的 `/bin/sh` 是 dash**：实测
+  `sh -c 'echo ${@:3}'` → `Bad substitution`。所以往 `odin_sudo` 的 heredoc 里
+  写 bash 数组语法会失败。调试时改用"scp 脚本上去再跑"（`tmp/venus-check/exec.sh`）。
+- **`odin_ssh 'bash -s' < 本地脚本` 会被 ssh 吃掉行首字符**（`echo` 变 `ho`、
+  `for` 变 `or`），必须改用 scp 传文件。
+- 从 GitHub 下载要走 `env -u http_proxy -u https_proxy`（本机默认有
+  `http_proxy=http://127.0.0.1:3030`）。core sparse 1.1GB 用 3m43s，可接受。
+- macOS 没有 `timeout`：外层等待用 Python `subprocess.run(..., timeout=)` 包一层。
+- 写后台采样器时别用裸 `wait` —— 它会把无限循环的采样器一起等进去，永远不返回。

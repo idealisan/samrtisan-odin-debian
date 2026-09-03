@@ -1,0 +1,65 @@
+=== /var/log/venus-watch.log (36322 bytes) ===
+[   46.020256] input: pm8941_resin as /devices/platform/soc@0/200f000.spmi/spmi-0/0-00/200f000.spmi:pmic@0:pon@800/200f000.spmi:pmic@0:pon@800:resin/input/input3
+[   47.959672] Bluetooth: Core ver 2.22
+[   47.979381] NET: Registered PF_BLUETOOTH protocol family
+[   47.981648] Bluetooth: HCI device and connection manager initialized
+[   48.005065] Bluetooth: HCI socket layer initialized
+[   48.008536] Bluetooth: L2CAP socket layer initialized
+[   48.013191] Bluetooth: SCO socket layer initialized
+[   49.146798] platform 1a01000.display-controller: Adding to iommu group 3
+[   49.147001] /soc@0/display-subsystem@1a00000/display-controller@1a01000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[   49.153649] /soc@0/display-subsystem@1a00000/display-controller@1a01000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[   49.166288] /soc@0/display-subsystem@1a00000/dsi@1a94000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0
+[   49.178604] qcom-venus 1d00000.venus: Unsupported property: 0
+[   49.179281] /soc@0/display-subsystem@1a00000/dsi@1a94000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/display-controller@1a01000
+[   49.191760] qcom-venus 1d00000.venus: truncated property 0x1007: need 20 bytes, 12 left
+[   49.211206] /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[   49.246145] /soc@0/display-subsystem@1a00000/dsi@1a94000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0
+[   49.246404] /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[   49.261591] msm_dpu 1a01000.display-controller: bound 1a94000.dsi (ops dsi_ops [msm])
+[   49.272266] adreno 1c00000.gpu: supply vdd not found, using dummy regulator
+[   49.278757] adreno 1c00000.gpu: supply vddcx not found, using dummy regulator
+[   49.290697] msm_dpu 1a01000.display-controller: bound 1c00000.gpu (ops a3xx_ops [msm])
+[   49.294948] [drm:dpu_kms_hw_init:1173] dpu hardware revision:0x10100000
+[   49.318265] [drm] Initialized msm 1.13.0 for 1a01000.display-controller on minor 0
+[   49.318585] msm_dpu 1a01000.display-controller: Direct firmware load for qcom/a530_pm4.fw failed with error -2
+[   49.324896] msm_dpu 1a01000.display-controller: [drm:adreno_request_fw [msm]] *ERROR* failed to load a530_pm4.fw
+[   49.335870] Bluetooth: MGMT ver 1.23
+[   49.534297] Console: switching to colour frame buffer device 135x120
+[   49.534328] fb0: sys_imageblit: framebuffer is not in virtual address space.
+[   49.575762] msm_dpu 1a01000.display-controller: [drm] fb0: msmdrmfb frame buffer device
+[   50.217551] wlan0: authenticate with 86:e8:9d:c5:b0:a9 (local address=02:00:67:db:fe:b9)
+[   50.217671] wlan0: send auth to 86:e8:9d:c5:b0:a9 (try 1/3)
+[   50.231422] wlan0: authenticated
+[   50.234386] wlan0: associate with 86:e8:9d:c5:b0:a9 (try 1/3)
+[   50.273280] wlan0: RX AssocResp from 86:e8:9d:c5:b0:a9 (capab=0x1531 status=0 aid=8)
+[   50.313902] wlan0: associated
+
+=== SMMU / IOMMU / NoC / watchdog 关键字 ===
+[   25.335750] qnoc-msm8953 500000.interconnect: sync_state() pending due to 1a00000.display-subsystem
+[   25.350762] qnoc-msm8953 400000.interconnect: sync_state() pending due to 1a00000.display-subsystem
+[   25.366662] qnoc-msm8953 500000.interconnect: sync_state() pending due to 1c00000.gpu
+[   25.370617] qnoc-msm8953 400000.interconnect: sync_state() pending due to 1c00000.gpu
+[   25.386446] qnoc-msm8953 500000.interconnect: sync_state() pending due to 1d00000.venus
+[   25.394362] qnoc-msm8953 400000.interconnect: sync_state() pending due to 1d00000.venus
+[   25.402241] gcc-msm8953 1800000.clock-controller: sync_state() pending due to 1d00000.venus
+[   25.410746] qnoc-msm8953 500000.interconnect: sync_state() pending due to 7900000.ipa
+[   25.418954] qnoc-msm8953 400000.interconnect: sync_state() pending due to 7900000.ipa
+[   25.426758] qnoc-msm8953 580000.interconnect: sync_state() pending due to 7900000.ipa
+[   25.436516] qnoc-msm8953 580000.interconnect:interconnect-snoc: sync_state() pending due to 1d00000.venus
+[   25.443072] qnoc-msm8953 580000.interconnect:interconnect-snoc: sync_state() pending due to 1a00000.display-subsystem
+[   49.146798] platform 1a01000.display-controller: Adding to iommu group 3
+[   49.178604] qcom-venus 1d00000.venus: Unsupported property: 0
+[   49.191760] qcom-venus 1d00000.venus: truncated property 0x1007: need 20 bytes, 12 left
+(以上为空=没有)
+
+=== crash.err ===
+cat: /home/user/crash.err: No such file or directory
+
+=== 当前 dmesg 里的 venus 尾部 ===
+[   25.386446] qnoc-msm8953 500000.interconnect: sync_state() pending due to 1d00000.venus
+[   25.394362] qnoc-msm8953 400000.interconnect: sync_state() pending due to 1d00000.venus
+[   25.402241] gcc-msm8953 1800000.clock-controller: sync_state() pending due to 1d00000.venus
+[   25.436516] qnoc-msm8953 580000.interconnect:interconnect-snoc: sync_state() pending due to 1d00000.venus
+[   49.178604] qcom-venus 1d00000.venus: Unsupported property: 0
+[   49.191760] qcom-venus 1d00000.venus: truncated property 0x1007: need 20 bytes, 12 left

@@ -1,0 +1,42 @@
+=== 1. 上一轮 19:36:21 附近的完整内核日志 ===
+493-Sep 03 19:36:21 odin kernel: x8 : 0101010101010101 x7 : 7f7f7f7f7f7f7f7f x6 : fefefeff6364626d
+494-Sep 03 19:36:21 odin kernel: x5 : 8080808000000000 x4 : 0000000000000000 x3 : 0000000000000001
+495-Sep 03 19:36:21 odin kernel: x2 : 0000000000000000 x1 : ffff000022a14c40 x0 : 00000000ffffffea
+496-Sep 03 19:36:21 odin kernel: Call trace:
+497-Sep 03 19:36:21 odin kernel:  venus_remove+0xd8/0x100 [venus_core] (P)
+498-Sep 03 19:36:21 odin kernel:  platform_remove+0x28/0x40
+499-Sep 03 19:36:21 odin kernel:  device_remove+0x54/0x90
+500-Sep 03 19:36:21 odin kernel:  device_release_driver_internal+0x1d4/0x238
+501-Sep 03 19:36:21 odin kernel:  device_driver_detach+0x20/0x38
+502-Sep 03 19:36:21 odin kernel:  unbind_store+0xbc/0xc8
+503-Sep 03 19:36:21 odin kernel:  drv_attr_store+0x2c/0x48
+504-Sep 03 19:36:21 odin kernel:  sysfs_kf_write+0x84/0xa8
+505-Sep 03 19:36:21 odin kernel:  kernfs_fop_write_iter+0x138/0x1f0
+506-Sep 03 19:36:21 odin kernel:  vfs_write+0x220/0x348
+507-Sep 03 19:36:21 odin kernel:  ksys_write+0x74/0x118
+508-Sep 03 19:36:21 odin kernel:  __arm64_sys_write+0x24/0x38
+509-Sep 03 19:36:21 odin kernel:  invoke_syscall+0x50/0x120
+510-Sep 03 19:36:21 odin kernel:  el0_svc_common.constprop.0+0x48/0xf0
+511-Sep 03 19:36:21 odin kernel:  do_el0_svc+0x24/0x38
+512-Sep 03 19:36:21 odin kernel:  el0_svc+0x34/0x108
+513-Sep 03 19:36:21 odin kernel:  el0t_64_sync_handler+0xa0/0xe8
+514-Sep 03 19:36:21 odin kernel:  el0t_64_sync+0x198/0x1a0
+515:Sep 03 19:36:21 odin kernel: ---[ end trace 0000000000000000 ]---
+
+=== 2. 看门狗 ===
+ls: cannot access '/dev/watchdog*': No such file or directory
+(无输出=内核没注册看门狗)
+
+=== 3. 上一轮内核日志的最后 8 行 ===
+Sep 03 19:36:21 odin kernel:  __arm64_sys_write+0x24/0x38
+Sep 03 19:36:21 odin kernel:  invoke_syscall+0x50/0x120
+Sep 03 19:36:21 odin kernel:  el0_svc_common.constprop.0+0x48/0xf0
+Sep 03 19:36:21 odin kernel:  do_el0_svc+0x24/0x38
+Sep 03 19:36:21 odin kernel:  el0_svc+0x34/0x108
+Sep 03 19:36:21 odin kernel:  el0t_64_sync_handler+0xa0/0xe8
+Sep 03 19:36:21 odin kernel:  el0t_64_sync+0x198/0x1a0
+Sep 03 19:36:21 odin kernel: ---[ end trace 0000000000000000 ]---
+
+=== 4. 上一轮结束与本次启动的间隔 ===
+上一轮最后日志: 2026-09-03T19:41:00
+本次启动时刻  : 2026-09-03T19:41:38+08:00

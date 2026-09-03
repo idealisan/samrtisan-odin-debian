@@ -1,0 +1,70 @@
+=== 1. 电池 ===
+  *                            
+
+=== 2. upower ===
+Device: /org/freedesktop/UPower/devices/battery_qcom_battery
+  native-path:          qcom-battery
+  power supply:         yes
+  updated:              Thu Sep  3 19:43:40 2026 (0 seconds ago)
+  has history:          yes
+  has statistics:       yes
+  battery
+    present:             yes
+    rechargeable:        yes
+    state:               charging
+    warning-level:       none
+    energy:              9.394 Wh
+    energy-empty:        0 Wh
+    energy-full:         15.4 Wh
+    energy-full-design:  15.4 Wh
+    energy-rate:         0.453182 W
+    voltage:             4.07362 V
+    charge-cycles:       N/A
+    time to full:        13.3 hours
+    percentage:          61%
+    temperature:         28 degrees C
+    capacity:            100%
+    technology:          lithium-ion
+    icon-name:          'battery-full-charging-symbolic'
+
+
+=== 3. 温度 ===
+cpu4-thermal	45800
+cpu5-thermal	46100
+pm8953-thermal	48868
+cpu6-thermal	45800
+cpu7-thermal	45800
+cpu0-thermal	44500
+cpu1-thermal	44500
+cpu2-thermal	45100
+cpu3-thermal	45800
+gpu-thermal	44800
+qcom-battery	28000
+
+=== 4. 上一轮的内核日志尾部（journalctl -b -1 -k）===
+Sep 03 19:36:21 odin kernel: Call trace:
+Sep 03 19:36:21 odin kernel:  venus_remove+0xd8/0x100 [venus_core] (P)
+Sep 03 19:36:21 odin kernel:  platform_remove+0x28/0x40
+Sep 03 19:36:21 odin kernel:  device_remove+0x54/0x90
+Sep 03 19:36:21 odin kernel:  device_release_driver_internal+0x1d4/0x238
+Sep 03 19:36:21 odin kernel:  device_driver_detach+0x20/0x38
+Sep 03 19:36:21 odin kernel:  unbind_store+0xbc/0xc8
+Sep 03 19:36:21 odin kernel:  drv_attr_store+0x2c/0x48
+Sep 03 19:36:21 odin kernel:  sysfs_kf_write+0x84/0xa8
+Sep 03 19:36:21 odin kernel:  kernfs_fop_write_iter+0x138/0x1f0
+Sep 03 19:36:21 odin kernel:  vfs_write+0x220/0x348
+Sep 03 19:36:21 odin kernel:  ksys_write+0x74/0x118
+Sep 03 19:36:21 odin kernel:  __arm64_sys_write+0x24/0x38
+Sep 03 19:36:21 odin kernel:  invoke_syscall+0x50/0x120
+Sep 03 19:36:21 odin kernel:  el0_svc_common.constprop.0+0x48/0xf0
+Sep 03 19:36:21 odin kernel:  do_el0_svc+0x24/0x38
+Sep 03 19:36:21 odin kernel:  el0_svc+0x34/0x108
+Sep 03 19:36:21 odin kernel:  el0t_64_sync_handler+0xa0/0xe8
+Sep 03 19:36:21 odin kernel:  el0t_64_sync+0x198/0x1a0
+Sep 03 19:36:21 odin kernel: ---[ end trace 0000000000000000 ]---
+(空=上一轮没有持久内核日志)
+
+=== 5. 上一轮最后 60 秒的全部日志 ===
+Sep 03 19:41:00 odin systemd[1]: Starting odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG)...
+Sep 03 19:41:00 odin systemd[1]: odin-usb-gadget.service: Deactivated successfully.
+Sep 03 19:41:00 odin systemd[1]: Finished odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG).

@@ -1,0 +1,23 @@
+id: user sudo video
+
+=== 你的命令（三处修正：video组 + -pix_fmt nv12 + -c:a aac）===
+  PASS  hw enc native 1920x1440 aac                      2539744 bytes    7305 ms
+
+=== 分步排查哪一项是必需的 ===
+  FAIL  A 原样（对照）                           rc=1
+          [h264_v4l2m2m @ 0xaaaac3ad6f30] Encoder requires nv12 pixel format.
+          Error initializing output stream 0:0 -- Error while opening encoder for output stream #0:0 - maybe incorrect parameters such as bit_rate, rate, width or height
+  FAIL  B 只改音频 aac                             rc=1
+          [h264_v4l2m2m @ 0xaaab1678bf30] Encoder requires nv12 pixel format.
+          Error initializing output stream 0:0 -- Error while opening encoder for output stream #0:0 - maybe incorrect parameters such as bit_rate, rate, width or height
+  FAIL  C 只加 -pix_fmt nv12                         rc=1
+          Could not write header for output file #0 (incorrect codec parameters ?): Invalid argument
+          Error initializing output stream 0:0 -- 
+  PASS  D 两项都改                                   2539744 bytes    8395 ms
+
+=== 硬件解码 ===
+  FAIL  hw dec hevc_v4l2m2m                            rc=0
+
+=== 全硬件转码 1280x720 ===
+  FAIL  hw dec -> hw enc 1280x720                      rc=139
+/home/user/.odin-exec-final.sh: line 6:  4607 Segmentation fault      timeout 55 "$@" > /dev/null 2> err.txt

@@ -37,6 +37,9 @@ odin-qemu/testdisk.img
 *.bin
 *.elf
 
+# 从 Release 下载到 dist/ 的校验和清单（随镜像一起下，不是仓库源码）
+dist/SHA256SUMS
+
 # 从设备/镜像里解出来的整棵内核模块树与 busybox（都是别人的构建产物）
 dist/stage/modules/
 dist/build/initramfs/bin/

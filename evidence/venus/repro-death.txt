@@ -1,0 +1,5 @@
+boot before: 2026-09-03T19:41:39+08:00
+运行死亡时刻那条命令：软件 HEVC 解码 -> rawvideo（618MB 输出）
+rc=0
+产出: 617932800 bytes
+还活着:  19:51:09 up 9 min, 1 user, load average: 2.28, 1.70, 1.10
