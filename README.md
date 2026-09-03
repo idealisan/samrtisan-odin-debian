@@ -121,21 +121,23 @@ exFAT 或 NTFS。**
 
 | label | DTB | 用途 |
 |---|---|---|
-| `l0` | `msm8953-smartisan-odin-ft8716.dtb` | 完整版：按 Type-C 方向自动切换 USB 网卡或 OTG host |
-| `l0-safe`（首刷默认） | `msm8953-smartisan-odin-ft8716-norolesw.dtb` | USB 固定 device，UDC 恒在，SSH 不依赖 Type-C 判定；代价：无 OTG |
+| `l0`（**默认**） | `msm8953-smartisan-odin-ft8716.dtb` | 完整版：按 USB-ID 在 USB 网卡(device) 与 OTG host 之间自动切换 |
+| `l0-safe` | `msm8953-smartisan-odin-ft8716-norolesw.dtb` | 救援版：USB 固定 device，UDC 恒在，SSH 不依赖角色判定；**原理上不支持 OTG** |
 
-**首刷默认 `l0-safe`。** 原因：`l0` 依赖 Type-C 角色切换，而这条链路在 2026-09-02
-被整体重写过（`fc3e971`：删掉 FUSB301 与 SMBCHG OTG boost 两个内核补丁共 665 行、
-新增 `qcom-smbchg` 的 `usb-role-switch` 补丁、改设备树 89 行与内核配置），
-**没有真机验证记录**（已排期补，见 §七）。SSH 是本机唯一的远程生命线 —— 角色切换不工作 ⇒ 无 `usb0`
-⇒ 无 `172.16.42.1` ⇒ 无 SSH，而无屏设备这时只剩 UART。
+**默认 `l0`。** 角色切换的事实来源是 PMI8950 SMBCHG 的 USB-ID 检测（不是 Type-C 芯片），
+由 `qcom-smbchg` 驱动调 `usb_role_switch_set_role()`，用户态再由
+`odin-usb-role.sh` 跟着 UDC 的增删重配 gadget。
 
-> 2026-09-03 源码级核对结论（消掉上面"零验证"的顾虑）：`msm8953.dtsi` 的 `usb3`
-> 节点本就带 `usb-role-switch` + `role-switch-default-mode = "peripheral"`，
-> `pmi8950_smbcharger` 的 `usb-role-switch = <&usb3>` 能正确解析到 DWC3 的 role switch
-> （`qcom-smbchg.c` 的 `usb_role_switch_get` 带 120s 重试兜底）；且即使角色切换彻底失效，
-> DWC3 默认仍为 peripheral、UDC 照常出现，故 **device 模式（SSH 走的那条）不受影响**，
-> 最坏情况只是 OTG host 不可用。真机验证仍待补。
+> ⚠️ **`l0-safe` 是"原理上不支持 OTG"，不是"保守一点"。**
+> `dts/msm8953-smartisan-odin-norolesw.dts` 把 `&usb3` 与 `&pmi8950_smbcharger` 的
+> `usb-role-switch` 都删了、`dr_mode` 改成 `peripheral`，于是 DWC3 走
+> `dwc3_core_init_mode()` 的 `USB_DR_MODE_PERIPHERAL` 分支（只 `dwc3_gadget_init()`），
+> 根本到不了注册 role switch 的 `dwc3_drd_init()`。
+> ⇒ 在 `l0-safe` 下接任何 USB 外设都永远不会有块设备，硬盘灯亮只是 VBUS 有电。
+>
+> 另外 `l0-safe` **并不能**阻止硬件尝试 OTG：`qcom-smbchg.c` 的 `otg-vbus`
+> regulator 是无条件注册的，插 OTG 设备仍会报 `OTG regulator failure`
+> （2026-09-03 实测：外接 SSD 触发，随后整机重启）。要完全不碰 OTG 得改驱动侧。
 
 用的是**面板写死 FT8716** 的那一对 DTB（`*-ft8716*`），不是自动识别版：写死之后面板
 是否点亮与 lk2nd 选中哪个 QCDT 条目无关，排障面小很多。自动识别的一对也随镜像发布，
@@ -197,8 +199,9 @@ sudo sed -i 's/^default .*/default l0/' /extlinux/extlinux.conf && sudo reboot
 1. **备份**：当前可启动的 boot 分区与 postmarketOS `/boot`。
 2. 刷 `lk2nd.img` → boot 分区（64M）；刷 `odin-debian-sparse.img` → userdata。
    顺序不能反（lk2nd 负责挂载 userdata 找到 `/extlinux/extlinux.conf`）。
-3. **切到 `l0` 后**：连接电脑时提供 USB 网络，连接 OTG Hub/U 盘时切换为 host（首刷默认仍是 `l0-safe`，确认整机可用再切，见上方策略）。
-4. 若完整角色切换异常，可将 default 改成 `l0-safe` 重启，恢复固定 USB 网络救援模式。
+3. 默认 `l0`：连电脑时是 USB 网络（device），插 OTG 线/U 盘时自动切 host。
+   切回固定 device：`sudo sed -i 's/^default .*/default l0-safe/' /extlinux/extlinux.conf && sudo reboot`。
+4. 若角色切换异常，把 default 改成 `l0-safe` 重启，回到固定 USB 网络救援模式。
 5. 屏幕观察顺序：panel driver 绑定 → DRM connector → fb0 → 背光。
    **屏幕能否点亮取决于 lk2nd 是否选中 odin 条目**（见 §七 已知限制第 1 条）。
 6. USB 观察顺序：CC attach → role=host → VBUS 5V → 枚举 → `/run/media/sdX`。
@@ -217,8 +220,10 @@ sudo sed -i 's/^default .*/default l0/' /extlinux/extlinux.conf && sudo reboot
 - **面板名透传未实锤**：实测当前 pmOS 的 `/proc/cmdline` **没有** `mdss_mdp.panel=`，
   但那台机器跑的是 pmOS 的 lk2nd（无 odin 条目），不能直接推断原厂 aboot 的行为。
   需在刷入本包后查 `/proc/cmdline` 或 `fastboot getvar lk2nd:panel`。
-- **USB 角色手动回退缺口**：`/sys/class/usb_role/*/role` 实测不存在（6.17.7）。
-  本包的 6.19 内核上是否可用未验证；回退请优先改 `extlinux.conf` 的 default 或用 UART。
+- **USB 角色手动回退**：`/sys/class/usb_role/*/role` 只有在 role switch 真的注册了
+  才存在，而它只在 `dr_mode = "otg"`（`l0`）下才注册 —— 在 `l0-safe` 下查不到是**正常的**。
+  `l0` 下应当存在（DWC3 注册时带 `allow_userspace_control = true`），尚未实测。
+  回退首选改 `extlinux.conf` 的 default，其次 UART。
 - 触摸屏（FocalTech FTS @ i2c_3, reset GPIO64/IRQ65）未包含——主线无
   FTS 驱动，属独立移植任务。
 - QMP SuperSpeed PHY 主线无 msm8953 支持，先以 USB2 HighSpeed 工作
@@ -235,7 +240,7 @@ sudo sed -i 's/^default .*/default l0/' /extlinux/extlinux.conf && sudo reboot
 |---|---|---|
 | 1 | 阶段 2（UTF-8） | **放弃 FAT32 中文，不做 `nls_utf8`**；以 exFAT / NTFS 为主力 |
 | 2 | 自动挂载方案 | **systemd mount unit**（不装 udisks2） |
-| 3 | 首刷策略 | **接受首刷期间没有 OTG**，`l0-safe` 作为 default |
+| 3 | 默认引导 label | 2026-08-30：**接受没有 OTG**，`l0-safe` 作为 default（当时 SSH 是唯一生命线）→ **2026-09-03 晚改回 `l0`**：WiFi 已打通，SSH 不再只依赖 usb0，而 `l0-safe` 是原理上不支持 OTG，留着它就永远用不了外接 USB 设备 |
 
 ## 九、从头刷入（原生 fastboot → SSH 可用）
 

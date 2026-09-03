@@ -1,0 +1,189 @@
+=== 0. 基本信息 ===
+kernel : 6.19.5-postmarketos-qcom-msm8953+
+model  : Smartisan U2 Pro (ODIN)
+cmdline: console=ttyMSM0,115200n8 earlycon=msm_serial_dm,0x78af000 root=/dev/disk/by-label/pmOS_root rootwait rw console=tty0
+
+=== 1. 当前引导的 label 与 DTB ===
+/tmp/odin-diag.sh: line 5: warning: command substitution: ignored null byte in input
+default l0-safe
+label l0
+    fdt /boot/dtbs/qcom/msm8953-smartisan-odin-ft8716.dtb
+label l0-safe
+    fdt /boot/dtbs/qcom/msm8953-smartisan-odin-ft8716-norolesw.dtb
+
+=== 2. USB 控制器的角色状态 ===
+-- /sys/class/udc/ --
+7000000.usb
+-- /sys/class/usb_role/ --
+/sys/class/usb_role/:
+-- 各 role 节点当前值 --
+-- dr_mode（设备树里写死的）--
+/tmp/odin-diag.sh: line 21: warning: command substitution: ignored null byte in input
+  /sys/firmware/devicetree/base/soc@0/usb@7000000 dr_mode=peripheral  usb-role-switch=no
+
+=== 3. 内核 USB 相关日志 ===
+[    0.115269] usbcore: registered new interface driver usbfs
+[    0.115349] usbcore: registered new interface driver hub
+[    0.115422] usbcore: registered new device driver usb
+[    0.269915] usbcore: registered new interface driver uas
+[    0.270038] usbcore: registered new interface driver usb-storage
+[    0.288369] sdhci: Secure Digital Host Controller Interface driver
+[    0.291602] usbcore: registered new interface driver usbhid
+[    0.291636] usbhid: USB HID core driver
+[    3.602646] configfs-gadget.odin gadget.0: HOST MAC 32:47:14:c4:62:e8
+[    6.521629] systemd[1]: Hostname set to <odin>.
+
+=== 4. USB 总线上的设备 ===
+(没装 usbutils，跳过 lsusb)
+-- /sys/bus/usb/devices/ --
+
+=== 5. 块设备 ===
+NAME         MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+mmcblk0      179:0    0 116.5G  0 disk 
+|-mmcblk0p1  179:1    0     1K  0 part 
+|-mmcblk0p2  179:2    0     8K  0 part 
+|-mmcblk0p3  179:3    0   512K  0 part 
+|-mmcblk0p4  179:4    0   512K  0 part 
+|-mmcblk0p5  179:5    0   512K  0 part 
+|-mmcblk0p6  179:6    0   512K  0 part 
+|-mmcblk0p7  179:7    0     2M  0 part 
+|-mmcblk0p8  179:8    0     2M  0 part 
+|-mmcblk0p9  179:9    0   512K  0 part 
+|-mmcblk0p10 179:10   0    32M  0 part 
+|-mmcblk0p11 179:11   0   256K  0 part 
+|-mmcblk0p12 179:12   0   256K  0 part 
+|-mmcblk0p13 179:13   0    16M  0 part 
+|-mmcblk0p14 179:14   0     2M  0 part 
+|-mmcblk0p15 179:15   0     2M  0 part 
+|-mmcblk0p16 179:16   0    32K  0 part 
+|-mmcblk0p17 179:17   0    16K  0 part 
+|-mmcblk0p18 179:18   0    11M  0 part 
+|-mmcblk0p19 179:19   0     1M  0 part 
+|-mmcblk0p20 179:20   0     1M  0 part 
+|-mmcblk0p21 179:21   0    64M  0 part 
+|-mmcblk0p22 179:22   0    64M  0 part 
+|-mmcblk0p23 179:23   0     1M  0 part 
+|-mmcblk0p24 179:24   0    32M  0 part 
+|-mmcblk0p25 179:25   0     1M  0 part 
+|-mmcblk0p26 179:26   0   512K  0 part 
+|-mmcblk0p27 179:27   0    32K  0 part 
+|-mmcblk0p28 179:28   0     1M  0 part 
+|-mmcblk0p29 179:29   0    32M  0 part 
+|-mmcblk0p30 179:30   0   256M  0 part 
+|-mmcblk0p31 179:31   0    32K  0 part 
+|-mmcblk0p32 259:0    0   512K  0 part 
+|-mmcblk0p33 259:1    0     1M  0 part 
+|-mmcblk0p34 259:2    0    32M  0 part 
+|-mmcblk0p35 259:3    0   512K  0 part 
+|-mmcblk0p36 259:4    0     4M  0 part 
+|-mmcblk0p37 259:5    0   128K  0 part 
+|-mmcblk0p38 259:6    0   128K  0 part 
+|-mmcblk0p39 259:7    0   256K  0 part 
+|-mmcblk0p40 259:8    0   256K  0 part 
+|-mmcblk0p41 259:9    0   256K  0 part 
+|-mmcblk0p42 259:10   0   256K  0 part 
+|-mmcblk0p43 259:11   0   256K  0 part 
+|-mmcblk0p44 259:12   0   256K  0 part 
+|-mmcblk0p45 259:13   0   256K  0 part 
+|-mmcblk0p46 259:14   0   256K  0 part 
+|-mmcblk0p47 259:15   0     8K  0 part 
+|-mmcblk0p48 259:16   0     2M  0 part 
+|-mmcblk0p49 259:17   0     2M  0 part 
+|-mmcblk0p50 259:18   0     2M  0 part 
+|-mmcblk0p51 259:19   0     2M  0 part 
+|-mmcblk0p52 259:20   0    96M  0 part 
+|-mmcblk0p53 259:21   0   256M  0 part 
+|-mmcblk0p54 259:22   0     3G  0 part 
+|-mmcblk0p55 259:23   0     2M  0 part 
+|-mmcblk0p56 259:24   0     2M  0 part 
+`-mmcblk0p57 259:25   0 111.9G  0 part /
+mmcblk0boot0 179:32   0     4M  1 disk 
+mmcblk0boot1 179:64   0     4M  1 disk 
+-- /proc/partitions --
+major minor  #blocks  name
+
+ 179        0  122138624 mmcblk0
+ 179        1          1 mmcblk0p1
+ 179        2          8 mmcblk0p2
+ 179        3        512 mmcblk0p3
+ 179        4        512 mmcblk0p4
+ 179        5        512 mmcblk0p5
+ 179        6        512 mmcblk0p6
+ 179        7       2048 mmcblk0p7
+ 179        8       2048 mmcblk0p8
+ 179        9        512 mmcblk0p9
+ 179       10      32768 mmcblk0p10
+ 179       11        256 mmcblk0p11
+ 179       12        256 mmcblk0p12
+ 179       13      16384 mmcblk0p13
+ 179       14       2048 mmcblk0p14
+ 179       15       2048 mmcblk0p15
+ 179       16         32 mmcblk0p16
+ 179       17         16 mmcblk0p17
+ 179       18      11264 mmcblk0p18
+ 179       19       1024 mmcblk0p19
+ 179       20       1024 mmcblk0p20
+ 179       21      65536 mmcblk0p21
+ 179       22      65536 mmcblk0p22
+ 179       23       1024 mmcblk0p23
+ 179       24      32768 mmcblk0p24
+ 179       25       1024 mmcblk0p25
+ 179       26        512 mmcblk0p26
+ 179       27         32 mmcblk0p27
+ 179       28       1024 mmcblk0p28
+ 179       29      32768 mmcblk0p29
+ 179       30     262144 mmcblk0p30
+ 179       31         32 mmcblk0p31
+ 259        0        512 mmcblk0p32
+ 259        1       1024 mmcblk0p33
+ 259        2      32768 mmcblk0p34
+ 259        3        512 mmcblk0p35
+ 259        4       4096 mmcblk0p36
+ 259        5        128 mmcblk0p37
+ 259        6        128 mmcblk0p38
+ 259        7        256 mmcblk0p39
+ 259        8        256 mmcblk0p40
+ 259        9        256 mmcblk0p41
+ 259       10        256 mmcblk0p42
+ 259       11        256 mmcblk0p43
+ 259       12        256 mmcblk0p44
+ 259       13        256 mmcblk0p45
+ 259       14        256 mmcblk0p46
+ 259       15          8 mmcblk0p47
+ 259       16       2048 mmcblk0p48
+ 259       17       2048 mmcblk0p49
+ 259       18       2048 mmcblk0p50
+ 259       19       2048 mmcblk0p51
+ 259       20      98304 mmcblk0p52
+ 259       21     262144 mmcblk0p53
+ 259       22    3145728 mmcblk0p54
+ 259       23       2048 mmcblk0p55
+ 259       24       2048 mmcblk0p56
+ 259       25  117354479 mmcblk0p57
+ 179       32       4096 mmcblk0boot0
+ 179       64       4096 mmcblk0boot1
+-- /dev/sd* --
+ls: cannot access '/dev/sd*': No such file or directory
+
+=== 6. 供电（VBUS 到底有没有）===
+  --- qcom-battery ---
+      type         Battery
+      present      1
+      voltage_now  4130530
+      current_now  30669
+  --- qcom-smbchg-usb ---
+      type         USB
+      present      1
+      online       1
+
+=== 7. 内核配置里与 OTG/主机相关的项 ===
+  CONFIG_USB_DWC3=y
+  CONFIG_USB_DWC3_QCOM=y
+  CONFIG_USB_ROLE_SWITCH=y
+  CONFIG_TYPEC=y
+  CONFIG_EXTCON=y
+  CONFIG_USB_STORAGE=y
+  CONFIG_USB_UAS=y
+  CONFIG_SCSI=y
+  CONFIG_BLK_DEV_SD=y
+  ?

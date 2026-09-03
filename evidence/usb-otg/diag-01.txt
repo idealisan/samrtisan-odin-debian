@@ -1,0 +1,9 @@
+=== 0. 基本信息 ===
+kernel : 6.19.5-postmarketos-qcom-msm8953+
+model  : Smartisan U2 Pro (ODIN)
+/tmp/odin-diag.sh: line 5: warning: command substitution: ignored null byte in input
+cmdline: console=ttyMSM0,115200n8 earlycon=msm_serial_dm,0x78af000 root=/dev/disk/by-label/pmOS_root rootwait rw console=tty0
+
+=== 1. 当前引导的 label 与 DTB ===
+Read from remote host 192.168.18.251: Operation timed out
+client_loop: send disconnect: Broken pipe

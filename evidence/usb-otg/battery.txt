@@ -1,0 +1,134 @@
+=== 0. 本次启动时刻 ===
+now    : 2026-09-03T20:19:38+08:00
+boot at: 2026-09-03T20:16:05+08:00
+uptime : 213 秒
+
+=== 1. 上一轮死前的最后 12 条日志 ===
+Sep 03 20:15:40 odin sshd[15085]: Accepted password for user from 192.168.18.85 port 52435 ssh2
+Sep 03 20:15:40 odin sshd[15085]: pam_unix(sshd:session): session opened for user user(uid=1000) by (uid=0)
+Sep 03 20:15:40 odin systemd-logind[313]: New session 36 of user user.
+Sep 03 20:15:40 odin systemd[1]: Started session-36.scope - Session 36 of User user.
+Sep 03 20:15:40 odin sshd[15085]: pam_env(sshd:session): deprecated reading of user environment enabled
+Sep 03 20:15:40 odin sshd[15085]: pam_env(sshd:session): Unable to open env file: /etc/default/locale: No such file or directory
+Sep 03 20:15:40 odin sshd[15091]: Received disconnect from 192.168.18.85 port 52435:11: disconnected by user
+Sep 03 20:15:40 odin sshd[15091]: Disconnected from user user 192.168.18.85 port 52435
+Sep 03 20:15:40 odin sshd[15085]: pam_unix(sshd:session): session closed for user user
+Sep 03 20:15:40 odin systemd[1]: session-36.scope: Deactivated successfully.
+Sep 03 20:15:40 odin systemd-logind[313]: Session 36 logged out. Waiting for processes to exit.
+Sep 03 20:15:40 odin systemd-logind[313]: Removed session 36.
+
+=== 2. 上一轮死前的最后 12 条内核日志 ===
+Sep 03 19:41:14 odin kernel: Console: switching to colour frame buffer device 135x120
+Sep 03 19:41:14 odin kernel: fb0: sys_imageblit: framebuffer is not in virtual address space.
+Sep 03 19:41:14 odin kernel: msm_dpu 1a01000.display-controller: [drm] fb0: msmdrmfb frame buffer device
+Sep 03 19:41:15 odin kernel: wlan0: authenticate with 86:e8:9d:c5:b0:a9 (local address=02:00:67:db:fe:b9)
+Sep 03 19:41:15 odin kernel: wlan0: send auth to 86:e8:9d:c5:b0:a9 (try 1/3)
+Sep 03 19:41:15 odin kernel: wlan0: authenticated
+Sep 03 19:41:15 odin kernel: wlan0: associate with 86:e8:9d:c5:b0:a9 (try 1/3)
+Sep 03 19:41:15 odin kernel: wlan0: RX AssocResp from 86:e8:9d:c5:b0:a9 (capab=0x1531 status=0 aid=8)
+Sep 03 19:41:15 odin kernel: wlan0: associated
+Sep 03 19:56:43 odin kernel: qcom-venus 1d00000.venus: wait for cpu and video core idle fail (-110)
+Sep 03 20:14:34 odin kernel: qcom-smbchg 200f000.spmi:pmic@2:smbchager@1000: OTG regulator failure
+Sep 03 20:14:53 odin kernel: qcom-smbchg 200f000.spmi:pmic@2:smbchager@1000: USB role switch is not found
+
+=== 3. 电池 power_supply 原始字段 ===
+--- qcom-battery ---
+    DEVTYPE=power_supply
+    OF_NAME=fuel-gauge
+    OF_FULLNAME=/soc@0/spmi@200f000/pmic@2/fuel-gauge@4000
+    OF_COMPATIBLE_0=qcom,pmi8996-fg
+    OF_COMPATIBLE_N=1
+    POWER_SUPPLY_NAME=qcom-battery
+    POWER_SUPPLY_TYPE=Battery
+    POWER_SUPPLY_STATUS=Charging
+    POWER_SUPPLY_HEALTH=Good
+    POWER_SUPPLY_PRESENT=1
+    POWER_SUPPLY_TECHNOLOGY=Li-ion
+    POWER_SUPPLY_VOLTAGE_MAX_DESIGN=4400000
+    POWER_SUPPLY_VOLTAGE_MIN_DESIGN=3400000
+    POWER_SUPPLY_VOLTAGE_NOW=4122900
+    POWER_SUPPLY_CURRENT_NOW=39520
+    POWER_SUPPLY_CHARGE_FULL_DESIGN=3500000
+    POWER_SUPPLY_CONSTANT_CHARGE_CURRENT_MAX=1500000
+    POWER_SUPPLY_CAPACITY=77
+    POWER_SUPPLY_TEMP=280
+    POWER_SUPPLY_TEMP_MAX=400
+    POWER_SUPPLY_TEMP_MIN=100
+    POWER_SUPPLY_TEMP_ALERT_MIN=50
+    POWER_SUPPLY_TEMP_ALERT_MAX=450
+    POWER_SUPPLY_TYPE=Battery
+    POWER_SUPPLY_CHARGE_TERM_CURRENT=100000
+--- qcom-smbchg-usb ---
+    DEVTYPE=power_supply
+    OF_NAME=smbchager
+    OF_FULLNAME=/soc@0/spmi@200f000/pmic@2/smbchager@1000
+    OF_COMPATIBLE_0=qcom,pmi8996-smbchg
+    OF_COMPATIBLE_N=1
+    POWER_SUPPLY_NAME=qcom-smbchg-usb
+    POWER_SUPPLY_TYPE=USB
+    POWER_SUPPLY_STATUS=Charging
+    POWER_SUPPLY_CHARGE_TYPE=Fast
+    POWER_SUPPLY_HEALTH=Good
+    POWER_SUPPLY_PRESENT=1
+    POWER_SUPPLY_ONLINE=1
+    POWER_SUPPLY_CONSTANT_CHARGE_CURRENT=1500000
+    POWER_SUPPLY_CONSTANT_CHARGE_CURRENT_MAX=1500000
+    POWER_SUPPLY_INPUT_CURRENT_LIMIT=300000
+    POWER_SUPPLY_TYPE=USB
+    POWER_SUPPLY_USB_TYPE=Unknown SDP DCP [CDP]
+    POWER_SUPPLY_CHARGE_TERM_CURRENT=100000
+
+=== 4. upower 视角 ===
+Device: /org/freedesktop/UPower/devices/battery_qcom_battery
+  native-path:          qcom-battery
+  power supply:         yes
+  updated:              Thu Sep  3 20:19:41 2026 (0 seconds ago)
+  has history:          yes
+  has statistics:       yes
+  battery
+    present:             yes
+    rechargeable:        yes
+    state:               charging
+    warning-level:       none
+    energy:              11.858 Wh
+    energy-empty:        0 Wh
+    energy-full:         15.4 Wh
+    energy-full-design:  15.4 Wh
+    energy-rate:         0.172542 W
+    voltage:             4.12412 V
+    charge-cycles:       N/A
+    percentage:          77%
+    temperature:         28 degrees C
+    capacity:            100%
+    technology:          lithium-ion
+    icon-name:          'battery-full-charging-symbolic'
+  History (charge):
+    1788437981	0.000	unknown
+  History (rate):
+    1788437981	0.000	unknown
+
+Device: /org/freedesktop/UPower/devices/line_power_qcom_smbchg_usb
+  native-path:          qcom-smbchg-usb
+  power supply:         yes
+  updated:              Thu Sep  3 20:19:41 2026 (0 seconds ago)
+  has history:          no
+  has statistics:       no
+  line-power
+    warning-level:       none
+    online:              yes
+    icon-name:          'ac-adapter-symbolic'
+
+Device: /org/freedesktop/UPower/devices/DisplayDevice
+
+=== 5. 温度 ===
+cpu4-thermal	39600
+cpu5-thermal	40200
+pm8953-thermal	44082
+cpu6-thermal	39600
+cpu7-thermal	40200
+cpu0-thermal	38600
+cpu1-thermal	39300
+cpu2-thermal	39600
+cpu3-thermal	39600
+gpu-thermal	39300
+qcom-battery	27500

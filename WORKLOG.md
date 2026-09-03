@@ -2854,3 +2854,102 @@ b) **外部功放没被正确使能** —— 原厂只给了 `ext-pa-enable = gp
   `http_proxy=http://127.0.0.1:3030`）。core sparse 1.1GB 用 3m43s，可接受。
 - macOS 没有 `timeout`：外层等待用 Python `subprocess.run(..., timeout=)` 包一层。
 - 写后台采样器时别用裸 `wait` —— 它会把无限循环的采样器一起等进去，永远不返回。
+
+## ================= 2026-09-03 晚：USB OTG 专题（外接 SSD 只亮灯、不出块设备） =================
+
+### 结论：不是配置坏了，是设备跑在 `l0-safe` 上，而那个变体**原理上**不支持 OTG
+
+真机只读诊断（`evidence/usb-otg/diag-02.txt`）：
+
+```
+/sys/firmware/devicetree/base/soc@0/usb@7000000  dr_mode=peripheral  usb-role-switch=no
+/sys/class/usb_role/                             空
+/sys/class/udc/7000000.usb                       存在（gadget/device）
+/sys/bus/usb/devices/                            空
+/dev/sd*                                        不存在
+```
+
+内核栈是齐的：`CONFIG_USB_DWC3=y`、`CONFIG_USB_DWC3_QCOM=y`、
+`CONFIG_USB_ROLE_SWITCH=y`、`CONFIG_TYPEC=y`、`CONFIG_EXTCON=y`、
+`CONFIG_USB_STORAGE=y`、`CONFIG_USB_UAS=y`、`CONFIG_BLK_DEV_SD=y`。
+
+### 源码级根因（推翻 09-03 上午那份"链路正确自洽"的静态核对）
+
+`drivers/usb/dwc3/core.c:1603 dwc3_core_init_mode()`：
+
+```c
+switch (dwc->dr_mode) {
+case USB_DR_MODE_PERIPHERAL:  → dwc3_gadget_init()      /* 不注册 role switch */
+case USB_DR_MODE_HOST:        → dwc3_host_init()        /* 不注册 role switch */
+case USB_DR_MODE_OTG:         → dwc3_drd_init()         /* 才注册 */
+}
+```
+
+role switch 只在 `drivers/usb/dwc3/drd.c:500 dwc3_setup_role_switch()` 里注册，
+且只能由 `dwc3_drd_init()` 触发（`drd.c:546-548`，条件
+`ROLE_SWITCH && device_property_read_bool(dwc->dev, "usb-role-switch")`）。
+
+而 `dts/msm8953-smartisan-odin-norolesw.dts` 四件事全做了：
+删 `&usb3` 的 `usb-role-switch`、删 `ports`、`dr_mode` 改 `peripheral`、
+删 `&pmi8950_smbcharger` 的 `usb-role-switch`。
+
+⇒ **l0-safe 下 DWC3 根本不会注册 role switch**，smbchg 的
+`smbchg_check_role_switch()`（`qcom-smbchg.c:878`）重试 60 次后打出
+`USB role switch is not found` —— 与真机日志逐字对应。
+
+**早上那份核对错在哪**：只看了 smbchg 侧能解析 phandle（"能解析到 DWC3 的
+role switch"），没看 DWC3 侧会不会去注册。方向反了。
+
+### `l0` 的配置是齐的（这次逐项核过）
+
+- `msm8953.dtsi:2299` —— `usb3` 节点自带 `usb-role-switch;` 与
+  `role-switch-default-mode = "peripheral";`
+- `patches/0007` —— `&usb3 { status = "okay"; dr_mode = "otg"; }`
+- `patches/0007` —— `&pmi8950_smbcharger { usb-role-switch = <&usb3>; otg-vbus {...}; }`
+- 用户态 —— `odin-usb-role.sh`（`want_role()` 读 extcon、`apply_host()` 解绑 UDC
+  并停 dnsmasq、`apply_device()` 等 UDC 后重配 gadget）+ `99-odin-usb-role.rules`
+  （UDC add/remove、typec change、extcon change 三个触发器，走 systemd 标签）
+  + `odin-usb-gadget.service/timer` 看门狗。
+
+事实来源是 PMI8950 SMBCHG 的 USB-ID 检测（不是 Type-C 芯片），由 `qcom-smbchg`
+调 `usb_role_switch_set_role()`。**缺的一直是真机验证，不是配置。**
+
+### 一条无效功（记下来别再试）
+
+想让 l0-safe "彻底不碰 OTG"，试过去掉 DTS 里的 `otg-vbus` 子节点 —— **没用**。
+`qcom-smbchg.c:1608-1626` 是 `devm_regulator_register()` 无条件注册，
+`otg_rdesc.of_match = "otg-vbus"` 只用于匹配 init_data，删了子节点既不阻止
+probe 也不阻止 OTG 尝试。要真禁掉得改驱动侧。
+
+### 那次重启（外接 SSD 触发）
+
+时序（上一轮 journal）：
+```
+20:14:34  qcom-smbchg: OTG regulator failure        ← 插 SSD，硬件尝试供 VBUS 失败
+20:14:53  qcom-smbchg: USB role switch is not found ← 重试 60 次后放弃
+20:16:05  重启
+```
+电池当时并非没电（事后 20:19 测得 77% / 4.13 V / 28 °C / charging / capacity 100%）。
+用户是插回电脑才自动开机的。**根因未定位**，但已排除：非 panic（pstore 空）、
+非热（44–49 °C）、非电池低电量。
+
+### 顺带查出的电池信息两处不准
+
+1. **能量值虚高约 14%**：upower 报 `energy-full: 15.4 Wh`，而 15.4 Wh ÷ 3.5 Ah
+   = 4.4 V —— 它拿 `VOLTAGE_MAX_DESIGN`（充满上限电压）算的，不是标称电压
+   （Li-ion 约 3.85 V）。按标称应为 **13.5 Wh**。`energy`/`energy-full`/
+   `energy-rate` 全都偏高。
+2. **电池健康度读不到**：uevent 只有 `CHARGE_FULL_DESIGN`（设计 3500 mAh，
+   与 reports/025 一致），**缺 `CHARGE_FULL`（实测满充容量）** ⇒ upower 的
+   `capacity: 100%` 是"设计值÷设计值"，**恒为 100%，反映不出老化**。
+   真正可信的百分比（77%）是 PMIC fuel gauge 的 SOC。
+
+### 本轮改动
+
+`extlinux.conf` 的 `default` 从 `l0-safe` 改回 `l0`。理由：当初选 l0-safe 的
+唯一前提是"SSH 是唯一远程生命线"，而**现在 WiFi 已打通**（实测可经
+192.168.18.251 局域网 SSH 登录），这个前提不成立了；而 `l0-safe` 是原理上
+不支持 OTG，留着它就永远用不了外接 USB 设备。
+`l0-safe` 保留为救援 label。README §四/§七/§八 与 extlinux.conf 注释同步更新。
+
+> ⚠️ `l0` 从未在真机上验证过。刷入验证需用户点头（属 AGENTS.md §7 不可逆级）。
