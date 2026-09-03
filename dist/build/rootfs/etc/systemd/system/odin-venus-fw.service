@@ -7,7 +7,11 @@ After=local-fs.target systemd-modules-load.service
 
 [Service]
 Type=oneshot
-# 取不到最坏只是没有硬件编解码，绝不能因为这一步把启动拖住或搞挂
+# 取不到最坏只是没有硬件编解码，绝不能因为这一步把启动拖住或搞挂。
+# 显式压超时（默认 90s）：本服务会重建 venus 的 probe，而真机上踩过
+# venus 相关操作卡在不可中断状态、连 reboot 都被挡住的事故（reports/029 §7），
+# 宁可这一步被 systemd 放弃，也不要把后面的启动流程拖死。
+TimeoutStartSec=30
 ExecStart=/usr/local/sbin/odin-venus-fw.sh
 RemainAfterExit=yes
 

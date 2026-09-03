@@ -4,13 +4,25 @@
 #   sudo odin-video-check.sh            # 完整体检（含一次真实编解码）
 #   sudo odin-video-check.sh --quick    # 只看固件/设备/格式，不跑编解码
 #
-# 判据：venus 是 V4L2 M2M 设备，不是 VA-API。可用 = firmware 在 + /dev/videoX
-# 里有 venus 的 decoder/encoder + 能真的编出一帧、再解回来。
-# 只看 lsmod 有 venus_core 不算数 —— 它 probe 失败时模块照样在。
+# 判据：venus 是 V4L2 M2M 设备，不是 VA-API。可用 = firmware 在 +
+# 出现 qcom-venus-decoder 与 qcom-venus-encoder 两个设备 + 能真的编出一帧、
+# 再解回来。
+# 只看 lsmod 有 venus_core 不算数 —— 它 probe 失败时模块照样在；
+# 只看 /dev/video* 也不算数 —— 摄像头 msm_vfe* 占着 video0~video5。
 set -u
 
 QUICK=0
 [ "${1:-}" = "--quick" ] && QUICK=1
+
+VENUS_LIB=/usr/local/lib/odin/venus-devs.sh
+if [ -r "$VENUS_LIB" ]; then
+	# shellcheck source=/dev/null
+	. "$VENUS_LIB"
+else
+	odin_venus_devs() { :; }
+	odin_venus_dev() { return 1; }
+	echo "  ❌ 缺 $VENUS_LIB，无法判定 venus 设备（镜像不完整？）"
+fi
 
 ok=0; bad=0
 pass() { echo "  ✅ $*"; ok=$((ok + 1)); }
@@ -31,8 +43,10 @@ fi
 
 # ---------------------------------------------------------------- 2. 内核
 head2 "2. 内核驱动"
-if grep -q "venus" /proc/modules 2>/dev/null; then
-	pass "venus 模块已加载：$(grep -o '^venus_[a-z]*' /proc/modules | tr '\n' ' ')"
+# /proc/modules 里是下划线（venus_core/venus_dec/venus_enc），模块文件是
+# venus-core.ko —— kmod 把 - 与 _ 当同一个，所以两种写法都能 modprobe。
+if grep -qE '^venus[-_]' /proc/modules 2>/dev/null; then
+	pass "venus 模块已加载：$(grep -oE '^venus[-_][a-z]+' /proc/modules | tr '\n' ' ')"
 else
 	fail "venus 模块未加载"
 fi
@@ -44,24 +58,35 @@ fi
 
 # ---------------------------------------------------------------- 3. v4l2 设备
 head2 "3. V4L2 M2M 设备"
-DEC=""; ENC=""
-# 靠"它到底支持哪些压缩格式"来认设备，比认名字可靠：
-# venus 的 decoder / encoder 各占一个 /dev/videoX，名字随内核版本变过。
+# 按驱动写死在 sysfs 里的设备名认设备（qcom-venus-decoder / qcom-venus-encoder），
+# 不靠"发现顺序"也不靠"有 /dev/video*"—— 本机摄像头 msm_vfe* 占着 video0~video5，
+# 后两种判据都不成立。
+DEC=$(odin_venus_dev dec)
+ENC=$(odin_venus_dev enc)
+
+# 把全部 video 设备列出来做上下文，venus 的那两个单独标注
 for v in /dev/video*; do
 	[ -e "$v" ] || continue
-	info "$v  name=$(cat /sys/class/video4linux/${v#/dev/}/name 2>/dev/null)"
-	fmts=$(v4l2-ctl -d "$v" --list-formats 2>/dev/null | tr '\n' ' ')
-	case "$fmts" in
-		*H264*|*HEVC*|*VP8*|*VP9*|*MPEG4*)
-			if [ -z "$DEC" ]; then DEC="$v"; else ENC="$v"; fi ;;
+	n=$(cat "/sys/class/video4linux/${v#/dev/}/name" 2>/dev/null)
+	case "$v" in
+		"$DEC"|"$ENC") info "$v  name=$n   ← venus" ;;
+		*)             info "$v  name=$n" ;;
 	esac
 done
-if [ -n "$DEC" ]; then
-	pass "找到编解码设备：dec=$DEC enc=${ENC:-（未识别，可能同一个）}"
-else
-	fail "没有任何 /dev/video* 支持压缩格式 —— venus 没起来"
-fi
-[ -n "$DEC" ] && v4l2-ctl -d "$DEC" --list-formats 2>/dev/null | sed 's/^/     /'
+
+if [ -n "$DEC" ]; then pass "解码器 $DEC"; else fail "没有 qcom-venus-decoder 设备"; fi
+if [ -n "$ENC" ]; then pass "编码器 $ENC"; else fail "没有 qcom-venus-encoder 设备"; fi
+
+# 两端格式都列：解码器吃压缩格式、吐原始帧；编码器反过来。
+# 哪一侧是压缩格式取决于 v4l2-ctl 对 M2M 设备的映射，所以这里不猜，
+# 两边都打出来并注明是哪条命令的结果。
+for d in "$DEC" "$ENC"; do
+	[ -n "$d" ] || continue
+	info "$d --list-formats："
+	v4l2-ctl -d "$d" --list-formats 2>/dev/null | sed 's/^/     /'
+	info "$d --list-formats-out："
+	v4l2-ctl -d "$d" --list-formats-out 2>/dev/null | sed 's/^/     /'
+done
 
 [ "$QUICK" = 1 ] && {
 	echo

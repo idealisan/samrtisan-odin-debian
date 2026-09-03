@@ -46,10 +46,15 @@ part_dev() {
 	return 1
 }
 
-# 固件是否已就位（只认 .mdt：段表在里面，段文件由 qcom_mdt 按需取）
+# 固件是否已就位。
+# 主判据只认 .mdt（段表在里面，段文件由 qcom_mdt 按表取）；但**额外**要求至少
+# 有一个 venus.b* 段文件 —— 否则"上次拷到一半被断电"会留下只有 .mdt 的半套固件，
+# 而这个 check 会一直返回真、之后再也不补，表现为 venus 永远起不来。
+# （.b04 只有 32 字节、内容全是 0xdeadadd0 填充，是最容易漏的那一个。）
 check() {
 	root=$1
-	[ -s "$root/lib/firmware/$MDT" ]
+	[ -s "$root/lib/firmware/$MDT" ] || return 1
+	ls "$root/lib/firmware"/venus.b* >/dev/null 2>&1
 }
 
 ROOT=${1:-}
