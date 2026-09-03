@@ -2757,3 +2757,15 @@ b) **外部功放没被正确使能** —— 原厂只给了 `ext-pa-enable = gp
   没有反过来问"它现在会在什么条件下被触发、触发多少次"。补"自愈"逻辑时，
   **触发频率本身就是正确性的一部分** —— 一次性的补救和每次开机都跑的循环
   是完全不同的风险等级。
+
+- **15:27 T? 完成** — USB 角色切换链路源码级排查：无功能性 bug，仅修 README 文档漂移
+  - 核对对象：qcom-smbchg.c / dwc3-qcom.c / msm8953.dtsi（内核 commit 770e10fa）、
+    patches/0007、dts/*-norolesw.dts、odin-usb-role.sh、99-odin-usb-role.rules、
+    apply-staging-fixes.sh 生成的 odin-usb-gadget.{service,timer}、extlinux.conf、config-postmarketos。
+  - 结论：fc3e971 的 USB 重写链路正确自洽。`msm8953.dtsi` 的 usb3 本就带
+    `usb-role-switch` + `role-switch-default-mode="peripheral"`，smbchg 的
+    `usb-role-switch=<&usb3>` 能解析到 DWC3 的 role switch；device 模式（SSH 那条）
+    由 DWC3 默认 peripheral 保证 UDC 恒在，即便 smbchg 角色切换失效也不影响。
+    唯一真问题：README 第 193 行"默认进 l0"与首刷默认 l0-safe 政策自相矛盾，已改。
+  - **踩坑/补记**：WORKLOG 此前记 fc3e971"零验证记录"的担忧经源码核对可排除；
+    但真机验证（fastboot 刷入后实跑）仍待补，本机 Windows 缺 fastboot 驱动暂未刷。

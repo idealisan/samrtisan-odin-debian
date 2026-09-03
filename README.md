@@ -127,8 +127,15 @@ exFAT 或 NTFS。**
 **首刷默认 `l0-safe`。** 原因：`l0` 依赖 Type-C 角色切换，而这条链路在 2026-09-02
 被整体重写过（`fc3e971`：删掉 FUSB301 与 SMBCHG OTG boost 两个内核补丁共 665 行、
 新增 `qcom-smbchg` 的 `usb-role-switch` 补丁、改设备树 89 行与内核配置），
-**没有真机验证记录**。SSH 是本机唯一的远程生命线 —— 角色切换不工作 ⇒ 无 `usb0`
+**没有真机验证记录**（已排期补，见 §七）。SSH 是本机唯一的远程生命线 —— 角色切换不工作 ⇒ 无 `usb0`
 ⇒ 无 `172.16.42.1` ⇒ 无 SSH，而无屏设备这时只剩 UART。
+
+> 2026-09-03 源码级核对结论（消掉上面"零验证"的顾虑）：`msm8953.dtsi` 的 `usb3`
+> 节点本就带 `usb-role-switch` + `role-switch-default-mode = "peripheral"`，
+> `pmi8950_smbcharger` 的 `usb-role-switch = <&usb3>` 能正确解析到 DWC3 的 role switch
+> （`qcom-smbchg.c` 的 `usb_role_switch_get` 带 120s 重试兜底）；且即使角色切换彻底失效，
+> DWC3 默认仍为 peripheral、UDC 照常出现，故 **device 模式（SSH 走的那条）不受影响**，
+> 最坏情况只是 OTG host 不可用。真机验证仍待补。
 
 用的是**面板写死 FT8716** 的那一对 DTB（`*-ft8716*`），不是自动识别版：写死之后面板
 是否点亮与 lk2nd 选中哪个 QCDT 条目无关，排障面小很多。自动识别的一对也随镜像发布，
@@ -190,7 +197,7 @@ sudo sed -i 's/^default .*/default l0/' /extlinux/extlinux.conf && sudo reboot
 1. **备份**：当前可启动的 boot 分区与 postmarketOS `/boot`。
 2. 刷 `lk2nd.img` → boot 分区（64M）；刷 `odin-debian-sparse.img` → userdata。
    顺序不能反（lk2nd 负责挂载 userdata 找到 `/extlinux/extlinux.conf`）。
-3. **默认进 `l0`**：连接电脑时提供 USB 网络，连接 OTG Hub/U 盘时切换为 host。
+3. **切到 `l0` 后**：连接电脑时提供 USB 网络，连接 OTG Hub/U 盘时切换为 host（首刷默认仍是 `l0-safe`，确认整机可用再切，见上方策略）。
 4. 若完整角色切换异常，可将 default 改成 `l0-safe` 重启，恢复固定 USB 网络救援模式。
 5. 屏幕观察顺序：panel driver 绑定 → DRM connector → fb0 → 背光。
    **屏幕能否点亮取决于 lk2nd 是否选中 odin 条目**（见 §七 已知限制第 1 条）。
