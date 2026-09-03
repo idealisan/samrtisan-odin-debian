@@ -314,7 +314,12 @@ ffmpeg -c:v h264_v4l2m2m -i in.mp4 -f rawvideo -pix_fmt nv12 out.raw
 ffmpeg -c:v hevc_v4l2m2m -i in.mkv -c:v h264_v4l2m2m -b:v 4M out.mp4
 ```
 
-需要的 Debian 包：`ffmpeg` `v4l-utils`（已加进 `setup-rootfs.sh` 的基础包清单）。
+需要的 Debian 包：`ffmpeg` `v4l-utils`。
+
+> ⚠️ **2026-09-03 更正**：这两个包**已移出默认镜像**（用户拍板：视频工具不进
+> rootfs，ffmpeg 会拖进一大堆依赖）。本段"已加进 `setup-rootfs.sh` 的基础包
+> 清单"的说法作废。需要的人自己 `sudo apt install ffmpeg v4l-utils`。
+> 用法与约束见 `reports/030`。
 
 ⚠️ **不要装 `mesa-venus`** —— 那是 VirtIO-GPU 的 Vulkan 驱动（给虚拟机用的），
 与裸机的 qcom venus **同名不同物**。

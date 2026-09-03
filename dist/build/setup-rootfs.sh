@@ -265,15 +265,18 @@ chroot $R apt-get update -qq
 # 不需要蓝牙固件（与 WiFi 共用 wcnss.*，已由 odin-wlan-fw.sh 提供）、
 # 不需要 btattach、不需要额外的 udev 规则。
 #
-# ffmpeg + v4l-utils：venus 硬件编解码的用户态入口。
-# 主线 qcom-venus 暴露的是 **V4L2 M2M** 设备（/dev/videoX，decoder 与 encoder
-# 各一个），不是 VA-API —— 裸机上没有 mesa 后端会去接管它，所以 FFmpeg 走
-#   ffmpeg -c:v h264_v4l2m2m            （解码）
-#   ffmpeg -c:v h264_v4l2m2m            （编码）
-# v4l-utils 提供 v4l2-ctl，用来列格式（v4l2-ctl -d /dev/videoX --list-formats）
-# 与排查 —— 排查硬件编解码时它是唯一的"看得见"的工具。
-# 另注：pmOS 的 mesa-venus 是 VirtIO-GPU 的 Vulkan 驱动（给虚拟机用的），
-# 与裸机的 qcom venus 同名不同物，别装。
+# 【刻意不装】ffmpeg 与 v4l-utils —— 用户 2026-09-03 拍板：视频工具不进默认镜像。
+#
+# 背景：venus 硬件编解码的用户态入口就是这两个包
+#   ffmpeg    -c:v h264_v4l2m2m / hevc_v4l2m2m（V4L2 M2M，不是 VA-API）
+#   v4l-utils v4l2-ctl，列格式与排查，排硬件编解码时唯一"看得见"的工具
+# 但 ffmpeg 在 bookworm 上会拖进一大堆依赖（libav* / libx264 / libvpx / SDL2 …），
+# 镜像体积与 rootfs 解包耗时都受影响，而它不是每个人都要用。
+#
+# ⇒ 需要的人自己装：sudo apt install ffmpeg v4l-utils
+#   用法与约束见 docs/03 §六 与 reports/030。
+#   另外注意：pmOS 的 mesa-venus 是 VirtIO-GPU 的 Vulkan 驱动（给虚拟机用的），
+#   与裸机的 qcom venus 同名不同物，别装。
 if ! chroot $R apt-get install -y -qq $APT_OPTS \
 	kmod \
 	network-manager wpasupplicant iw wireless-tools rfkill firmware-atheros \
@@ -282,7 +285,6 @@ if ! chroot $R apt-get install -y -qq $APT_OPTS \
 	systemd-resolved systemd-timesyncd util-linux-extra fake-hwclock cron \
 	upower policykit-1 \
 	bluez \
-	ffmpeg v4l-utils \
 	nftables; then
 	echo "[setup-rootfs] FATAL: 网络/基础包没装上，构建中止（apt 的完整报错在上面）" >&2
 	exit 1
