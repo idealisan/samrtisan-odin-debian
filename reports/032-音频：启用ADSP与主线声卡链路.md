@@ -105,28 +105,107 @@ QDSP6 全套（AFE / ADM / ASM / ROUTING / PRM / Q6VOICE）、
 
 ---
 
-## 4. 还没解决：外置扬声器功放
+## 4. 外置扬声器功放：GPIO 132（官方源码实锤）
 
-本机是 **两个麦克风 + 一个扬声器 + 一个听筒**（用户 2026-09-03 确认），不是立体声。
+### 4.1 依据
 
-pmOS 的 **mido（红米 Note 4）** 用：
+官方开源内核 **SmartisanOS_Kernel_Source 的 `U2ProKernel` 分支**（Linux 3.18.31）里的
+`arch/arm/boot/dts/qcom/u3-p1-msm8953-special-odin-audio.dtsi`：
 
 ```dts
-speaker_amp: audio-amplifier {
-	compatible = "awinic,aw8738";
-	mode-gpios = <&tlmm 96 GPIO_ACTIVE_HIGH>;
-	awinic,mode = <5>;
+&pm8953_diangu_analog { status = "ok"; };
+
+&int_codec {
+	status = "ok";
+	qcom,msm-mbhc-hphl-swh = <1>;
+	qcom,msm-hs-micbias-type = "external";
+	qcom,cdc-us-euro-gpios = <&tlmm 128 0>;
+	qcom,msm-micbias2-ext-cap;
+};
+
+&pm8953_diangu_dig {
+	status = "ok";
+	qcom,cdc-micbias-cfilt-mv = <2700000>;
+	qcom,ext-pa-enable = <&tlmm 132 0>;   ← 外置功放使能 = GPIO 132
+	qcom,speaker-id    = <&tlmm 93  0>;   ← 扬声器 ID 检测（输入）
 };
 ```
 
-09-01 那轮调试的 AW8738 假设就是照抄 mido 来的。**但本机 GPIO 是否相同没有证据**，
-所以这次**没有加** —— 猜错 GPIO 可能把别的引脚配坏。
+下游驱动 `sound/soc/codecs/msm8x16-wcd.c`：
 
-09-01 的实验现象值得记住：RX3 通路 DAPM 全 On、`hw_ptr` 在推进、增益满
-（RX3=124=+40 dB）、零报错，但物理不发声。这恰恰说明**数字链路是通的，
-问题出在最后的功放没打开**。
+```c
+SND_SOC_DAPM_SPK("Ext Spk", msm8x16_wcd_codec_enable_spk_ext_pa);
+gpio_request_one(pdata->ext_pa_en_gpio, GPIOF_OUT_INIT_LOW, ...);  /* 默认关 */
+gpio_set_value_cansleep(pdata->ext_pa_en_gpio, 1);                 /* 高 = 开 */
+```
 
-下一步（等基础链路起来后）：用 `amixer` 逐个试 SPK 通路与 GPIO。
+**用的是 PMIC 内置 codec**（`pm8953_diangu_analog` / `pm8953_diangu_dig`）——
+对应主线的 `wcd_codec`（`qcom,pm8916-wcd-analog-codec`）与
+`lpass_codec`（`qcom,msm8916-wcd-digital-codec`）。外置的只有一颗功放。
+
+### 4.2 ⚠️ 关键更正：GPIO 是 132，不是 96
+
+| 来源 | GPIO | 结论 |
+|---|---|---|
+| pmOS 的 mido（红米 Note 4，`awinic,aw8738`） | 96 | ❌ 09-01 照抄了这个，扬声器一直不响 |
+| **ODIN 官方 DTS** | **132** | ✅ 本次采用 |
+
+09-01 那轮把 mido 的 AW8738 + GPIO 96 当成通用模板抄过来，是扬声器无解的直接原因。
+
+### 4.3 主线怎么接
+
+主线没有 aw8738 驱动，也不需要 —— 这颗功放只有一根使能脚。用主线自带的
+**`simple-audio-amplifier`**（`sound/soc/codecs/simple-amplifier.c`）即可：
+它的 DAPM 是 `INL/INR → DRV → OUTL/OUTR`，`DRV` 的 POST_PMU/PRE_PMD 事件
+正好去拉 `enable-gpios`，等价于下游那个 `"Ext Spk"` widget。
+
+主线 WCD codec 的输出名（`msm8916-wcd-analog.c`）：
+`EAR`（听筒）、`HPH_L`/`HPH_R`（耳机）、`SPK_OUT`（扬声器）、`LINEOUT_OUT`。
+
+声卡驱动走的是公共解析器 `qcom_snd_parse_of()`（`sound/soc/qcom/common.c`），
+支持 `widgets` / `audio-routing` / `pin-switches` / **`aux-devs`** —— 所以功放
+可以作为 aux device 挂进去。
+
+### 4.4 已落地的 DTS
+
+```dts
+/ {
+	speaker_amp: audio-amplifier {
+		compatible = "simple-audio-amplifier";
+		enable-gpios = <&tlmm 132 GPIO_ACTIVE_HIGH>;
+		sound-name-prefix = "Speaker Amp";
+	};
+};
+
+&sound_card {
+	status = "okay";
+	widgets = "Speaker", "Ext Spk",
+		  "Earpiece", "Earpiece";
+	audio-routing =
+		"AMIC1", "MIC BIAS External1",
+		"AMIC2", "MIC BIAS External2",
+		"AMIC3", "MIC BIAS External1",
+		"Speaker Amp INL", "SPK_OUT",
+		"Ext Spk", "Speaker Amp DRV",
+		"Earpiece", "EAR";
+	pin-switches = "Ext Spk", "Earpiece";
+	aux-devs = <&speaker_amp>;
+};
+```
+
+两处刻意的取舍：
+
+1. 从 **DRV** 取信号而不是 OUTL/OUTR —— 后者还串着 simple-amp 的
+   `VCC` regulator supply，而本机功放的供电轨没查到证据，接错反而点不亮。
+2. 不建模 `qcom,speaker-id`（GPIO 93）—— 那是给安卓 HAL 选功放型号用的输入引脚，
+   主线不需要。
+
+> `speaker_amp` 节点必须包在 `/ { }` 里。这个项目踩过：顶层节点在 dtc 1.6.1 下
+> 直接报 `syntax error`（见 `setup-rootfs.sh` 里 battery 节点的注释）。
+
+**待验证**：GPIO 132 的极性（下游是 `GPIOF_OUT_INIT_LOW` + 置 1 开启，
+所以 `GPIO_ACTIVE_HIGH` 应当正确）、simple-amp 的 DRV 事件能否正常触发。
+刷入后若扬声器仍不响，先用 `gpioget/set` 直接拉 GPIO 132 确认功放本身。
 
 ---
 

@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,565 @@
+@@ -0,0 +1,629 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -562,8 +562,71 @@ index 000000000..3dc8f434d
 +	status = "okay";
 +};
 +
++/*
++ * 外置扬声器功放 + 听筒 —— 2026-09-03
++ *
++ * 依据来自**官方开源内核**（SmartisanOS_Kernel_Source 的 U2ProKernel 分支，
++ * Linux 3.18）里的 `arch/arm/boot/dts/qcom/u3-p1-msm8953-special-odin-audio.dtsi`：
++ *
++ *     &pm8953_diangu_dig {
++ *         status = "ok";
++ *         qcom,cdc-micbias-cfilt-mv = <2700000>;
++ *         qcom,ext-pa-enable = <&tlmm 132  0>;   ← 外置功放使能 = GPIO 132
++ *         qcom,speaker-id    = <&tlmm 93   0>;   ← 扬声器 ID 检测（输入，主线不需要）
++ *     };
++ *     &int_codec { status = "ok"; ... };          ← 用的就是 PMIC 内置 codec
++ *
++ * ⚠️ 关键更正：GPIO 是 **132**，不是 96。
++ *    96 是 pmOS 的 mido（红米 Note 4）用 awinic,aw8738 的引脚，
++ *    09-01 那轮调试直接照抄了 mido，扬声器因此一直不响。
++ *    下游驱动 sound/soc/codecs/msm8x16-wcd.c 里
++ *        SND_SOC_DAPM_SPK("Ext Spk", msm8x16_wcd_codec_enable_spk_ext_pa)
++ *        → gpio_set_value_cansleep(ext_pa_en_gpio, 1)   ← 高电平开功放
++ *        → 初始 gpio_request_one(..., GPIOF_OUT_INIT_LOW) ← 默认关
++ *
++ * 主线这边没有 aw8738 的驱动，也没有必要 —— 这颗功放只有一根使能脚，
++ * 用主线自带的 `simple-audio-amplifier`（sound/soc/codecs/simple-amplifier.c）
++ * 就够了：它的 DAPM 是 INL/INR → DRV → OUTL/OUTR，DRV 的 POST_PMU/PRE_PMD
++ * 事件去拉 `enable-gpios`，正好等价于下游那个 "Ext Spk" widget。
++ *
++ * 拓扑：WCD 的 SPK_OUT → 功放 INL → DRV(拉高 GPIO132) → 卡片上的 Ext Spk
++ *
++ * 两点刻意的取舍：
++ *   1. 从 **DRV** 取信号而不是 OUTL/OUTR —— 后者还串着 simple-amp 的
++ *      VCC regulator supply，而本机功放的供电轨没查到证据，接错反而点不亮。
++ *   2. 不建模 `qcom,speaker-id`（GPIO 93）—— 那是给安卓 HAL 选功放型号用的
++ *      输入引脚，主线不需要。
++ *
++ * 听筒（EAR）由 WCD 直接驱动，不经外置功放，所以走 audio-routing 直连。
++ */
++/ {
++	speaker_amp: audio-amplifier {
++		compatible = "simple-audio-amplifier";
++		enable-gpios = <&tlmm 132 GPIO_ACTIVE_HIGH>;
++		sound-name-prefix = "Speaker Amp";
++	};
++};
++
 +&sound_card {
 +	status = "okay";
++
++	widgets =
++		"Speaker", "Ext Spk",
++		"Earpiece", "Earpiece";
++
++	audio-routing =
++		/* 麦克风（沿用 dtsi 默认：AMIC1/2/3 → MIC BIAS External1/2/1） */
++		"AMIC1", "MIC BIAS External1",
++		"AMIC2", "MIC BIAS External2",
++		"AMIC3", "MIC BIAS External1",
++		/* 扬声器：WCD 的 SPK_OUT → 外置功放（DRV 拉高 GPIO 132） */
++		"Speaker Amp INL", "SPK_OUT",
++		"Ext Spk", "Speaker Amp DRV",
++		/* 听筒：WCD 的 EAR 直驱 */
++		"Earpiece", "EAR";
++
++	pin-switches = "Ext Spk", "Earpiece";
++	aux-devs = <&speaker_amp>;
 +};
 +
 +/*
