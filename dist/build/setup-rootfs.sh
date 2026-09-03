@@ -369,7 +369,7 @@ if [ "$ODIN_VARIANT" = "gui" ]; then
 		plasma-nm \
 		firefox-esr \
 		vim nano less file unzip zip rsync tmux screen \
-		btop iotop sysstat \
+		htop btop iotop sysstat \
 		git build-essential \
 		pipewire pipewire-pulse wireplumber pipewire-alsa \
 		bluez-obexd libspa-0.2-bluetooth \
