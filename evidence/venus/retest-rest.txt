@@ -1,0 +1,28 @@
+日志 1948 字节；进程: 已结束
+======================
+=== 6. 全硬件转码 硬解->硬编（同分辨率直通）===
+/tmp/odin-rest.sh: line 10:  7315 Killed                  timeout -s KILL 45 "$@" > /dev/null 2> e.txt
+  FAIL  hw hevc dec -> hw h264 enc                 rc=137  error
+  进程残留检查: 有残留
+
+=== 6b. 拆两进程做全硬件转码（文档里的推荐绕法）===
+/tmp/odin-rest.sh: line 34:  7411 Killed                  timeout -s KILL 45 bash -c "ffmpeg -y -loglevel error -c:v ${C}_v4l2m2m -i $F -f rawvideo -pix_fmt nv12 - 2>/dev/null | ffmpeg -y -loglevel error -f rawvideo -pix_fmt nv12 -s 1920x1440 -r 30 -i - -c:v h264_v4l2m2m -b:v 4000k -f mp4 out.bin 2>/dev/null"
+  FAIL  two-process pipe rc=137
+
+=== 7. 分辨率档位 ===
+/tmp/odin-rest.sh: line 10:  7501 Killed                  timeout -s KILL 45 "$@" > /dev/null 2> e.txt
+  FAIL  enc scale=1280x720                         rc=137  
+  FAIL  enc scale=1920x1080                        rc=1  Error initializing output stream 0:0 -- Error while opening encoder for output stream #0:0 - maybe incorrect parameters such as bit_rate
+  FAIL  enc scale=854x480                          rc=1  Error initializing output stream 0:0 -- Error while opening encoder for output stream #0:0 - maybe incorrect parameters such as bit_rate
+  FAIL  enc scale=640x480                          rc=1  Error initializing output stream 0:0 -- Error while opening encoder for output stream #0:0 - maybe incorrect parameters such as bit_rate
+
+=== 8. 软件编码对照 ===
+  PASS  sw libx264 ultrafast                        28095979 bytes    8747ms
+
+=== 收尾 ===
+  设备:  21:31:28 up 28 min, 1 user, load average: 2.66, 1.20, 0.81
+  dmesg 尾部:
+    [ 1665.311005] qcom-venus 1d00000.venus: HW is overloaded, needed: 1296000 max: 1036800
+    [ 1665.314287] qcom-venus 1d00000.venus: HW is overloaded, needed: 1296000 max: 1036800
+    [ 1670.467545] qcom-venus 1d00000.venus: wait for cpu and video core idle fail (-110)
+REST_DONE

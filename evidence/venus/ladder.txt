@@ -1,0 +1,16 @@
+进程: 已结束
+==================
+venus max_load 参考: 1036800（msm8953_res）
+负载估算 = 宽*高*fps/64；30fps 下上限约 2211840 像素
+
+分辨率      像素     估算负载 结果
+640x480        307200     144000     PASS 2671494 bytes 8896ms
+854x480        409920     192150     PASS 2694420 bytes 9537ms
+1280x720       921600     432000     PASS 2681934 bytes 7745ms
+/tmp/odin-ladder.sh: line 13:  1081 Segmentation fault      timeout -s KILL 40 ffmpeg -y -loglevel error -i "$F" -vf "scale=$wh" -c:v h264_v4l2m2m -b:v 4000k -pix_fmt nv12 -an -f mp4 out.bin > /dev/null 2> e.txt
+1600x900       1440000    675000     FAIL rc=139  
+  >>> 遇到失败，停止后续更高分辨率，避免把设备搞僵
+
+dmesg 中是否出现 overload:
+  次数: 0
+LADDER_DONE

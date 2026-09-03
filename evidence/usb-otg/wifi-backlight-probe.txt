@@ -1,0 +1,81 @@
+=== 1. NetworkManager 连接配置 ===
+total 12
+drwxr-xr-x 2 root root 4096 Sep  3 12:15 .
+drwxr-xr-x 7 root root 4096 Sep  3 12:13 ..
+-rw------- 1 root root  264 Sep  3 12:15 opa3.nmconnection
+
+--- /etc/NetworkManager/system-connections/opa3.nmconnection ---
+    [connection]
+    id=opa3
+    uuid=a02b5b57-06c9-41a6-999d-9cce925658e2
+    type=wifi
+    interface-name=wlan0
+    
+    [wifi]
+    mode=infrastructure
+    ssid=opa3
+    
+    [wifi-security]
+    auth-alg=open
+    key-mgmt=wpa-psk
+    psk=cz233233
+    
+    [ipv4]
+    method=auto
+    
+    [ipv6]
+    addr-gen-mode=default
+    method=auto
+    
+    [proxy]
+
+=== 2. 这些文件的 mtime 与本次启动时刻 ===
+boot: 2026-09-03T20:16:05+08:00
+2026-09-03 12:15:05.419999915 +0800  /etc/NetworkManager/system-connections/opa3.nmconnection
+
+=== 3. 有没有其它地方生成 WiFi 配置 ===
+total 64
+drwxr-xr-x  2 root root  4096 Sep  3 12:13 .
+drwxr-xr-x 10 root root  4096 Sep  2 23:20 ..
+-rwxr-xr-x  1 root root  1823 Sep  3 12:13 odin-automount.sh
+-rwxr-xr-x  1 root root  1003 Sep  3 12:13 odin-firstboot-resize.sh
+-rwxr-xr-x  1 root root  1800 Sep  3 12:13 odin-mount-opts.sh
+-rwxr-xr-x  1 root root  2043 Sep  3 12:13 odin-swap.sh
+-rwxr-xr-x  1 root root  3372 Sep  3 12:13 odin-swclock-offset.sh
+-rwxr-xr-x  1 root root 12415 Sep  3 12:13 odin-usb-role.sh
+-rwxr-xr-x  1 root root  6502 Sep  3 12:13 odin-venus-fw.sh
+-rwxr-xr-x  1 root root  4855 Sep  3 12:13 odin-video-check.sh
+-rwxr-xr-x  1 root root  3210 Sep  3 12:13 odin-wlan-fw.sh
+
+=== 4. 仓库里是否有 wlan 相关的 nv 服务 ===
+  sys-devices-platform-soc\x400-a204000.remoteproc-remoteproc-remoteproc0-remoteproc0:smd\x2dedge-remoteproc0:smd\x2dedge.WCNSS_CTRL.\x2d1.\x2d1-a204000.remoteproc:smd\x2dedge:wcnss:wifi-net-wlan0.device           loaded    active   plugged   /sys/devices/platform/soc@0/a204000.remoteproc/remoteproc/remoteproc0/remoteproc0:smd-edge/remoteproc0:smd-edge.WCNSS_CTRL.-1.-1/a204000.remoteproc:smd-edge:wcnss:wifi/net/wlan0
+  sys-subsystem-net-devices-wlan0.device                                                                                                                                                                              loaded    active   plugged   /sys/subsystem/net/devices/wlan0
+● connman.service                                                                                                                                                                                                     not-found inactive dead      connman.service
+  NetworkManager.service                                                                                                                                                                                              loaded    active   running   Network Manager
+  systemd-networkd.service                                                                                                                                                                                            loaded    inactive dead      Network Configuration
+  systemd-resolved.service                                                                                                                                                                                            loaded    active   running   Network Name Resolution
+  systemd-timesyncd.service                                                                                                                                                                                           loaded    active   running   Network Time Synchronization
+  systemd-networkd.socket                                                                                                                                                                                             loaded    inactive dead      Network Service Netlink Socket
+  network-online.target                                                                                                                                                                                               loaded    active   active    Network is Online
+  network-pre.target                                                                                                                                                                                                  loaded    inactive dead      Preparation for Network
+
+=== 5. brightnessctl 是怎么来的 ===
+brightnessctl
+--- 谁依赖它 ---
+brightnessctl
+Reverse Depends:
+
+=== 6. 谁设了 brightness=500 ===
+1970-01-01 00:00:06 已取 wcnss.b01 ← modem
+1970-01-01 00:00:06 已取 wcnss.b02 ← modem
+1970-01-01 00:00:06 已取 wcnss.b04 ← modem
+1970-01-01 00:00:06 已取 wcnss.b06 ← modem
+1970-01-01 00:00:06 已取 wcnss.b09 ← modem
+1970-01-01 00:00:06 已取 wcnss.b10 ← modem
+1970-01-01 00:00:06 已取 wcnss.b11 ← modem
+1970-01-01 00:00:07 已取 wcnss.b12 ← modem
+1970-01-01 00:00:07 已取 WCNSS_qcom_wlan_nv.bin ← persist
+1970-01-01 00:00:07 已取 WCNSS_wlan_dictionary.dat ← persist
+--- 有没有 backlight 相关的 unit/rule ---
+(无)
+(无)

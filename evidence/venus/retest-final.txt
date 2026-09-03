@@ -1,0 +1,43 @@
+日志大小: 1907 字节
+测试进程是否还在: 已结束
+==============================
+=== 0. 基本信息 ===
+  kernel: 6.19.5-postmarketos-qcom-msm8953+
+  user 组: user sudo video
+  lo 127.0.0.1/8
+  usb0 172.16.42.1/24
+  wlan0 192.168.18.251/24
+
+=== 1. 装 ffmpeg + v4l-utils ===
+  已装，跳过
+  ffmpeg : /usr/bin/ffmpeg
+  v4l2-ctl: /usr/bin/v4l2-ctl
+ffmpeg version 5.1.9-0+deb12u1 Copyright (c) 2000-2026 the FFmpeg developers
+
+=== 2. venus 设备 ===
+  /dev/video0  name=qcom-venus-decoder
+  /dev/video1  name=qcom-venus-encoder
+  dmesg venus:
+    [   13.654742] qnoc-msm8953 580000.interconnect:interconnect-snoc: sync_state() pending due to 1d00000.venus
+    [   38.681886] qcom-venus 1d00000.venus: Unsupported property: 0
+    [   38.686399] qcom-venus 1d00000.venus: truncated property 0x1007: need 20 bytes, 12 left
+
+=== 3. 素材 ===
+  用: IMG_7575.MOV  (7152036 字节)
+      Duration: 00:00:05.37, start: 0.000000, bitrate: 10661 kb/s
+      Stream #0:0[0x1](und): Video: hevc (Main) (hvc1 / 0x31637668), yuvj420p(pc, smpte170m/smpte432/bt709), 1920x1440, 9897 kb/s, 30 fps, 30 tbr, 600 tbn (default)
+      Stream #0:1[0x2](und): Audio: pcm_s16le (lpcm / 0x6D63706C), 44100 Hz, 1 channels, s16, 705 kb/s (default)
+      Stream #0:2[0x3](und): Data: none (mebx / 0x7862656D), 0 kb/s (default)
+      Stream #0:3[0x4](und): Data: none (mebx / 0x7862656D), 34 kb/s (default)
+  视频编码: hevc
+
+=== 4. 硬件解码（硬解）===
+  PASS  hw decode hevc_v4l2m2m -> null               (null 输出)            2023ms
+  PASS  sw decode (对照) -> null                   (null 输出)            6520ms
+
+=== 5. 硬件编码（软解 -> 硬编，转码主路径）===
+  PASS  enc +nv12 +aac                                 2677170 bytes    9337ms
+  FAIL  enc 不加 -pix_fmt（应失败）           rc=1  requires nv12 pixel format.
+  PASS  enc +nv12 无音轨                            2625986 bytes    9287ms
+
+=== 6. 全硬件转码（硬解 -> 硬编，同分辨率直通）===

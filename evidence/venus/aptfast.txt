@@ -1,0 +1,86 @@
+########## /var/log/odin-aptfast.log (618 字节) ##########
+=== 备份原 sources.list ===
+  原: deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware
+  中断正在下载的 apt-get（下载阶段，安全）
+  新源已写入
+
+=== apt-get update ===
+E: Could not get lock /var/lib/apt/lists/lock. It is held by process 3233 (apt-get)
+E: Unable to lock directory /var/lib/apt/lists/
+  rc=0
+
+=== 装 ffmpeg + v4l-utils ===
+E: Unable to locate package ffmpeg
+E: Unable to locate package v4l-utils
+
+real	0m0.046s
+user	0m0.034s
+sys	0m0.013s
+  ffmpeg : 未安装
+  v4l2-ctl: 未安装
+
+=== 装完即跑测试 ===
+  测试已在后台启动
+APTFAST_DONE
+
+########## /var/log/odin-videotest.log (2275 字节) ##########
+=== 0. 基本信息 ===
+  kernel: 6.19.5-postmarketos-qcom-msm8953+
+  user 组: user sudo video
+  lo 127.0.0.1/8
+  usb0 172.16.42.1/24
+  wlan0 192.168.18.251/24
+
+=== 1. 装 ffmpeg + v4l-utils ===
+E: Unable to locate package ffmpeg
+E: Unable to locate package v4l-utils
+  ffmpeg : 未安装
+  v4l2-ctl: 未安装
+
+=== 2. venus 设备 ===
+  /dev/video0  name=qcom-venus-decoder
+  /dev/video1  name=qcom-venus-encoder
+  dmesg venus:
+    [   13.654742] qnoc-msm8953 580000.interconnect:interconnect-snoc: sync_state() pending due to 1d00000.venus
+    [   38.681886] qcom-venus 1d00000.venus: Unsupported property: 0
+    [   38.686399] qcom-venus 1d00000.venus: truncated property 0x1007: need 20 bytes, 12 left
+
+=== 3. 素材 ===
+  用: IMG_7575.MOV  (7152036 字节)
+  视频编码: 
+
+=== 4. 硬件解码（硬解）===
+  FAIL  hw decode _v4l2m2m -> null                   rc=127  
+  FAIL  sw decode (对照) -> null                   rc=127  
+
+=== 5. 硬件编码（软解 -> 硬编，转码主路径）===
+  FAIL  enc +nv12 +aac                               rc=127  
+  FAIL  enc 不加 -pix_fmt（应失败）           rc=127  
+  FAIL  enc +nv12 无音轨                          rc=127  
+
+=== 6. 全硬件转码（硬解 -> 硬编，同分辨率直通）===
+  FAIL  hw dec -> hw h264enc                         rc=127  
+
+=== 7. 分辨率档位 ===
+  FAIL  enc scale=1280x720                           rc=127  
+  FAIL  enc scale=1920x1080                          rc=127  
+  FAIL  enc scale=854x480                            rc=127  
+  FAIL  enc scale=640x480                            rc=127  
+
+=== 8. 软件编码对照 ===
+  FAIL  sw libx264 ultrafast                         rc=127  
+
+=== 9. 收尾 ===
+               total        used        free      shared  buff/cache   available
+Mem:            3544         236        3032           9         359        3308
+  dmesg 尾部:
+    [  373.416960] wlan0: authenticated
+    [  373.420578] wlan0: associate with 86:e8:9d:c5:b0:a9 (try 1/3)
+    [  373.464837] wlan0: RX AssocResp from 86:e8:9d:c5:b0:a9 (capab=0x1531 status=0 aid=10)
+    [  373.508618] wlan0: associated
+VIDEOTEST_DONE
+4837] wlan0: RX AssocResp from 86:e8:9d:c5:b0:a9 (capab=0x1531 status=0 aid=10)
+    [  373.508618] wlan0: associated
+VIDEOTEST_DONE
+
+=== 进程 ===

@@ -51,6 +51,16 @@ concurrency:
   # 后写的覆盖先写的。排队等反而又快又省 runner 时间。
   #
   # 不取消在跑的：它是有价值的（正在把缓存建起来），取消等于白跑。
+  #
+  # ⚠️ 但 GitHub 对并发组还有一个**不在文档显眼处**的限制：
+  #   同一组最多 **1 个 running + 1 个 pending**。第 3 条进来时，
+  #   会把**已经在 pending 的那条**取消掉（运行的那条不受影响）。
+  #
+  #   2026-09-03 实测：otg(在跑) + backlight-swap(排队) 时又发了 pkg-list
+  #   ⇒ backlight-swap 直接被 cancelled，一次都没跑起来。
+  #
+  #   所以别连发版本。要发就等前一条进 running 再发下一条，
+  #   或者干脆攒够改动发一次 —— 反正每条都是全量构建（约 30 分钟）。
   group: release-build
   cancel-in-progress: false
 

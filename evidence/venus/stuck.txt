@@ -1,0 +1,17 @@
+=== ffmpeg 残留 ===
+   6932    6631 S          07:55 timeout 55 ffmpeg -y -loglevel error -c:v hevc_v4l2m2m -i IMG_7575.MOV -c:v h264_v4l2m2m -b:v 4000k -pix_fmt nv12 -an -f mp4 out.bin
+   6933    6932 SLl        07:55 ffmpeg -y -loglevel error -c:v hevc_v4l2m2m -i IMG_7575.MOV -c:v h264_v4l2m2m -b:v 4000k -pix_fmt nv12 -an -f mp4 out.bin
+
+=== 状态里的 D（不可中断）===
+
+=== 谁占着 /dev/video* ===
+  /dev/video0: /dev/video0:          6933m
+  /dev/video1: /dev/video1:          6933m
+
+=== 还能 SIGKILL 掉吗 ===
+  PID 6933 杀不掉（仍然存活）
+
+=== 清完后能否再编码 ===
+[h264_v4l2m2m @ 0xaaaad78f2770] output VIDIOC_REQBUFS failed: Connection timed out
+[h264_v4l2m2m @ 0xaaaad78f2770] no v4l2 output context's buffers
+  rc=0  0 bytes
