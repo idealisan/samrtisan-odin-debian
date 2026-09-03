@@ -1,0 +1,23 @@
+[Unit]
+Description=ODIN 默认背光亮度（省电）
+# 面板背光的 sysfs 范围是 0..4095（max_brightness=4095）。默认 500 ≈ 12%，
+# 够在室内看清，又比默认的 2048 省一大截。
+#
+# 为什么排在这里：背光设备由面板驱动在启动早期注册，等 udev 冷插拔处理完最稳。
+# 另一个要点是 systemd-backlight@.service —— 它也是被 backlight 设备的 udev add
+# 触发的，作用是把上次关机时的亮度恢复回来。排在它**之后**，我们的默认值才能
+# 覆盖那个恢复值，保证"每次开机都回到 500"。
+#
+# 想让手动调的亮度跨重启保留：把本服务 mask 掉，只留 systemd-backlight。
+#   sudo systemctl mask odin-backlight.service
+After=systemd-udev-settle.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# brightnessctl 不带 -d 时操作第一个 backlight 设备，本机只有一个。
+# 失败无所谓 —— 最坏只是亮度没设成，绝不能把启动拖住或搞挂。
+ExecStart=/usr/bin/brightnessctl set 500
+
+[Install]
+WantedBy=multi-user.target

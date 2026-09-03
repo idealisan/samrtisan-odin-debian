@@ -285,6 +285,7 @@ if ! chroot $R apt-get install -y -qq $APT_OPTS \
 	systemd-resolved systemd-timesyncd util-linux-extra fake-hwclock cron \
 	upower policykit-1 \
 	bluez \
+	brightnessctl htop \
 	nftables; then
 	echo "[setup-rootfs] FATAL: 网络/基础包没装上，构建中止（apt 的完整报错在上面）" >&2
 	exit 1
@@ -315,13 +316,24 @@ chroot $R systemctl enable cron.service
 # `[ -e /run/systemd/system ] && exit 0`，systemd 下压根不会去写 RTC），
 # 所以没什么要屏蔽的 —— 之前那句 mask 是照 pmOS 的思路想当然加的，撤掉。
 chroot $R systemctl enable NetworkManager.service
-chroot $R systemctl enable odin-swap.service 2>/dev/null || true
 chroot $R systemctl enable wpa_supplicant.service 2>/dev/null || true
+#
+# ⚠️ 下面这两个服务**不能**在这里 enable —— 它们的 unit 文件来自
+# dist/build/rootfs/，而那棵树要到 apply-staging-fixes.sh（本脚本之后才跑）
+# 才部署进来。在这里 enable 时文件还不存在，必然失败。
+# 2026-09-03 实测：odin-swap.service 就是这样一直 disabled、swap 从没建立过
+# （真机 Swap: 0、/swapfile 不存在、/var/log/odin-swap.log 也没有），
+# 而那句 `2>/dev/null || true` 把失败吞得干干净净。
+# ⇒ 启用动作统一放在 apply-staging-fixes.sh 的「阶段 5 之后」，见那里。
+#   · odin-swap.service        → sysinit.target.wants
+#   · odin-backlight.service   → multi-user.target.wants
+#
 # venus 固件的正确时序在 initramfs（switch_root 之前，见
-# dist/build/initramfs/sbin/odin-venus-fw.sh）；这里启的是用户态兜底：
-# 已刷好的机器里那个 initramfs 还没有这段，而 venus 是模块，缺固件导致
-# probe 失败后不会自己重试 —— 由 odin-venus-fw.sh 取完固件再重载一次。
-chroot $R systemctl enable odin-venus-fw.service 2>/dev/null || true
+# dist/build/initramfs/sbin/odin-venus-fw.sh）；odin-venus-fw.service 是用户态兜底。
+# 它同样在 dist/build/rootfs/ 里，但**刻意不启用** —— initramfs 路径已经覆盖了
+# 正常情况，而本服务会重建 venus 的 probe，真机上踩过 venus 相关操作卡在不可
+# 中断状态、连 reboot 都被挡住的事故（reports/029 §7）。要手动补一次就跑
+# `sudo systemctl start odin-venus-fw`，不必让它每次开机都去赌。
 
 # --- USB 救援通道保护（reports/013 的 P0-2） ---
 # /etc/network/interfaces 不存在 ⇒ Debian 默认 [ifupdown] managed=false 保护不到
@@ -357,7 +369,7 @@ if [ "$ODIN_VARIANT" = "gui" ]; then
 		plasma-nm \
 		firefox-esr \
 		vim nano less file unzip zip rsync tmux screen \
-		htop btop iotop sysstat \
+		btop iotop sysstat \
 		git build-essential \
 		pipewire pipewire-pulse wireplumber pipewire-alsa \
 		bluez-obexd libspa-0.2-bluetooth \

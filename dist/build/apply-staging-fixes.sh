@@ -198,6 +198,41 @@ if [ -d "$HERE/rootfs" ]; then
 	say "rootfs 覆盖树已部署"
 fi
 
+# -------------------------------------------- 5b. 启用来自覆盖树的 systemd 服务
+#
+# ⚠️ 这一步**必须**放在上面那棵覆盖树部署之后。
+#
+# 历史 bug（2026-09-03 查出来）：odin-swap.service 的 unit 文件就在
+# dist/build/rootfs/ 里，而 setup-rootfs.sh 在**本脚本之前**跑，那时文件还
+# 不存在 ⇒ `systemctl enable` 必然失败，又被 `2>/dev/null || true` 吞掉。
+# 结果 swap 的代码、服务、sysctl 全都齐，就是从来没跑过：真机 Swap: 0、
+# /swapfile 不存在、/var/log/odin-swap.log 也没有。
+#
+# 这里照 odin-usb-gadget.timer 的既有做法，直接建 wants 符号链接 ——
+# 不依赖 chroot 里跑 systemctl，staging 目录形态下也能生效。
+#
+# 逐个说明为什么是这些：
+#   odin-swap.service      WantedBy=sysinit.target（要在内存压力出现之前挂上）
+#   odin-backlight.service WantedBy=multi-user.target（等 udev 冷插拔处理完）
+#   odin-venus-fw/wlan-fw  刻意**不**启用：正确时序已由 initramfs 覆盖
+#                          （switch_root 之前取固件），且 venus 兜底会重建
+#                          probe，真机踩过卡死事故（reports/029 §7），
+#                          不让它每次开机都去赌。需要时手动 start 即可。
+enable_from_tree() { # enable_from_tree <unit> <target>
+	local unit=$1 target=$2
+	[ -f "$R/etc/systemd/system/$unit" ] || {
+		say "跳过 $unit（覆盖树里没有这个 unit）"; return 0; }
+	# 被 mask（指向 /dev/null）就不动它，保持 mask 生效
+	if [ -L "$R/etc/systemd/system/$unit" ]; then
+		say "跳过 $unit（已被 mask）"; return 0; fi
+	mkdir -p "$R/etc/systemd/system/$target.wants"
+	ln -sfn "/etc/systemd/system/$unit" "$R/etc/systemd/system/$target.wants/$unit"
+	say "已启用 $unit → $target.wants"
+}
+
+enable_from_tree odin-swap.service      sysinit.target
+enable_from_tree odin-backlight.service multi-user.target
+
 # ------------------------------------------------- 6. 阶段 3：USB 角色自动切换
 # 旧 odin-usb-gadget.sh 是 set -e 的一次性单元：开机那一刻 UDC 不在就永久 failed，
 # 之后再插线也不会恢复 ⇒ SSH 救援通道丢失（reports/014、015）。
