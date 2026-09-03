@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,518 @@
+@@ -0,0 +1,565 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -515,6 +515,54 @@ index 000000000..3dc8f434d
 +	vddrfa-supply = <&pm8953_l19>;
 +	vddpa-supply = <&pm8953_l9>;
 +	vdddig-supply = <&pm8953_l5>;
++	status = "okay";
++};
++
++/*
++ * 音频 —— 2026-09-03 启用
++ *
++ * 主线 msm8953 的音频不是"驱动直接喂 codec"，而是整条链路跑在 **ADSP**
++ * （Hexagon 音频 DSP）上，AP 侧通过 APR 与它通信：
++ *
++ *   &lpass      remoteproc，加载 adsp.mdt 把 ADSP 拉起来
++ *               （msm8953.dtsi:3076，compatible = "qcom,msm8953-adsp-pil"）
++ *   q6afe/q6adm/q6asm/q6routing  ADSP 上的服务（在 lpass 之下，无需在 DTS 里写）
++ *   &lpass_codec  数字部分 qcom,msm8916-wcd-digital-codec（msm8953.dtsi:3065）
++ *   &wcd_codec    模拟部分 qcom,pm8916-wcd-analog-codec，在 **pm8953.dtsi:141**
++ *                 （PMIC 里的 codec，注意它在 pm8953.dtsi 而不是 msm8953.dtsi）
++ *   &sound_card   machine driver qcom,msm8953-qdsp6-sndcard（msm8953.dtsi:2982）
++ *                 内含 Primary MI2S（回放）与 Tertiary MI2S（录音）两条 dai-link，
++ *                 每条的 codec 侧都是 <lpass_codec N>, <wcd_codec N>。
++ *
++ * 三者都必须显式 status = "okay" —— 主线 dtsi 里它们默认全是 disabled。
++ * 实测：只写其中一部分的话 /proc/asound/cards 就是 "--- no soundcards ---"。
++ *
++ * ⚠️ ADSP 固件 adsp.mdt + adsp.b00~b13 不在任何 Debian 包里，取自原厂
++ *    modem 分区的 /image/（与 wcnss.*、venus.* 同级），由 initramfs 的
++ *    odin-adsp-fw.sh 在 switch_root 之前备好。
++ *    关键点：qcom,msm8953-adsp-pil 的匹配数据 msm8996_adsp_resource 带
++ *    **auto_boot = true** —— 驱动一 probe 就立刻 request_firmware，
++ *    失败不会自己重试，之后补文件也没用。固件必须先于驱动就位。
++ *
++ * 本机是 **两个麦克风 + 一个扬声器 + 一个听筒**（用户 2026-09-03 确认），
++ * 不是立体声双扬声器。默认 audio-routing 已覆盖 AMIC1/AMIC2/AMIC3
++ * （分别挂在 MIC BIAS External1/2/1），先不动它。
++ *
++ * ⚠️ 尚未接的部分：外置扬声器功放。pmOS 的 mido（红米 Note 4）用的是
++ *    awinic,aw8738 + tlmm 96，但那是对照抄过来的猜测，本机 GPIO 是否相同
++ *    没有证据。09-01 那轮实验在 RX3（听筒通路）上有数据、有增益、零报错
++ *    但物理不发声 —— 说明问题很可能就在这颗功放没打开。等音频基础链路
++ *    起来后，用 amixer 逐个试 SPK 通路与 GPIO，再补这一节。
++ */
++&lpass {
++	status = "okay";
++};
++
++&wcd_codec {
++	status = "okay";
++};
++
++&sound_card {
 +	status = "okay";
 +};
 +

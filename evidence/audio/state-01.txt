@@ -1,0 +1,48 @@
+=== 1. ALSA 声卡 ===
+--- no soundcards ---
+  /proc/asound/pcm:
+
+=== 2. remoteproc（ADSP 是否起来）===
+  remoteproc0: state=running firmware=wcnss.mdt name=a204000.remoteproc
+
+=== 3. 内核音频模块 ===
+  snd_soc_msm8916_digital
+  qcom_pon
+  qcom_spmi_temp_alarm
+  qcom_spmi_vadc
+  qcom_vadc_common
+  qcom_memshare
+  qcom_wcnss_pil
+  qcom_pil_info
+  qcom_sysmon
+  qcom_common
+
+=== 4. 设备树里 sound/lpass/wcd 的状态 ===
+  audio-codec@f000: status=disabled compat=qcom,pm8916-wcd-analog-codec
+
+=== 5. dmesg 里的音频 ===
+  [    0.000000] OF: reserved mem: 0x000000008d600000..0x000000008e6fffff (17408 KiB) nomap non-reusable adsp@8d600000
+  [    0.118820] Advanced Linux Sound Architecture Driver Initialized.
+  [    3.608095]   No soundcards found.
+
+=== 6. alsa 工具与 /lib/firmware ===
+  aplay: 无   amixer: 无   alsaucm: 无
+  fw: ar3k
+  fw: ar5523.bin
+  fw: ar7010.fw
+  fw: ar7010_1_1.fw
+  fw: ar9271.fw
+  fw: ath10k
+  fw: ath11k
+  fw: ath3k-1.fw
+  fw: ath6k
+  fw: htc_7010.fw
+  fw: htc_9271.fw
+  fw: qca
+  fw: regulatory.db
+  fw: regulatory.db-debian
+  fw: regulatory.db-upstream
+
+=== 7. 已加载的 ASoC 组件（若 debugfs 可用）===
+snd-soc-dummy
+snd-soc-dummy

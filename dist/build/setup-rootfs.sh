@@ -286,6 +286,7 @@ if ! chroot $R apt-get install -y -qq $APT_OPTS \
 	upower policykit-1 \
 	bluez \
 	brightnessctl htop \
+	alsa-utils alsa-ucm-conf \
 	nftables; then
 	echo "[setup-rootfs] FATAL: 网络/基础包没装上，构建中止（apt 的完整报错在上面）" >&2
 	exit 1

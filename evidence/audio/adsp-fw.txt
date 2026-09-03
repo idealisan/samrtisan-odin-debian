@@ -1,0 +1,49 @@
+modem 分区: /dev/mmcblk0p52
+挂载成功，/image 下的固件:
+  total 70656
+  -rwxr-xr-x 1 root root      532 May 23  2018 adsp.b00
+  -rwxr-xr-x 1 root root     6920 May 23  2018 adsp.b01
+  -rwxr-xr-x 1 root root     7465 May 23  2018 adsp.b02
+  -rwxr-xr-x 1 root root   379548 May 23  2018 adsp.b03
+  -rwxr-xr-x 1 root root  6478181 May 23  2018 adsp.b04
+  -rwxr-xr-x 1 root root   744664 May 23  2018 adsp.b05
+  -rwxr-xr-x 1 root root      360 May 23  2018 adsp.b06
+  -rwxr-xr-x 1 root root    60264 May 23  2018 adsp.b07
+  -rwxr-xr-x 1 root root    80292 May 23  2018 adsp.b08
+  -rwxr-xr-x 1 root root    32488 May 23  2018 adsp.b09
+  -rwxr-xr-x 1 root root  1041668 May 23  2018 adsp.b10
+  -rwxr-xr-x 1 root root    14132 May 23  2018 adsp.b11
+  -rwxr-xr-x 1 root root    84684 May 23  2018 adsp.b12
+  -rwxr-xr-x 1 root root   315756 May 23  2018 adsp.b13
+  -rwxr-xr-x 1 root root     7452 May 23  2018 adsp.mdt
+  -rwxr-xr-x 1 root root      244 May 23  2018 cmnlib.b00
+  -rwxr-xr-x 1 root root     6632 May 23  2018 cmnlib.b01
+  -rwxr-xr-x 1 root root   178690 May 23  2018 cmnlib.b02
+  -rwxr-xr-x 1 root root      564 May 23  2018 cmnlib.b03
+  -rwxr-xr-x 1 root root       80 May 23  2018 cmnlib.b04
+  -rwxr-xr-x 1 root root      832 May 23  2018 cmnlib.b05
+  -rwxr-xr-x 1 root root     6876 May 23  2018 cmnlib.mdt
+  -rwxr-xr-x 1 root root      400 May 23  2018 cmnlib64.b00
+  -rwxr-xr-x 1 root root     6632 May 23  2018 cmnlib64.b01
+  -rwxr-xr-x 1 root root   229184 May 23  2018 cmnlib64.b02
+  -rwxr-xr-x 1 root root     1080 May 23  2018 cmnlib64.b03
+  -rwxr-xr-x 1 root root      160 May 23  2018 cmnlib64.b04
+  -rwxr-xr-x 1 root root     2496 May 23  2018 cmnlib64.b05
+  -rwxr-xr-x 1 root root     7032 May 23  2018 cmnlib64.mdt
+
+  adsp 相关:
+    -rwxr-xr-x 1 root root     532 May 23  2018 /tmp/mdm/image/adsp.b00
+    -rwxr-xr-x 1 root root    6920 May 23  2018 /tmp/mdm/image/adsp.b01
+    -rwxr-xr-x 1 root root    7465 May 23  2018 /tmp/mdm/image/adsp.b02
+    -rwxr-xr-x 1 root root  379548 May 23  2018 /tmp/mdm/image/adsp.b03
+    -rwxr-xr-x 1 root root 6478181 May 23  2018 /tmp/mdm/image/adsp.b04
+    -rwxr-xr-x 1 root root  744664 May 23  2018 /tmp/mdm/image/adsp.b05
+    -rwxr-xr-x 1 root root     360 May 23  2018 /tmp/mdm/image/adsp.b06
+    -rwxr-xr-x 1 root root   60264 May 23  2018 /tmp/mdm/image/adsp.b07
+    -rwxr-xr-x 1 root root   80292 May 23  2018 /tmp/mdm/image/adsp.b08
+    -rwxr-xr-x 1 root root   32488 May 23  2018 /tmp/mdm/image/adsp.b09
+    -rwxr-xr-x 1 root root 1041668 May 23  2018 /tmp/mdm/image/adsp.b10
+    -rwxr-xr-x 1 root root   14132 May 23  2018 /tmp/mdm/image/adsp.b11
+    -rwxr-xr-x 1 root root   84684 May 23  2018 /tmp/mdm/image/adsp.b12
+    -rwxr-xr-x 1 root root  315756 May 23  2018 /tmp/mdm/image/adsp.b13
+    -rwxr-xr-x 1 root root    7452 May 23  2018 /tmp/mdm/image/adsp.mdt

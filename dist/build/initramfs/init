@@ -101,6 +101,24 @@ if [ -x /sbin/odin-venus-fw.sh ]; then
     fi
 fi
 
+# ADSP（音频 DSP）固件 —— 主线的整条 msm8953 音频链路都跑在它上面
+#   （q6afe / q6adm / q6asm / q6routing，声卡是 qcom,msm8953-qdsp6-sndcard）。
+#   同样取自 modem:/image/。这里的关键是与 wlan / venus 不同的那一点：
+#   qcom,msm8953-adsp-pil 的匹配数据 msm8996_adsp_resource 带 **auto_boot = true**，
+#   驱动一 probe 就立刻 request_firmware("adsp.mdt")，**失败不会自己重试**。
+#   固件不到位 = 整台机器没有声音。必须在 switch_root 之前备好。
+if [ -x /sbin/odin-adsp-fw.sh ]; then
+    if /sbin/odin-adsp-fw.sh /mnt --check; then
+        echo "[initramfs] ADSP 固件已在位"
+    else
+        echo "[initramfs] 取出 ADSP 固件"
+        mount -o remount,rw /mnt 2>/dev/null
+        /sbin/odin-adsp-fw.sh /mnt
+        sync
+        mount -o remount,ro /mnt 2>/dev/null
+    fi
+fi
+
 # 注意：此处不得 umount /mnt —— 根必须保持挂载态供 switch_root 使用；
 # 只读挂载由 systemd 依 fstab 重挂为 rw。
 kill %1 %2 2>/dev/null
