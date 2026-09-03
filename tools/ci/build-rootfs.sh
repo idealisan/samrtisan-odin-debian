@@ -142,8 +142,16 @@ BB=$ROOT/bin/busybox
 install -m 0755 "$BB" "$ISTAGE/bin/busybox"
 
 # applet 名单同理不能靠 ls bin/ 得到（见上），走一份文本文件
+#
+# ⚠️ 这个文件是**逐行机器读取**的，不解析任何注释语法：往里写 `# ...` 注释，
+#    这一行会被当成 applet 名，于是 `ln -sf busybox "$ISTAGE/bin/# ..."`。
+#    若注释里还含 `/`（比如顺手写上 `/sys/class/udc` 之类），路径会被当成多级
+#    目录 ⇒ "No such file or directory" ⇒ 整个 rootfs job 直接失败（2026-09-03
+#    实踩：两行中文注释让 core 与 gui 两个变体都在这一步挂掉，白跑 35 分钟）。
+#    所以下面显式跳过注释与空行，并把"为什么要有某个 applet"的理由写进
+#    WORKLOG / 提交信息，不写在这个文件里。
 while read -r applet; do
-  [ -n "$applet" ] || continue
+  case "$applet" in ''|'#'*) continue ;; esac
   [ -e "$ISTAGE/bin/$applet" ] && rm -f "$ISTAGE/bin/$applet"
   ln -sf busybox "$ISTAGE/bin/$applet"
 done < "$REPO/dist/build/initramfs-applets.txt"
