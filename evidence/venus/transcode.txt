@@ -1,0 +1,18 @@
+=== 1. 单进程全硬件转码（已知崩）===
+  FAIL  one-process dec->enc 1280x720                rc=139
+
+=== 2. 两进程管道：硬解 | 硬编 ===
+  PASS  two-process pipe 1280x720                      2580327 bytes   17815 ms
+
+=== 3. 单进程 + -vf scale（640x480 已知可过）===
+  FAIL  one-process dec->enc 640x480                 rc=124
+
+=== 4. 单进程不加任何 filter（原始 1920x1440）===
+  PASS  one-process dec->enc no filter                 2487622 bytes    7785 ms
+
+=== 5. 1920x1080：对齐到 1088 试试 ===
+  FAIL  enc 1920x1080 (崩的)                       rc=139
+/home/user/.odin-exec-transcode.sh: line 6:  6014 Segmentation fault      timeout 50 "$@" > /dev/null 2> err.txt
+/home/user/.odin-exec-transcode.sh: line 6:  6756 Segmentation fault      timeout 50 "$@" > /dev/null 2> err.txt
+
+[本地超时]

@@ -100,7 +100,12 @@ W=/tmp/odin-video-check
 mkdir -p "$W"
 
 head2 "4. 硬件编码（h264_v4l2m2m）"
-if ffmpeg -y -loglevel error -f lavfi -i testsrc2=size=640x360:rate=30:duration=2 \
+# 分辨率**不能随便挑**：venus 的编码器在若干档位上会让 ffmpeg 段错误，
+# 1920x1080 一带必崩，640x360 也崩（但 640x480、1280x720、854x480、
+# 1920x1440 都正常）。实测档位表见 reports/030 §4，改这里之前先去查表。
+# 另外必须显式 -pix_fmt nv12：源不是 nv12 时 ffmpeg 不一定会自动转，
+# 不转会直接报 "Encoder requires nv12 pixel format"（reports/030 §1.2）。
+if ffmpeg -y -loglevel error -f lavfi -i testsrc2=size=640x480:rate=30:duration=2 \
 	-pix_fmt nv12 -c:v h264_v4l2m2m -b:v 2M "$W/enc.h264" 2>"$W/enc.err"; then
 	pass "编码成功：$(stat -c%s "$W/enc.h264") 字节"
 else

@@ -1,0 +1,7 @@
+=== 1080 高度附近逐档试（宽度固定 1920）===
+  FAIL  1920x1072        rc=139  
+  FAIL  1920x1080        rc=139  
+/home/user/.odin-exec-p1080.sh: line 4:  7301 Segmentation fault      timeout 45 ffmpeg -y -loglevel error -t 2 -i "$F" -vf "scale=$w:$h" -c:v h264_v4l2m2m -b:v 4000k -pix_fmt nv12 -an -f mp4 out.bin > /dev/null 2> err.txt
+/home/user/.odin-exec-p1080.sh: line 4:  7362 Segmentation fault      timeout 45 ffmpeg -y -loglevel error -t 2 -i "$F" -vf "scale=$w:$h" -c:v h264_v4l2m2m -b:v 4000k -pix_fmt nv12 -an -f mp4 out.bin > /dev/null 2> err.txt
+
+[本地超时]

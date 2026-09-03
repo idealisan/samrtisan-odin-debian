@@ -53,7 +53,13 @@ fix_dns() {
 fix_dns
 
 # --- user & sudo (幂等：重跑时用户已存在则跳过) ---
-chroot $R id -u user >/dev/null 2>&1 || chroot $R useradd -m -s /bin/bash -G sudo user
+# video 组是**必需的**，不是为了摄像头：/dev/video* 属于 root:video 660，
+# 而 venus 的硬件编解码器也挂在这两个节点上（video0=decoder、video1=encoder）。
+# 不加的话 ffmpeg 打不开设备，却报 "Could not find a valid device" ——
+# 报错里一个字都不提权限，排查时会被带偏。详见 reports/030 §1.1。
+chroot $R id -u user >/dev/null 2>&1 || chroot $R useradd -m -s /bin/bash -G sudo,video user
+# 上面那行在用户已存在时会跳过，所以这里再补一次（usermod -aG 本身幂等）
+chroot $R usermod -aG video user
 echo "user:user" | chroot $R chpasswd
 echo "root:*" | chroot $R chpasswd -e   # lock root password login
 
