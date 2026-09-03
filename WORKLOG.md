@@ -2702,3 +2702,58 @@ b) **外部功放没被正确使能** —— 原厂只给了 `ext-pa-enable = gp
 - 待办（设备回来后）
   1. 跑 reports/029 §7 的验证（`odin-video-check.sh`），把结果补进 §7；
   2. 走 CI 出带 0009 与本次脚本修正的正式版，刷入验证。
+
+## ================= 2026-09-03 上午：启动/SSH 正确性排查（用户要求） =================
+
+用户要求：排查"有什么会让设备无法启动或无法连到 SSH"的错误。真机未动，全静态核对。
+结论是**三个问题，其中一个会让 v0.9.4-venus 刷了也白刷**。
+
+- **11:00 完成（P0）** — initramfs 缺 **head** applet ⇒ venus/WiFi 固件永远取不到
+  - 依赖 head 的三处：
+    `initramfs/sbin/odin-venus-fw.sh:42`（part_dev 找 modem 分区）、
+    `initramfs/sbin/odin-wlan-fw.sh:56`（同）、`initramfs/init:22`（usb_up 取 UDC）。
+  - 缺 applet = 直接 not found、**不回退**。项目自己有实锤：ae85275 记过 v0.9.2
+    缺 `cp` ⇒ initramfs 里 odin-wlan-fw.sh 静默失败 ⇒ WiFi 起不来且无报错。
+  - **为什么一直没暴露**：0a07508 说过，odin-wlan-fw.sh 的 `--check` 因为固件
+    已预置而直接返回 0，压根没走到 part_dev。而 **venus 固件没有任何预置途径**
+    （构建脚本里没有任何往 /lib/firmware 放 venus.* 的地方，全靠 initramfs 现取）
+    ⇒ part_dev 是必经之路 ⇒ 必挂。
+  - 后果：venus 固件取不到 ⇒ venus 起不来；WiFi 固件同样取不到；
+    initramfs 救援通道（telnet 172.16.42.2→23）也失效。
+  - 修法：补 head（顺带补 kill；ash 里 kill 是内建，留着只是保险）。
+    补完重扫三个 initramfs 脚本，命令已无缺失。
+  - **方法论**：这类"缺 applet"是本项目反复踩的一类坑（cp、cmp、date/printf/
+    rmdir/stat/tr、mktemp/readlink、现在是 head）。根因是名单靠手维护，而脚本
+    失败都不致命 ⇒ 静默。以后新增/修改 initramfs 脚本必须同步核这份名单。
+
+- **11:10 完成（P1，我自己引入的回归）** — venus 每次开机都重建 probe
+  - 127b7b0 让 odin-venus-fw.sh 在"venus 没起来"时重建 probe，没限制次数。
+    这台机器 venus 从没起来过 ⇒ **每次开机都重建一次**。
+  - 而"venus 相关操作卡在不可中断状态、sudo reboot 被挡住、设备停在'网络在、
+    SSH 已停'的半关机、只能长按电源键"是本机实锤记录的故障模式（reports/029 §7）。
+    每次开机都撞一次 = 把小概率启动失败放大成每开机必赌一次。
+  - 修法：只重试一次（`/var/lib/odin-venus-retried` 标记）；venus 真起来后
+    自动清标记，将来再坏还能再自动重试一次。
+
+- **11:20 完成** — 首刷默认改回 **l0-safe**（用户拍板）
+  - extlinux.conf 在 ce27c95（09-02 20:56）被改成 `default l0`，但所有文档与
+    AGENTS.md §8 决策表第 3 条一直写的都是首刷 l0-safe ⇒ 代码与文档脱节。
+  - l0 依赖 Type-C 角色切换，而这条链路在 fc3e971（同日 23:05）被**整体重写**：
+    删 FUSB301 与 SMBCHG OTG boost 两个内核补丁共 665 行、新增 qcom-smbchg 的
+    usb-role-switch 补丁、改设备树 89 行与内核配置。**WORKLOG 里零验证记录。**
+  - SSH 是唯一远程生命线：角色切换不工作 ⇒ 无 usb0 ⇒ 无 172.16.42.1 ⇒ 无 SSH，
+    无屏设备只剩 UART。
+  - README 的"双 label 引导"表格同步更新（原来写着 l0 是默认）。
+
+- 顺带核对、确认没问题的（别再查）
+  - `debootstrap --include=...ssh...` ⇒ sshd 在；`parted`/`e2fsprogs` 也在。
+  - 扩容不需要 `growpart`：镜像是刷进 userdata 分区的，分区本就是全尺寸，
+    只要 `resize2fs` 把 fs 撑满即可；`growpart` 失败是无害的（脚本也只记日志）。
+  - initramfs 组装：`build-rootfs.sh:131` 是 `cp -a dist/build/initramfs/.`，
+    sbin 下的脚本都会被收进去；applet 按清单建符号链接。
+  - `pack_initramfs.sh` 打包整个 staging 目录，没有白名单会漏文件。
+
+- **方法论教训（给自己）**：上一轮我改 odin-venus-fw.sh 时，只想着"让兜底真的生效"，
+  没有反过来问"它现在会在什么条件下被触发、触发多少次"。补"自愈"逻辑时，
+  **触发频率本身就是正确性的一部分** —— 一次性的补救和每次开机都跑的循环
+  是完全不同的风险等级。
