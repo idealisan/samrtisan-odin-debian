@@ -2639,3 +2639,66 @@ b) **外部功放没被正确使能** —— 原厂只给了 `ext-pa-enable = gp
      `rmmod` + `insmod`，看 probe 是否成功、`/dev/videoX` 是否出现；
   2. 装 `ffmpeg` `v4l-utils`，跑 `odin-video-check.sh` 真编一帧再解回来；
   3. 把结论补进 reports/029，走 CI 出正式版。
+
+## ================= 2026-09-03：venus 用户态判据修正（真机未动，只改代码） =================
+
+背景：真机停在半关机状态（网络在、SSH 已停），用户指示**先不动真机、只修代码**，
+等 CI 出包再刷。所以这一轮全部是静态核对 + 脚本修复，没有任何真机实测。
+
+- **10:00 完成** — 拉主线源码（`770e10fa…`）到 `tmp/venus-review/` 静态核对，
+  确认 `patches/0009` 落点正确、理由成立。
+  - `hfi_msgs.c:269-276`：`hfi_parser(core, inst, pkt->data, pkt->hdr.size - sizeof(*pkt))`
+    ⇒ `rem_bytes = 2576 - 16 = 2560`，与 reports/029 §4 的数字逐字对上。
+  - `hfi_parser.c:388` 就是补丁改的那一行，上下文（switch 的各 case、循环
+    `while (words < frame_size)`、`rem_bytes -= 4`）与补丁一致 ⇒ **补丁能干净应用**。
+  - 顺带核对四项，**都排除**（写入 reports/029 §10.6，别再查）：
+    `msm8953_res.max_load = 1036800`（非 0）、ICC 路径已拿到、
+    `venus_enumerate_codecs()` 对 3XX 直接 return 0、模块名是
+    `venus-core`/`venus-dec`/`venus-enc`（Makefile 实锤）。
+
+- **10:15 完成（重要）** — 修掉 venus 用户态**两个真实 bug**，根源是同一个错误判据。
+  - **踩坑（真机取证实锤）**：`compgen -G '/dev/video*'` 在本机是**恒真**判据。
+    摄像头（CAMSS / `msm_vfe`）占着 `video0`~`video5`
+    （`evidence/device-probe/05-hardware-full.txt:149-154`）。
+    后果有两处，都很致命：
+    1. `odin-venus-fw.sh` 的重载条件 `copied>0 && ! compgen -G '/dev/video*'`
+       恒为假 ⇒ **模块重载分支从不执行** —— 用户态兜底（已刷机器唯一的补救
+       路径）一直是死代码；
+    2. 结果判定 `if compgen -G '/dev/video*'` 恒为真 ⇒ 日志永远谎报
+       "venus 已就绪"，venus 完全没起来也报成功。
+  - 正确判据（主线源码实锤）：设备名是驱动写死的 ——
+    `vdec.c:1796` = `qcom-venus-decoder`，`venc.c:1584` = `qcom-venus-encoder`。
+    摄像头 name 是 `msm_vfe*_video*`，不冲突。
+    判据抽成共享库 `dist/build/rootfs/usr/local/lib/odin/venus-devs.sh`，
+    两个脚本共同 source —— 这次的 bug 正是"两个脚本各写一套错判据"。
+  - 顺带修 `odin-video-check.sh`：原来按发现顺序把第一个支持压缩格式的设备当
+    decoder、第二个当 encoder，同样不可靠。
+
+- **10:20 完成** — 重建 probe 改用 **platform driver 的 unbind + bind**，
+  不再 `modprobe -r` + `modprobe`。
+  理由：WORKLOG 记过一次事故 —— `insmod` 卡在不可中断的 D 状态（`core->lock`
+  被死掉的 IRQ 线程握着），`sudo reboot` 被它挡住没能完成，设备停在"网络在、
+  SSH 已停"的半关机状态，只能长按电源键。unbind/bind 不卸载模块，
+  `struct module` 全程没动，没有这条路径。
+  - **踩坑（写法上的）**：bind 的目标要从 `/sys/bus/platform/devices/` 找，
+    不能从 `.../drivers/qcom-venus/` 找 —— probe 失败后驱动核心已经把设备解绑了，
+    驱动目录是空的，但 platform 设备本身还在。写错就永远走不到 bind。
+  - `modprobe` 保留为退化路径（`venus-core` 还没加载时，本服务跑在 udev 之前）。
+  - 顺带把"固件齐了就 exit 0"改成"固件取完后一定检查 venus 是否真的起来了，
+    没起来就重建 probe" —— 固件齐但 probe 一直失败正是这个服务存在的理由。
+
+- **10:25 完成** — initramfs 侧 `check()` 防半套固件。
+  原来只认 `venus.mdt`；若拷贝被断电打断，会留下只有 `.mdt` 的半套固件，
+  而 `check()` 一直返回真、之后再也不补。现在额外要求至少一个 `venus.b*`
+  （`.b04` 只有 32 字节、内容全是 `0xdeadadd0` 填充，最容易漏）。
+
+- 验证（本机可做范围内的）
+  - 四个脚本 `bash -n` 全通过。
+  - 假 sysfs 树冒烟：混入 `msm_vfe*` 的 video0/video1 后，
+    `odin_venus_devs` 仍精确输出 `dec /dev/video6`、`enc /dev/video7`，
+    摄像头被正确忽略。
+  - `check()` 语义：只有 `.mdt` 判"缺（需重取）"，有 `.mdt` + `.b00` 判"齐全"。
+
+- 待办（设备回来后）
+  1. 跑 reports/029 §7 的验证（`odin-video-check.sh`），把结果补进 §7；
+  2. 走 CI 出带 0009 与本次脚本修正的正式版，刷入验证。

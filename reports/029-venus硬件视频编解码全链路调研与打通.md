@@ -332,8 +332,86 @@ v4l2-ctl -d /dev/videoX --list-formats
 
 ---
 
-## 10. 待办
+## 10. 追加修正：venus 设备判据与兜底路径（2026-09-03）
+
+真机还没回来（§7 的验证仍待做），先把**用户态这一侧两个真实的 bug** 修掉。
+它们的共同根源是同一个错误判据。
+
+### 10.1 `compgen -G '/dev/video*'` 是恒真判据
+
+本机摄像头（CAMSS / `msm_vfe`）占着 `video0`~`video5`：
+
+```
+evidence/device-probe/05-hardware-full.txt:149-154
+  video0 msm_vfe0_video0   video1 msm_vfe0_video1   video2 msm_vfe0_video2
+  video3 msm_vfe1_video0   video4 msm_vfe1_video1   video5 msm_vfe1_video2
+```
+
+`odin-venus-fw.sh` 原本用 `compgen -G '/dev/video*'` 判断"venus 起来了没"，
+于是：
+
+| 位置 | 原逻辑 | 实际后果 |
+|---|---|---|
+| 重载条件 `copied>0 && ! compgen -G '/dev/video*'` | 恒为假 | **模块重载分支从不执行** —— 用户态兜底（已刷机器唯一的补救路径）是死代码 |
+| 结果判定 `if compgen -G '/dev/video*'` | 恒为真 | 日志永远写"venus 已就绪"，即使 venus 完全没起来 |
+
+### 10.2 正确判据：驱动写死在 sysfs 里的设备名
+
+主线源码实锤（`770e10fa…`）：
+
+| 角色 | 源码位置 | `vdev->name` |
+|---|---|---|
+| 解码器 | `venus/vdec.c:1796` | `qcom-venus-decoder` |
+| 编码器 | `venus/venc.c:1584` | `qcom-venus-encoder` |
+
+摄像头设备的 name 是 `msm_vfe*_video*`，不冲突。判据实现抽成共享库
+`dist/build/rootfs/usr/local/lib/odin/venus-devs.sh`，两个脚本共同 source ——
+这次的 bug 正是"两个脚本各写一套错判据"造成的，实现只留一份。
+
+顺带修正 `odin-video-check.sh`：原来按发现顺序把第一个支持压缩格式的设备当
+decoder、第二个当 encoder，同样不可靠。
+
+### 10.3 重建 probe 改用 unbind + bind
+
+原来用 `modprobe -r` + `modprobe`。WORKLOG 记过一次事故：`insmod` 卡在不可中断
+的 D 状态（`core->lock` 被死掉的 IRQ 线程握着），`sudo reboot` 被它挡住没能完成，
+设备停在"网络在、SSH 已停"的半关机状态，只能长按电源键。
+
+改成 platform driver 的 `unbind` + `bind`：不卸载模块，`struct module` 全程没动，
+只是重新走一遍 `venus_probe()`（`core` 是 devm 分配的，失败的 probe 会自动释放）。
+没有卡 D 状态的路径。
+
+一个坑：bind 的目标要从 `/sys/bus/platform/devices/` 里找，不能从
+`.../drivers/qcom-venus/` 里找 —— probe 失败后驱动核心已经把设备解绑了，
+驱动目录是空的，但 platform 设备本身还在。
+
+`modprobe` 保留为退化路径（`venus-core` 还没加载时本服务跑在 udev 之前）。
+
+### 10.4 兜底脚本不再只管取固件
+
+原逻辑是"固件齐了就 `exit 0`"，于是"固件齐但 probe 一直失败"的机器没人管 ——
+而那正是这个服务存在的理由。改成：**固件取完后一定检查 venus 是否真的起来了，
+没起来就重建 probe**，与"这次有没有新拷到文件"无关。
+
+### 10.5 initramfs 侧：防半套固件
+
+`check()` 原来只认 `venus.mdt`。若某次拷贝被断电打断，会留下只有 `.mdt` 的半套
+固件，而 `check()` 一直返回真、之后再也不补。现在额外要求至少一个 `venus.b*`
+段文件（`.b04` 只有 32 字节、内容全是 `0xdeadadd0` 填充，最容易漏）。
+
+### 10.6 内核侧顺带核对过、确认没问题的项
+
+| 项 | 结论 |
+|---|---|
+| `msm8953_res.max_load` | = 1036800（原厂 DT 写 1044480，差 0.7%），**不是 0**，不存在"频率被算成 0" |
+| ICC 路径 `video-mem` / `cpu-cfg` | probe 日志已经走过这一步才到 `hfi_core_init`，说明拿到了 |
+| `venus_enumerate_codecs()` | `hfi_version != HFI_VERSION_1XX` 时直接 `return 0`，3XX 不走这条路径 |
+| 模块名 | Makefile 实锤 `venus-core` / `venus-dec` / `venus-enc`；`/proc/modules` 里是下划线，kmod 两者通用 |
+
+---
+
+## 11. 待办
 
 1. 设备回来后跑 §7 的验证，把结果补进去；
-2. 把"硬件编解码怎么用"写进 `docs/03-系统使用.md`；
+2. ~~把"硬件编解码怎么用"写进 `docs/03-系统使用.md`~~ （已完成，`docs/03` §六）；
 3. 走 CI 出带 0009 的正式版。
