@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,629 @@
+@@ -0,0 +1,704 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -554,6 +554,81 @@ index 000000000..3dc8f434d
 + *    但物理不发声 —— 说明问题很可能就在这颗功放没打开。等音频基础链路
 + *    起来后，用 amixer 逐个试 SPK 通路与 GPIO，再补这一节。
 + */
++/*
++ * USB Type-C 控制器：FUSB301 —— 2026-09-03
++ *
++ * 依据官方开源内核（SmartisanOS_Kernel_Source 的 U2ProKernel 分支）
++ * `arch/arm/boot/dts/qcom/u3-p1-msm8953-charging.dtsi`：
++ *
++ *     &i2c_6 {
++ *         fusb301@25 {
++ *             compatible = "fc,fusb301";
++ *             reg = <0x25>;
++ *             fusb301,int-gpio = <&tlmm 38 0>;      ← 中断在 GPIO 38
++ *             fusb301,init-mode = /bits/ 8 <0x20>;  ← DRP + 音频配件检测
++ *             fusb301,host-current = /bits/ 8 <1>;
++ *             fusb301,use-try-snk-emulation;
++ *             qcom,usb_switch_asel = <&tlmm 33 0>;  ← USB 通路开关选择脚
++ *             qcom,cdc_hsdet_l    = <&tlmm 25 0>;   ← 耳机检测（音频用）
++ *         };
++ *     };
++ *
++ * ⚠️ 这条推翻了 fc3e971 的判断。那一版把 FUSB301 的补丁当成"用不到"删掉了
++ *    （连同 SMBCHG OTG boost 一起删了 665 行）。官方源码证明 **这颗芯片焊在板子上**：
++ *    它在 i2c_6 的 0x25 地址、中断接 GPIO 38，而且管着 USB 通路开关（GPIO 33）。
++ *
++ * 主线侧怎么接：
++ *   - 驱动是主线自带的 `drivers/usb/typec/fusb301.c`（compatible = "fcs,fusb301"，
++ *     注意是 fcs 不是下游的 fc）。需要 CONFIG_TYPEC_FUSB301（已加到内核配置）。
++ *   - 总线的对应是干净的：下游 `i2c_6: i2c@7af6000`，主线 `i2c_6: i2c@7af6000`
++ *     —— 编号和地址都一样，可以直接照搬地址 0x25。
++ *   - 驱动的 probe 会读 `device_get_named_child_node(dev, "connector")`，
++ *     所以必须有 `connector` 子节点；connector 上带 `usb-role-switch`，
++ *     并用 port/endpoint 指回 dwc3 的 `usb_dwc3_hs`（主线 msm8953.dtsi:2312
++ *     留了个空 endpoint 就是给板级填 remote-endpoint 用的）。
++ *   - `fcs,init-mode` / `fcs,host-current` 照抄下游的 0x20 / 1。
++ *   - 下游那两个 `qcom,usb_switch_asel`（GPIO 33）、`qcom,cdc_hsdet_l`（GPIO 25）
++ *     是下游驱动私有的，主线没有对应，这里不建模。GPIO 33 是**物理的 USB 通路
++ *     开关选择脚** —— 如果实测发现 OTG 仍然不通（比如 VBUS 出了但数据不通），
++ *     第一嫌疑就是这根脚没人拉，需要再加一个 gpio-hog 或 fixed-regulator 去控。
++ *
++ * ⚠️ 待真机验证：FUSB301 与 pmi8950_smbcharger 都可能提供角色切换，需要确认
++ *    最终生效的是哪一个。若角色切换异常，先试把 connector 上的 `usb-role-switch`
++ *    去掉（保留 smbchg → usb3 那条），看是否恢复。
++ */
++&i2c_6 {
++	status = "okay";
++
++	fusb301@25 {
++		compatible = "fcs,fusb301";
++		reg = <0x25>;
++		interrupt-parent = <&tlmm>;
++		interrupts = <38 IRQ_TYPE_LEVEL_LOW>;
++		fcs,init-mode = <0x20>;
++		fcs,host-current = <1>;
++
++		/*
++		 * 这里**故意不接** connector → dwc3 的 port/endpoint。
++		 * 原因：本文件是共享基础 DTS，`msm8953-smartisan-odin-norolesw.dts`
++		 * 会对 `&usb3` 做 `/delete-node/ ports;`（那是安全版的既定取舍 ——
++		 * 不做角色切换），于是 `usb_dwc3_hs` 那个 endpoint 在安全版里不存在。
++		 * 若在基础 DTS 里写 `&usb_dwc3_hs { remote-endpoint = <&usb_con_hs>; }`，
++		 * 安全版会直接编不过（ERROR: Reference to non-existent node or label
++		 * "usb_dwc3_hs"）—— 已实测复现。
++		 *
++		 * 所以角色切换仍由 `pmi8950_smbcharger { usb-role-switch = <&usb3>; }`
++		 * 那条提供（完整版 l0 生效，安全版 l0-safe 不生效），本节点只负责
++		 * 让 FUSB301 起来、把 CC / 方向检测暴露出来。等真机确认角色切换最终
++		 * 由谁驱动之后，再决定要不要把 endpoint 接回去（接的话要写到完整版
++		 * 专用的 DTS 里，不能放共享基础）。
++		 */
++		connector {
++			compatible = "usb-c-connector";
++			label = "USB-C";
++		};
++	};
++};
++
 +&lpass {
 +	status = "okay";
 +};
