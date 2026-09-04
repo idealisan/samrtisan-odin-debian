@@ -426,3 +426,86 @@ DEC1=DMIC2 CIC1=DMIC                 RMS = 0.0
 本机没有 3.5mm 耳机口，HPH_L / HPH_R 是空着的 —— 外置功放很可能就挂在
 它们上面，而不是挂在 SPK_OUT 上。原厂 `mixer_paths_mtp.xml`（reports/033 里
 已经解出来了）应当能直接给出答案，下一轮先去那里查。
+
+---
+
+## 8. 扬声器不响的真因：功放是 AW87318，MODE 脚要打脉冲（2026-09-05）
+
+### 8.1 现象里最费解的那一点
+
+上一轮抓到的证据是矛盾的：
+
+- DAPM 整条链全 On：`PDM_RX3 → SPK DAC → SPK PA → SPK_OUT`
+- 外置功放的使能脚 `gpio132 : out high` —— 确实拉高了
+- **但就是没声**
+
+如果 GPIO 拉高就等于功放开了，那应该响。所以"拉高"和"开了"之间还差一步。
+
+### 8.2 原厂源码给的答案
+
+`sound/soc/codecs/msm8x16-wcd.c`：
+
+```c
+	/* lineout to AW87318 */                              ← 注释点名型号
+	{"AW_SPK_PA", NULL, "LINEOUT PA"},                    ← 音频来自 LINEOUT
+	SND_SOC_DAPM_SPK("AW_SPK_PA", aw_speaker_pa_enable),
+
+	#define AW_BOOST_DEFAULT_MODE 6
+	static int aw_boost_mode = AW_BOOST_DEFAULT_MODE - 1; /* = 5 */
+
+	static int aw_speaker_pa_enable(struct snd_soc_dapm_widget *w, ...)
+	{
+		case SND_SOC_DAPM_POST_PMU:
+			gpio_set_value_cansleep(pdata->ext_pa_en_gpio, 1);      /* 第 1 个上升沿 */
+			for (i = 0; i < mode; i++) {                            /* mode = 5 */
+				gpio_set_value_cansleep(pdata->ext_pa_en_gpio, 0);
+				gpio_set_value_cansleep(pdata->ext_pa_en_gpio, 1);  /* 再来 5 个 */
+			}
+	}
+```
+
+而 `pdata->ext_pa_en_gpio` 的来源是 `qcom,ext-pa-enable` ——
+正好就是 ODIN 音频 DTS 里那个 `qcom,ext-pa-enable = <&tlmm 132 0>`。**同一个脚。**
+
+### 8.3 三条结论
+
+1. **这颗功放靠 MODE 脚上的脉冲个数选工作模式**，不是拉高就开。
+   `simple-audio-amplifier` 只会把脚拉高 ⇒ AW 芯片永远等不到模式脉冲 ⇒
+   一直关着 ⇒ 不出声。这就是为什么"GPIO 是 high"和"没声"能同时成立。
+2. `awinic,mode = <6>`：上游 aw8738 从 low 起打 `mode` 个 (0,1)，
+   要凑出下游的 1 + 5 = 6 个上升沿就得写 6。
+3. **音频输入是 LINEOUT，不是 SPK_OUT**。主线对应：
+   ```
+   {"LINEOUT_OUT", NULL, "LINEOUT PA"}
+   {"LINEOUT PA",  NULL, "LINEOUT"}
+   {"LINEOUT", "Switch", "LINEOUT DAC"}
+   {"LINEOUT DAC", NULL, "PDM_RX3"}
+   ```
+   所以 routing 写 `"Speaker Amp INL", "LINEOUT_OUT"`，
+   UCM 里再补 `cset "name='LINEOUT' Switch"`（mux 不打就没有信号进功放）。
+   主线 `LINEOUT_OUT ← LINEOUT PA` 是无 mux 直连，选它可以少开一个开关。
+
+### 8.4 两个干扰项（都排掉了）
+
+- codec 里还有另一个功放 widget
+  `SND_SOC_DAPM_SPK("Ext Spk", msm8x16_wcd_codec_enable_spk_ext_pa)`，
+  走**电平**驱动，GPIO 由 `qcom,msm-spk-ext-pa` 指定。
+  **整个原厂 DTS 树里没有任何一份定义这个属性** ⇒ 那条路对 ODIN 是死代码。
+- `mixer_paths_mtp.xml` 里 `<path name="speaker">` 写的是
+  `RX3 MIX1 INP1 = RX1` + `SPK = Switch`，看着像说"扬声器走 SPK_OUT"。
+  但那份 XML 是 **mtp 参考设计的通用配置**，`SPK` 指内部小喇叭那条；
+  ODIN 的大喇叭在原厂是由 `AW_SPK_PA` widget 承载的（注释点名 AW87318）。
+  两者不是一回事 —— 这也是为什么我一开始照 XML 接 SPK_OUT 却没声。
+
+### 8.5 改动
+
+| 文件 | 改动 |
+|---|---|
+| `patches/0007` | `compatible = "awinic,aw8738"` + `mode-gpios` + `awinic,mode = <6>`；routing `SPK_OUT → LINEOUT_OUT`；hunk 头 778 → 808 |
+| `dts/*.dtb` | 重编（63435 / 63283 字节，原 63413 / 63261），`.gitignore` 里不入库 |
+| UCM `HiFi.conf` | Speaker 的序列用 `LINEOUT` mux 取代 `SPK DAC Switch`；文件头加了"换回 simple-amplifier 就会静音"的警告 |
+| `odin-audio-test.sh` | `spk_on` / `ear_on` 同步改走 LINEOUT |
+
+`CONFIG_SND_SOC_AW8738=m` 内核里本来就有，不用动。
+
+**待真机听音确认**（CI run 33892957697 → v0.9.4-aw8738）。

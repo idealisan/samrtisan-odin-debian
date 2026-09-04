@@ -3057,3 +3057,32 @@ probe 也不阻止 OTG 尝试。要真禁掉得改驱动侧。
     是**从 HPH_R 取**的。本机没有 3.5mm 耳机口，HPH_L/HPH_R 空着 ——
     外置功放很可能挂在它们上面。去原厂 mixer_paths_mtp.xml（reports/033 已解出）
     查证。
+
+## 2026-09-05 扬声器不响的真因：功放是 AW87318，MODE 脚要打脉冲
+
+- **00:03 完成** — 定位并修完，已推 v0.9.4-aw8738 触发 CI（run 33892957697），待听音确认
+- 现象里最费解的一点：DAPM 全 On、`gpio132 : out high` 确实拉高了，**但就是没声**。
+  "拉高"和"功放开了"之间还差一步。
+- 原厂源码（ext/smartisan-kernel，msm8x16-wcd.c）给的答案
+  - `/* lineout to AW87318 */` + `{"AW_SPK_PA", NULL, "LINEOUT PA"}`
+    ⇒ **音频输入是 LINEOUT，不是 SPK_OUT**
+  - `aw_speaker_pa_enable()` 在 POST_PMU：先拉高，再打 5 个 (低,高) 脉冲
+    = **一共 6 个上升沿**；用的脚来自 `qcom,ext-pa-enable`，正是 DTS 里的 GPIO 132
+  - ⇒ 这颗 AW 功放**靠 MODE 脚的脉冲个数选模式**，不是拉高就开
+- 三条结论
+  1. `simple-audio-amplifier` 只会把脚拉高 ⇒ 永远等不到模式脉冲 ⇒ 一直关着 ⇒ 没声。
+     这正是"GPIO 是 high"与"没声"能同时成立的原因。改用主线自带的 `awinic,aw8738`。
+  2. `awinic,mode = <6>`：上游驱动从 low 起打 `mode` 个 (0,1)，凑下游的 1+5=6 个上升沿。
+  3. routing 改成 `"Speaker Amp INL", "LINEOUT_OUT"`；UCM 补 `cset name='LINEOUT' Switch`
+     （LINEOUT 这个 mux 不打，功放输入端就没信号）。
+- 两个干扰项（都排掉了，别再被带偏）
+  - codec 里另一个 `Ext Spk` widget 走**电平**驱动，GPIO 由 `qcom,msm-spk-ext-pa` 指定 ——
+    **整个原厂 DTS 树里没有任何一份定义这个属性**，对 ODIN 是死代码。
+  - `mixer_paths_mtp.xml` 的 `<path name="speaker">` 写 `SPK = Switch`，看着像"走 SPK_OUT"。
+    但那份 XML 是 **mtp 参考设计的通用配置**，`SPK` 指内部小喇叭；ODIN 的大喇叭在原厂
+    由 `AW_SPK_PA` 承载。两者不是一回事 —— 我一开始照 XML 接 SPK_OUT，所以没声。
+- **踩坑**
+  - 往 DTS 注释块里贴 C 代码时，`/* ... */` 会造成**注释嵌套** ⇒ dtc 直接 syntax error。
+    贴之前要把里面的 `/*` `*/` 去掉或改成 `#`。中过两次（`/* = 5 */` 和原厂那行注释）。
+  - 改完 patch 一定要 `git apply --check` + 真编一遍 DTB，光看 diff 看不出注释嵌套。
+  - `dts/*.dtb` 在 .gitignore 里（`*.dtb`），`git add dts/*.dtb` 会静默不生效、提交变成空操作。
