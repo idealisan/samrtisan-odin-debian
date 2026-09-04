@@ -102,6 +102,6 @@ echo "完成。安全版差异自检："
 if command -v dtc >/dev/null; then
 	dtc -I dtb -O dts -o "$TMP/safe.dts" "$HERE/msm8953-smartisan-odin-norolesw.dtb" 2>/dev/null
 	printf "  usb-role-switch : %s (期望 0)\n" "$(grep -c 'usb-role-switch' "$TMP/safe.dts")"
-	printf "  usb-c-connector : %s (期望 0)\n" "$(grep -c 'usb-c-connector' "$TMP/safe.dts")"
+	printf "  usb-c-connector : %s (期望 1：FUSB301 的 connector)\n" "$(grep -c 'usb-c-connector' "$TMP/safe.dts")"
 	printf "  dr_mode         : %s\n" "$(grep -o 'dr_mode = \"[a-z]*\"' "$TMP/safe.dts")"
 fi

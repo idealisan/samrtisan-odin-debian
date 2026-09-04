@@ -197,7 +197,12 @@ $(STAMPS)/dtb-$(KDIR_TAG): | $(STAMPS) fetch-kernel
 	else \
 		echo "[dtb]   ✅ 安全版无 usb-role-switch"; \
 	fi
-	@if grep -Eq "fcs,fusb301|qcom,pmi8950-smbchg-otg" "$(DTB_OUT)/.odin-dtb-check.dts"; then \
+	@# 只拦 smbchg-otg 这个下游遗留节点。
+	@# fcs,fusb301 **不再拦** —— 它曾被 fc3e971 当成"用不到"删掉，于是加了这条
+	@# 断言；但官方开源内核证明这颗 Type-C 芯片焊在板子上（i2c_6 @0x25、
+	@# 中断 GPIO 38），已在两个变体里都恢复。安全版与完整版的区别只在
+	@# 「做不做角色切换」，不在「有没有这颗芯片」，所以不能再用它当判据。
+	@if grep -Eq "qcom,pmi8950-smbchg-otg" "$(DTB_OUT)/.odin-dtb-check.dts"; then \
 		echo "[dtb]   ❌ 安全版仍含已移除的重复 USB 驱动节点" >&2; exit 1; \
 	fi
 	@rm -f "$(DTB_OUT)/.odin-dtb-check.dts"
@@ -210,7 +215,8 @@ $(STAMPS)/dtb-$(KDIR_TAG): | $(STAMPS) fetch-kernel
 	@if ! grep -q "otg-vbus" "$(DTB_OUT)/.odin-dtb-check.dts"; then \
 		echo "[dtb]   ❌ 完整版缺 SMBCHG 原生 OTG regulator 子节点" >&2; exit 1; \
 	fi
-	@if grep -Eq "fcs,fusb301|qcom,pmi8950-smbchg-otg" "$(DTB_OUT)/.odin-dtb-check.dts"; then \
+	@# 同上：fcs,fusb301 已恢复，不再当"已移除"来拦。
+	@if grep -Eq "qcom,pmi8950-smbchg-otg" "$(DTB_OUT)/.odin-dtb-check.dts"; then \
 		echo "[dtb]   ❌ 完整版仍含已移除的重复 USB 驱动节点" >&2; exit 1; \
 	fi
 	@echo "[dtb]   ✅ 完整版 SMBCHG → DWC3 role switch 接线正确"

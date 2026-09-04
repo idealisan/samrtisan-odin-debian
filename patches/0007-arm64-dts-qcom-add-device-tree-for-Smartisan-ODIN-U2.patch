@@ -635,7 +635,7 @@ index 000000000..3dc8f434d
 +
 +/*
 + * 麦克风偏置 —— 官方 `u3-p1-msm8953-special-odin-audio.dtsi` 给的：
-+ *     &pm8953_diangu_dig { qcom,cdc-micbias-cfilt-mv = <2700000>; }   /* 2.7V *\/
++ *     &pm8953_diangu_dig { qcom,cdc-micbias-cfilt-mv = <2700000>; }   即 2.7V
 + *     &int_codec        { qcom,msm-micbias2-ext-cap; ... }
 + *
 + * 主线 `sound/soc/codecs/msm8916-wcd-analog.c` 认的属性名不同，要换算：
