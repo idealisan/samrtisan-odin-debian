@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,740 @@
+@@ -0,0 +1,778 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -652,8 +652,10 @@ index 000000000..3dc8f434d
 + *     耳机检测）：主线没有 us-euro 切换。主线有
 + *     qcom,hphl-jack-type-normally-open 与 qcom,gnd-jack-type-normally-open，
 + *     但**极性没有官方依据**，不乱猜 —— 等实测耳机插拔行为再定。
-+ *   - 官方 &int_codec 那一大组 pinctrl（cdc_pdm_lines_*）是下游 PDM 引脚专用，
-+ *     主线不走这套。
++ *   - 官方 &int_codec 那一大组 pinctrl（cdc_pdm_lines_*）：**更正 09-03 的判断** ——
++ *     主线有同名的三组状态，就定义在 msm8953.dtsi 的 &tlmm 里
++ *     （gpio67~74，function = "cdc_pdm0"），而且**必须配**；
++ *     配置位置见下面 &sound_card 的 pinctrl-0 / pinctrl-1。
 + */
 +&wcd_codec {
 +	status = "okay";
@@ -691,8 +693,11 @@ index 000000000..3dc8f434d
 + * 拓扑：WCD 的 SPK_OUT → 功放 INL → DRV(拉高 GPIO132) → 卡片上的 Ext Spk
 + *
 + * 两点刻意的取舍：
-+ *   1. 从 **DRV** 取信号而不是 OUTL/OUTR —— 后者还串着 simple-amp 的
-+ *      VCC regulator supply，而本机功放的供电轨没查到证据，接错反而点不亮。
++ *   1. 从 **OUTL** 取信号而不是 DRV —— 照抄主线 msm8916-wingtech-wt88047：
++ *      同样是 WCD + 同样的 simple-audio-amplifier。OUTL 还串着 simple-amp 的
++ *      VCC regulator supply，但缺 VCC-supply 属性时它解析成 dummy regulator
++ *      （wt88047 也没有这个属性），不挡路。DAPM 会顺着 OUTL 反向把 DRV 带上电，
++ *      GPIO 132 照拉。
 + *   2. 不建模 `qcom,speaker-id`（GPIO 93）—— 那是给安卓 HAL 选功放型号用的
 + *      输入引脚，主线不需要。
 + *
@@ -708,6 +713,31 @@ index 000000000..3dc8f434d
 +
 +&sound_card {
 +	status = "okay";
++
++	/*
++	 * model 是**必填项**，不是可选的装饰。
++	 * sound/soc/soc-core.c 的 snd_soc_register_card() 开头就是
++	 *     if (!card->name || !card->dev)
++	 *             return -EINVAL;
++	 * 这一句**不带任何 dev_err** —— 缺了 model，整张卡静默 probe 失败，
++	 * dmesg 里只剩 driver core 那一句
++	 *     qcom-apq8016-sbc c051000.sound-card: probe ... failed with error -22
++	 * （2026-09-04 实刷 v0.9.4-submodules 撞上：ADSP 起来了、APR 设备也注册了，
++	 *   /proc/asound/cards 却仍是 "--- no soundcards ---"。）
++	 * 它同时是 ALSA 卡名，UCM 目录 conf.d/smartisan-odin 就是照它匹配的。
++	 */
++	model = "smartisan-odin";
++
++	/*
++	 * PDM 引脚复用 —— 更正 09-03 那句"主线不走这套"：**主线走，而且必须走**。
++	 * msm8953 全系板（mido / markw / potter / ysl / oxygen / vince …）都在
++	 * &sound_card 上挂这三组状态，定义在 msm8953.dtsi 的 &tlmm 里
++	 * （gpio67~74，function = "cdc_pdm0"）。不配就没有任何引脚被复用成
++	 * cdc_pdm0，WCD 的数字音频接口物理上就是断的。
++	 */
++	pinctrl-names = "default", "sleep";
++	pinctrl-0 = <&cdc_pdm_lines_act &cdc_pdm_lines_2_act &cdc_pdm_comp_lines_act>;
++	pinctrl-1 = <&cdc_pdm_lines_sus &cdc_pdm_lines_2_sus &cdc_pdm_comp_lines_sus>;
 +
 +	/*
 +	 * widgets 的第一个字符串是**类型**，snd_soc_of_parse_audio_simple_widgets()
@@ -730,12 +760,20 @@ index 000000000..3dc8f434d
 +		"AMIC1", "MIC BIAS External1",
 +		"AMIC2", "MIC BIAS External2",
 +		"AMIC3", "MIC BIAS External1",
-+		/* 扬声器：WCD 的 SPK_OUT → 外置功放（DRV 拉高 GPIO 132）→ Ext Spk */
++		/*
++		 * 扬声器：WCD 的 SPK_OUT → 外置功放（DRV 拉高 GPIO 132）→ Ext Spk
++		 * 写法照抄主线 msm8916-wingtech-wt88047 —— 同样是 WCD + 同样是
++		 * simple-audio-amplifier：从 **OUTL** 取信号，不是从 DRV 取。
++		 * DAPM 会顺着 OUTL 反向把 DRV 带上电，GPIO 132 照拉。
++		 */
 +		"Speaker Amp INL", "SPK_OUT",
-+		"Ext Spk", "Speaker Amp DRV",
++		"Ext Spk", "Speaker Amp OUTL",
 +		/* 听筒：WCD 的 EAR 直驱，不经外置功放 */
 +		"Earpiece", "EAR";
 +
++	/* pin-switches 会**覆盖** card->controls（丢掉驱动自带的
++	 * Headphone Jack / Mic Jack 两个开关），本机没有耳机口，正好不需要。
++	 * widget 的 connected 默认是 1，所以开机后 Ext Spk / Earpiece 直接可用。 */
 +	pin-switches = "Ext Spk", "Earpiece";
 +	aux-devs = <&speaker_amp>;
 +};

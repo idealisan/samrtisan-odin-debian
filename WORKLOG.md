@@ -2953,3 +2953,44 @@ probe 也不阻止 OTG 尝试。要真禁掉得改驱动侧。
 `l0-safe` 保留为救援 label。README §四/§七/§八 与 extlinux.conf 注释同步更新。
 
 > ⚠️ `l0` 从未在真机上验证过。刷入验证需用户点头（属 AGENTS.md §7 不可逆级）。
+
+## 2026-09-04 音频专项（续）：声卡 -22 与 ADSP 固件静默跳过
+
+- **22:15 完成** — 定位到 `--- no soundcards ---` 的两个独立真因，都已修（待 CI 验证）
+- 要点
+  - **真因 A：`&sound_card` 从来没写过 `model`。** `sound/soc/soc-core.c` 的
+    `snd_soc_register_card()` 开头就是 `if (!card->name || !card->dev) return -EINVAL;`，
+    **不带 dev_err**；而 `snd_soc_of_parse_card_name()` 又把"属性不存在(-EINVAL)"吞成 0。
+    于是整条 probe 一路顺利、最后一步静默 -22，dmesg 里只剩 driver core 那句通用的
+    `probe ... failed with error -22`。上游所有 msm8953 板都写了 model。
+    取 `smartisan-odin`（仓库 UCM 目录 `conf.d/smartisan-odin/` 就是照卡名匹配的）。
+  - **真因 B：`dist/build/initramfs/sbin/odin-adsp-fw.sh` 以 100644 入的库。**
+    initramfs 里 `[ -x /sbin/odin-adsp-fw.sh ]` 恒假 ⇒ 取 ADSP 固件那段**一次都没执行过**。
+    判据：真机 `/lib/firmware` 里 venus.* / wcnss.* 是 `Jan 1 1970`（initramfs 放的），
+    adsp.* 是 `Sep 4 20:40`（我手动跑用户态脚本放的）。
+    `apply-staging-fixes.sh:193` 会按 `*/sbin/*` 补 0755，所以用户态那份反而没事 ——
+    这层"自动补权限"把仓库里 100644 的事实掩盖了，initramfs 树不走它于是露馅。
+  - 两层修法：脚本 git 模式改 100755；`build-rootfs.sh` 拷完 initramfs 树显式
+    `chmod 0755 "$ISTAGE"/sbin/*.sh` —— 让"能不能执行"由构建步骤决定，而不是由
+    `git add` 的姿势决定。
+  - 用户态兜底的竞态：服务 40.0s 跑完，adsp remoteproc 40.5s 才注册，差 0.5 秒，
+    每轮都只留下"没有找到 adsp remoteproc，跳过"。改成每秒轮询、最多等 40s。
+  - 功放路由从 **OUTL** 取而不是 DRV —— 照抄主线 `msm8916-wingtech-wt88047`
+    （同样 WCD + 同样 simple-audio-amplifier + 同样 enable-gpios）。
+    09-03 那版"为绕开 VCC 故意从 DRV 取"的取舍作废：缺 `VCC-supply` 时
+    `devm_regulator_get(dev,"VCC")` 解析成 dummy regulator，不挡路。
+  - `MM_DL1` / `MM_UL2` 那三条板级路由**不需要** —— `q6asm-dai.c:1200` 的
+    `SND_SOC_DAPM_AIF_IN("MM_DL1", "MultiMedia1 Playback", ...)` 带流名，
+    ASoC 按流名自动连前端 DAI。mido/markw/tissot 那三条是历史遗留。
+- **踩坑**
+  - **改 diff 文件要用 Edit，old_string 必须带上行首的 `+`**。漏了 `+` 时 Edit 会
+    **按子串匹配成功**，于是新插入的注释行少了 `+` 前缀、补丁立刻损坏
+    （`git apply` 报 `补丁在第 831 行损坏`）。
+  - 手改 patch 后 **`@@ -0,0 +1,N @@` 的 N 要重算**，且不能用"grep -c '^+' 全文件"
+    （会把 Makefile 那个 hunk 的 3 行算进去）。正确做法：只数 DTS hunk 头之后、
+    `-- ` 之前、且以 `+` 开头的行。本次 740 → 778。
+  - 判断"某段 initramfs 代码到底有没有跑"，看产物的时间戳比看代码可靠：
+    initramfs 阶段还没设 RTC，落地文件会是 `Jan 1 1970`。
+  - `apply-patches.sh` 有一支"目标文件已存在 ⇒ 当作已打过、跳过"，
+    所以本地改完 patch 后**直接重跑是看不到效果的**，必须先
+    `git apply --check` 验证（要先把目标文件让位），再 `git apply` 真正打上。

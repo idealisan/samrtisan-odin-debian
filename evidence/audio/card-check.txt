@@ -1,0 +1,55 @@
+=== 声卡 ===
+  --- no soundcards ---
+
+=== dmesg 尾部（找 sound-card / apq8016 / q6afe ===
+  [  111.870962] remoteproc remoteproc1: powering up adsp
+  [  111.871243] remoteproc remoteproc1: Booting fw image adsp.mdt, size 7452
+  [  112.187626] remoteproc remoteproc1: remote processor adsp is now up
+  [  112.301039] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:3
+  [  112.301344] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:4
+  [  112.309560] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:7
+  [  112.318724] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:8
+  [  112.328041] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:9
+  [  112.337043] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:a
+  [  112.346425] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:b
+  [  112.430656] qcom-apq8016-sbc c051000.sound-card: probe with driver qcom-apq8016-sbc failed with error -22
+
+=== 全部声卡相关 dmesg ===
+  [  112.430656] qcom-apq8016-sbc c051000.sound-card: probe with driver qcom-apq8016-sbc failed with error -22
+
+=== 声卡驱动在不在、加载了吗 ===
+  q6voice_dai            24576  0
+  q6asm_dai              32768  0
+  q6voice                16384  1 q6voice_dai
+  q6afe_dai              81920  0
+  q6routing             393216  1 q6asm_dai
+  q6afe_clocks           12288  1
+  q6adm                  16384  1 q6routing
+  q6asm                  32768  1 q6asm_dai
+  q6afe                  20480  4 q6voice,q6afe_dai,q6afe_clocks,q6adm
+  snd_q6dsp_common       45056  4 q6asm,q6afe_dai,q6afe_clocks,q6adm
+  q6cvp                  12288  1 q6voice
+  q6mvm                  12288  1 q6voice
+  q6cvs                  12288  0
+  q6voice_common         16384  4 q6cvp,q6voice,q6mvm,q6cvs
+  q6core                 12288  3 q6asm,q6afe,q6adm
+  apr                    20480  8 q6asm,q6cvp,q6core,q6mvm,q6afe,q6cvs,q6voice_common,q6adm
+  qcom_q6v5_pas          36864  0
+  qcom_q6v5              12288  1 qcom_q6v5_pas
+  snd_soc_apq8016_sbc    12288  0
+  snd_soc_qcom_common    12288  1 snd_soc_apq8016_sbc
+  qcom_pil_info          12288  2 qcom_wcnss_pil,qcom_q6v5_pas
+  qcom_sysmon            24576  3 qcom_wcnss_pil,qcom_q6v5_pas,qcom_q6v5
+  qcom_common            16384  3 qcom_wcnss_pil,ipa2_lite,qcom_q6v5_pas
+  mdt_loader             12288  4 qcom_wcnss_pil,msm,qcom_q6v5_pas,venus_core
+
+=== ASoC 组件 ===
+  c200000.remoteproc:smd-edge:apr:service@9:dais
+  c200000.remoteproc:smd-edge:apr:service@7:dais
+  c200000.remoteproc:smd-edge:apr:service@4:dais
+  c0f0000.codec
+  c200000.remoteproc:smd-edge:apr:service@8:routing
+  200f000.spmi:pmic@1:audio-codec@f000
+  audio-amplifier
+  snd-soc-dummy
+  snd-soc-dummy

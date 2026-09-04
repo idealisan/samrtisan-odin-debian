@@ -1,0 +1,44 @@
+=== 服务文件在不在 ===
+  -rw-r--r-- 1 root root 1025 Sep  4  2026 /etc/systemd/system/odin-adsp-fw.service
+  is-enabled: enabled
+  is-active:  active
+
+=== 脚本在不在 ===
+  -rwxr-xr-x 1 root root 3278 Sep  4  2026 /usr/local/sbin/odin-adsp-fw.sh
+
+=== 日志 ===
+  2026-09-04T20:39:19+08:00 没有找到 adsp remoteproc，跳过
+
+=== systemctl status ===
+  ● odin-adsp-fw.service - Provision ADSP (audio DSP) firmware and start the remoteproc
+       Loaded: loaded (/etc/systemd/system/odin-adsp-fw.service; enabled; preset: enabled)
+       Active: active (exited) since Fri 2026-09-04 20:39:22 CST; 1min 10s ago
+         Docs: file:/usr/local/sbin/odin-adsp-fw.sh
+     Main PID: 584 (code=exited, status=0/SUCCESS)
+          CPU: 774ms
+  
+  Sep 04 20:39:18 odin systemd[1]: Starting odin-adsp-fw.service - Provision ADSP (audio DSP) firmware and start the remoteproc...
+  Sep 04 20:39:19 odin odin-adsp-fw.sh[584]: [odin-adsp-fw] 没有找到 adsp remoteproc，跳过
+  Sep 04 20:39:22 odin systemd[1]: Finished odin-adsp-fw.service - Provision ADSP (audio DSP) firmware and start the remoteproc.
+
+=== 手动跑一次 ===
+  [odin-adsp-fw] 已取 adsp.b04 (6478181 字节) ← modem
+  [odin-adsp-fw] 已取 adsp.b05 (744664 字节) ← modem
+  [odin-adsp-fw] 已取 adsp.b06 (360 字节) ← modem
+  [odin-adsp-fw] 已取 adsp.b07 (60264 字节) ← modem
+  [odin-adsp-fw] 已取 adsp.b08 (80292 字节) ← modem
+  [odin-adsp-fw] 已取 adsp.b09 (32488 字节) ← modem
+  [odin-adsp-fw] 已取 adsp.b10 (1041668 字节) ← modem
+  [odin-adsp-fw] 已取 adsp.b11 (14132 字节) ← modem
+  [odin-adsp-fw] 已取 adsp.b12 (84684 字节) ← modem
+  [odin-adsp-fw] 已取 adsp.b13 (315756 字节) ← modem
+  [odin-adsp-fw] 已取 adsp.mdt (7452 字节) ← modem
+  [odin-adsp-fw] 固件就位
+  [odin-adsp-fw] 启动 ADSP（/sys/class/remoteproc/remoteproc1）
+  [odin-adsp-fw]   state=running
+  [odin-adsp-fw] ADSP 已 running
+
+=== 再查 ===
+  adsp state: running
+  -rwxr-xr-x 1 root root 7452 Sep  4 20:40 /lib/firmware/adsp.mdt
+  --- no soundcards ---

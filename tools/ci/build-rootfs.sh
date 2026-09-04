@@ -137,6 +137,14 @@ cp -a "$REPO/dist/build/initramfs/." "$ISTAGE/"
 #     于是公开仓库（CI 拉的就是它）里整个 bin/ 都不存在
 mkdir -p "$ISTAGE"/{bin,dev,etc,lib,mnt,proc,run,sbin,sys/kernel,tmp,usr/bin,usr/sbin}
 
+# initramfs 里所有要被 init 直接调用的脚本必须带可执行位，而这一位**不能靠 git
+# 的模式**保证：dist/build/initramfs/sbin/odin-adsp-fw.sh 当初就是以 100644
+# 入的库，于是 initramfs 的 `if [ -x /sbin/odin-adsp-fw.sh ]` 恒假、整段跳过，
+# 表现为"ADSP 固件永远取不到、一台机器都出不来声卡"，而 dmesg 里什么都没有
+# （驱动那次 request_firmware 已经失败了，auto_boot 不重试）。
+# 这里显式补一次，让"能不能执行"由构建步骤说了算，而不是由谁 git add 的姿势说了算。
+chmod 0755 "$ISTAGE"/sbin/*.sh 2>/dev/null || true
+
 BB=$ROOT/bin/busybox
 [ -x "$BB" ] || { echo "rootfs 里没有 /bin/busybox" >&2; exit 1; }
 install -m 0755 "$BB" "$ISTAGE/bin/busybox"

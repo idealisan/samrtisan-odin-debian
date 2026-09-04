@@ -1,0 +1,27 @@
+=== 声卡 ===
+--- no soundcards ---
+
+=== remoteproc（ADSP 是否起来）===
+  remoteproc0: state=running fw=wcnss.mdt name=a204000.remoteproc
+  remoteproc1: state=offline fw=adsp.mdt name=adsp
+
+=== ADSP 固件是否在位 ===
+  ls: cannot access '/lib/firmware/adsp.mdt': No such file or directory
+  段文件数: 0
+
+=== typec（FUSB301）===
+
+=== dmesg 音频/ADSP ===
+  [    0.000000] OF: reserved mem: 0x000000008d600000..0x000000008e6fffff (17408 KiB) nomap non-reusable adsp@8d600000
+  [    0.118665] Advanced Linux Sound Architecture Driver Initialized.
+  [    2.899740]   No soundcards found.
+  [   40.577597] remoteproc remoteproc1: adsp is available
+  [   40.591818] remoteproc remoteproc1: Direct firmware load for adsp.mdt failed with error -2
+  [   40.595443] remoteproc remoteproc1: powering up adsp
+  [   40.603193] remoteproc remoteproc1: Direct firmware load for adsp.mdt failed with error -2
+  [   40.678731] qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: DT property missing, MBHC btn detection disabled
+  [   40.686406] qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: supply vdd-cdc-io not found, using dummy regulator
+  [   40.722327] qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: supply vdd-cdc-tx-rx-cx not found, using dummy regulator
+
+=== 背光 ===
+  brightness: 500

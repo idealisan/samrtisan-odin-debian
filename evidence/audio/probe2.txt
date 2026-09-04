@@ -1,0 +1,25 @@
+=== 功放模块在吗 ===
+snd-soc-simple-amplifier.ko
+snd-soc-simple-mux.ko
+
+=== 加载它 ===
+  snd_soc_simple_amplifier    12288  0
+
+=== 重新 bind 声卡，抓详细错误 ===
+
+=== 新增 dmesg ===
+  [  111.870962] remoteproc remoteproc1: powering up adsp
+  [  111.871243] remoteproc remoteproc1: Booting fw image adsp.mdt, size 7452
+  [  111.879816] qcom-wcnss-pil a204000.remoteproc: unexpected response to sysmon event
+  [  112.187626] remoteproc remoteproc1: remote processor adsp is now up
+  [  112.301039] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:3
+  [  112.301344] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:4
+  [  112.309560] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:7
+  [  112.318724] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:8
+  [  112.328041] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:9
+  [  112.337043] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:a
+  [  112.346425] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:b
+  [  112.430656] qcom-apq8016-sbc c051000.sound-card: probe with driver qcom-apq8016-sbc failed with error -22
+
+=== 声卡 ===
+  --- no soundcards ---

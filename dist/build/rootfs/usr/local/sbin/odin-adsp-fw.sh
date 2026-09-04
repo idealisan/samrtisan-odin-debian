@@ -14,6 +14,11 @@
 #       remoteproc1: Direct firmware load for adsp.mdt failed with error -2
 #       /proc/asound/cards -> --- no soundcards ---
 #
+#   initramfs 那次之所以没生效，是因为 dist/build/initramfs/sbin/odin-adsp-fw.sh
+#   以 100644（无可执行位）入的库 —— initramfs 的 `[ -x /sbin/odin-adsp-fw.sh ]`
+#   恒假，整段静默跳过，取固件的动作一次都没发生过。
+#   （2026-09-04 实刷 v0.9.4-submodules 撞上，ADSP 停在 offline。）
+#
 #   所以这里补一条用户态兜底：固件不在位就从原厂 modem 分区取，
 #   取到后通过 remoteproc 的 sysfs 接口把 ADSP 拉起来。
 #   remoteproc 与 platform 驱动不同 —— 它可以在用户态重新启动，
@@ -26,6 +31,12 @@ FW=adsp.mdt
 DEST=/lib/firmware
 LOG=/var/log/odin-adsp-fw.log
 PROC=/sys/class/remoteproc
+# 等 adsp 这个 remoteproc 出现的最长时间（秒）。
+# 实测本机 qcom,msm8953-adsp-pil 要到开机约 40.5s 才 probe 出 remoteproc1，
+# 而本服务（After=local-fs.target）在 40.0s 就跑完了 —— 差 0.5 秒，
+# 于是每次都只留下一句"没有找到 adsp remoteproc，跳过"。
+# 40 秒足够；服务的 TimeoutStartSec 是 60，留出余量给取固件与启动。
+WAIT_MAX=40
 
 say() { echo "$(date -Is) $*" >> "$LOG" 2>/dev/null; echo "[odin-adsp-fw] $*" >&2; }
 
@@ -60,7 +71,24 @@ start_adsp() {
 	[ "$st" = "running" ]
 }
 
-rp=$(rp_adsp) || { say "没有找到 adsp remoteproc，跳过"; exit 0; }
+# adsp remoteproc 的注册晚于本服务（见上面 WAIT_MAX 的注释），
+# 所以这里等它出现 —— 不睡固定时长，而是每次 1 秒轮询、最多等 WAIT_MAX 秒。
+rp=
+i=0
+while [ "$i" -lt "$WAIT_MAX" ]; do
+	if rp=$(rp_adsp); then
+		break
+	fi
+	rp=
+	i=$((i + 1))
+	sleep 1
+done
+
+if [ -z "$rp" ]; then
+	say "等了 ${WAIT_MAX}s 仍没有 adsp remoteproc，跳过"
+	exit 0
+fi
+say "找到 adsp remoteproc: $rp（等了 ${i}s）"
 
 # 1) 固件不在位就从原厂 modem 分区取
 if ! have_fw; then

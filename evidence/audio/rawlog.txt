@@ -1,0 +1,32 @@
+=== dmesg 尾部 30 行 ===
+  [   43.775513] msm_dpu 1a01000.display-controller: bound 1c00000.gpu (ops a3xx_ops [msm])
+  [   43.778039] Bluetooth: Core ver 2.22
+  [   43.781077] [drm:dpu_kms_hw_init:1173] dpu hardware revision:0x10100000
+  [   43.787100] NET: Registered PF_BLUETOOTH protocol family
+  [   43.797054] Bluetooth: HCI device and connection manager initialized
+  [   43.802601] Bluetooth: HCI socket layer initialized
+  [   43.808953] Bluetooth: L2CAP socket layer initialized
+  [   43.813579] Bluetooth: SCO socket layer initialized
+  [   43.836362] [drm] Initialized msm 1.13.0 for 1a01000.display-controller on minor 0
+  [   43.836672] msm_dpu 1a01000.display-controller: Direct firmware load for qcom/a530_pm4.fw failed with error -2
+  [   43.842937] msm_dpu 1a01000.display-controller: [drm:adreno_request_fw [msm]] *ERROR* failed to load a530_pm4.fw
+  [   44.052510] Console: switching to colour frame buffer device 135x120
+  [   44.052549] fb0: sys_imageblit: framebuffer is not in virtual address space.
+  [   44.077503] msm_dpu 1a01000.display-controller: [drm] fb0: msmdrmfb frame buffer device
+  [   44.147591] Bluetooth: MGMT ver 1.23
+  [   44.657459] wcn36xx: firmware WLAN version 'WCN v2.0 RadioPhy vIris_TSMC_4.0 with 48MHz XO' and CRM version 'CNSS-PR-4-0-00412'
+  [   44.657691] wcn36xx: firmware API 1.5.1.2, 41 stations, 2 bssids
+  [   45.972859] EXT4-fs (mmcblk0p57): resized filesystem to 29338619
+  [  111.870962] remoteproc remoteproc1: powering up adsp
+  [  111.871243] remoteproc remoteproc1: Booting fw image adsp.mdt, size 7452
+  [  111.879816] qcom-wcnss-pil a204000.remoteproc: unexpected response to sysmon event
+  [  112.187626] remoteproc remoteproc1: remote processor adsp is now up
+  [  112.301039] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:3
+  [  112.301344] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:4
+  [  112.309560] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:7
+  [  112.318724] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:8
+  [  112.328041] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:9
+  [  112.337043] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:a
+  [  112.346425] qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:b
+  [  112.430656] qcom-apq8016-sbc c051000.sound-card: probe with driver qcom-apq8016-sbc failed with error -22
+
