@@ -234,3 +234,151 @@ SND_SOC_DAPM_OUTPUT("SPK_OUT"),
 四项自检 ✅；反编译能看到 `model = "smartisan-odin"` 与 `pinctrl-0/pinctrl-1`。
 
 **尚未真机验证** —— 等 CI 出包刷入后再补 §6。
+
+---
+
+## 6. 真机验证（v0.9.4-audio-model，2026-09-04 22:57 刷入）
+
+### 6.1 两个真因都被证实
+
+刷入后声卡第一次出现：
+
+```
+$ cat /proc/asound/cards
+ 0 [smartisanodin  ]: smartisan-odin - smartisan-odin
+                      smartisan-odin
+
+$ aplay -l                                  $ arecord -l
+card 0: device 0: MultiMedia1 (*)           card 0: device 1: MultiMedia2 (*)
+card 0: device 2: MultiMedia3 (*)           card 0: device 4: VoiceMMode1 (*)
+card 0: device 4: VoiceMMode1 (*)
+```
+
+ADSP 也从"手动才起"变成开机自起。判据是 `/lib/firmware` 的文件时间戳：
+
+| 版本 | adsp.* 时间戳 | 谁放的 |
+|---|---|---|
+| v0.9.4-submodules | `Sep 4 20:40` | 我手动跑用户态脚本 |
+| v0.9.4-audio-model | `Jan 1 1970` | **initramfs**（那时还没设 RTC） |
+
+`venus.*` / `wcnss.*` 一直是 1970，现在 `adsp.*` 终于与它们一致了。
+刷机验收 16 项全过，其中 `背光(回读): 500`。
+
+### 6.2 播放侧：整条链通电 + 功放使能脚拉高
+
+一边播 1 kHz 一边抓 `/sys/kernel/debug/asoc/smartisan-odin/**/dapm/*`：
+
+```
+card 级      Ext Spk             On
+digital      AIF1 Playback       On      I2S RX1        On
+             RX3 MIX1            On      RX3 MIX1 INP1  On
+             RX3 INT             On      PDM_RX3        On
+analog       PDM_RX3             On      SPK DAC        On
+             SPK PA              On      SPK_OUT        On
+             SPKR_CLK            On      RX_BIAS        On
+GPIO         gpio132 : out high func0 2mA pull down     ← 外置功放已开
+```
+
+从 ADSP 的 PRI_MI2S_RX 一路到外置功放的使能脚，全通。
+
+### 6.3 采集侧：后端是 Tertiary MI2S，不是 Primary
+
+第一次 `arecord -D hw:0,1` 直接 `Invalid argument`，内核给了关键一句：
+
+```
+MultiMedia2: ASoC: no backend DAIs enabled for MultiMedia2,
+             possibly missing ALSA mixer-based routing or UCM profile
+```
+
+`msm8953.dtsi` 里只有 `tertiary-mi2s-dai-link` 是 TX 后端（`TERTIARY_MI2S_TX`），
+而 UCM 里写的是 `MultiMedia2 Mixer PRI_MI2S_TX` —— 名字对得上（控件确实存在）、
+方向不对，于是后端永远没被启用。改成 `TERT_MI2S_TX` 后能开了。
+
+采集链通电情况（改对之后）：
+
+```
+analog   MIC BIAS External1  On    MIC_BIAS1  On    PDM_TX  On    PDM Capture  On
+digital  ADC1  On   DEC1 MUX  On   CIC1 MUX  On   I2S TX1  On   AIF1 Capture  On
+```
+
+### 6.4 控件名的陷阱：scontrols 显示的名字 ≠ cset 认的名字
+
+`amixer scontrols` 走 alsa-lib 的 **simple 层**，会把尾部的
+`" Switch"` / `" Volume"` / `" Mux"` 剥掉；而 `cset name=...` 走的是原始元素名。
+同一张卡上实测对照：
+
+| `amixer scontrols` 显示 | `cset` / UCM 要写 |
+|---|---|
+| `SPK DAC` | `SPK DAC Switch` |
+| `RX3 Digital` | `RX3 Digital Volume` |
+| `Ext Spk` | `Ext Spk Switch` |
+| `Earpiece` | `Earpiece Switch` |
+| `ADC2` | `ADC2 Volume` |
+| `ADC2 MUX` | `ADC2 MUX`（两边一样） |
+
+拿左列去写 UCM，`alsaucm` 只给一句 `Invalid argument`，不说是哪条。
+
+顺带一条：上游 `apq8016-sbc` 的 UCM 里 `RX3 Digital Volume` 写 **128**，
+本机是 `min=0 max=124`、1 dB/档、84 = 0 dB —— 写 128 直接 -EINVAL。
+**这才是 `alsaucm set _dev Speaker` 失败的真因**（不是文件结构问题）。
+
+### 6.5 麦克风输入扫描
+
+让扬声器持续播 1 kHz，逐个试 `DEC1 MUX`，各录 2 秒算 RMS：
+
+```
+DEC1=ADC1 CIC1=AMIC ADC2MUX=INP2     RMS = 5.5    ← 唯一明显高于本底
+DEC1=ADC1 CIC1=AMIC ADC2MUX=INP3     RMS = 5.6
+DEC1=ADC2 CIC1=AMIC ADC2MUX=INP2     RMS = 1.2
+DEC1=ADC2 CIC1=AMIC ADC2MUX=INP3     RMS = 2.1
+DEC1=ADC3 CIC1=AMIC ADC2MUX=INP2     RMS = 1.1
+DEC1=ADC3 CIC1=AMIC ADC2MUX=INP3     RMS = 2.1
+DEC1=DMIC1 CIC1=DMIC                 RMS = 0.0
+DEC1=DMIC2 CIC1=DMIC                 RMS = 0.0
+静音基线（DEC1=ADC2 INP2）           RMS = 1.2
+```
+
+只有 **ADC1（AMIC1）** 有响应，两个数字麦恒为 0。
+
+⚠️ 但把这个结论再往前推一步就不成立了：之后用 1 kHz 谱线做的 A/B
+（直接算 1000 Hz 的 DFT 幅值）显示
+
+```
+1000 Hz 幅值：扬声器关 = 8.1   扬声器开 = 9.0
+```
+
+几乎没有变化 —— ADC1 上并没有明确的 1 kHz 分量。前面那个 RMS 抬升
+更像是开扬声器时的整体噪声抬升，不是收到了 1 kHz。
+所以"主麦克风 = AMIC1"**仍待耳朵复核**，可能的原因有：
+
+- 手机平放在桌上，扬声器出声孔被压住、或被外壳遮挡；
+- 内置麦与扬声器之间的声耦合本来就很弱；
+- 扬声器本身虽然通电但没出声（DAPM 全 On 只证明电路打通，不证明有声音）。
+
+### 6.6 遗留：`alsaucm set _dev` 恒定 -EINVAL
+
+设任何设备都失败，**连上游 apq8016-sbc 的配置也一样**；而把同样的 cset
+用 `amixer cset` 逐条手工执行，全部成功。已排除：
+
+- Syntax 3 / Syntax 4 —— 都一样失败
+- 卡名写法（`smartisan-odin` / `hw:0` / `smartisanodin` / 不填）—— 都一样
+- `ConflictingDevice` —— 删掉也一样
+- `EnableSequence` 内容 —— 空序列、单条 cset、完整序列全一样
+- 单次调用 vs batch 模式 —— 都一样（`set _verb` 成功、`list _devices` 正常）
+
+对照组：`set _verb NoSuchVerb` 会报 `No such file or directory`（说明 verb 查找是好的），
+而 `set _dev NoSuchDevice` 与 `set _dev Speaker` 报一样的 `Invalid argument`
+—— 从 alsaucm 的角度看，这个设备就是"不存在"，尽管 `list _devices` 列得出来。
+
+暂未定位。不影响用 `amixer` 直接控音：播放与采集通路本身是通的
+（6.2 / 6.3），UCM 只是桌面声音服务（PipeWire/PulseAudio）的配置入口。
+
+### 6.7 需要人耳确认的两件事
+
+1. **扬声器到底出不出声**：跑
+   `sudo amixer -c 0 cset name='RX3 MIX1 INP1' RX1 && sudo amixer -c 0 cset name='RX3 Digital Volume' 100 && sudo amixer -c 0 cset name='SPK DAC Switch' on && sudo amixer -c 0 cset name='Ext Spk Switch' on && sudo amixer -c 0 cset name='PRI_MI2S_RX Audio Mixer MultiMedia1' 1 && sudo speaker-test -D hw:0,0 -c 2 -r 48000 -F S16_LE -t sine -l 1`
+2. **听筒**（另一条通路，走 EAR）：把上面换成
+   `RX1 MIX1 INP1=RX1`、`RX1 Digital Volume=84`、`EAR_S=Switch`、
+   `Earpiece Switch=on`、`Ext Spk Switch=off` 再试。
+
+证据文件：`evidence/audio/audio-v094-audio-model.txt`

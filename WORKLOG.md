@@ -2994,3 +2994,45 @@ probe 也不阻止 OTG 尝试。要真禁掉得改驱动侧。
   - `apply-patches.sh` 有一支"目标文件已存在 ⇒ 当作已打过、跳过"，
     所以本地改完 patch 后**直接重跑是看不到效果的**，必须先
     `git apply --check` 验证（要先把目标文件让位），再 `git apply` 真正打上。
+
+## 2026-09-04（续）v0.9.4-audio-model 真机验证：声卡终于出来了
+
+- **23:30 完成** — 刷入 v0.9.4-audio-model，验收 16/16；声卡注册成功、ADSP 开机自起
+- 两个真因都被真机证实
+  - `cat /proc/asound/cards` → `0 [smartisanodin]: smartisan-odin`；
+    aplay 有 device 0/2/4（MultiMedia1/3/VoiceMMode1），arecord 有 1/4。
+  - ADSP 固件时间戳从 `Sep 4 20:40`（我手动补的）变成 `Jan 1 1970`（initramfs 放的），
+    与 venus/wcnss 一致 —— initramfs 那段之前**一次都没执行过**，现在执行了。
+- 播放侧证据（播 1 kHz 时抓 debugfs）
+  - 全链 On：AIF1 Playback → I2S RX1 → RX3 MIX1 → RX3 INT → PDM_RX3 → SPK DAC →
+    SPK PA → SPK_OUT，且 `gpio132 : out high`（外置功放已开）。
+- **控件名的陷阱（本轮最值钱的一条）**
+  - `amixer scontrols` 走 alsa-lib simple 层，会把尾部 `" Switch"` / `" Volume"` 剥掉；
+    `cset name=` 走原始元素名。两边不一样：
+    `SPK DAC`↔`SPK DAC Switch`、`RX3 Digital`↔`RX3 Digital Volume`、
+    `Ext Spk`↔`Ext Spk Switch`、`ADC2`↔`ADC2 Volume`。
+  - 上游 apq8016-sbc 的 UCM 里 `RX3 Digital Volume` 写 **128**，本机上限是
+    **124**（1 dB/档，84 = 0 dB）—— 写 128 直接 -EINVAL，
+    **这才是 `alsaucm set _dev Speaker` 失败的真因**，不是文件结构问题。
+- 采集侧：后端是 **Tertiary MI2S**（`MultiMedia2 Mixer TERT_MI2S_TX`），不是 Primary。
+  写错时内核报 `MultiMedia2: ASoC: no backend DAIs enabled`，arecord 只给
+  `Invalid argument`，完全看不出是混音器没配对。
+- 麦克风扫描：DEC1 MUX 逐个试，只有 **ADC1（AMIC1）** 的录音能量明显高于本底
+  （5.5 vs 1.2），ADC2/ADC3 与本底齐平，两个 DMIC 恒 0.0。
+  ⚠️ 但用 1 kHz 谱线做 A/B 时 ADC1 上也没有明确的 1 kHz 分量
+  （关 8.1 / 开 9.0）—— 那个 RMS 抬升更像整体噪声，不是收到了音。
+  "主麦 = AMIC1"**待耳朵复核**。
+- **踩坑**
+  - `alsaucm set _dev` 在本机恒定 -EINVAL，**连上游 apq8016-sbc 的配置也一样**，
+    而同样的 cset 用 `amixer cset` 逐条手工跑全部成功。已排除 Syntax 3/4、
+    卡名写法、ConflictingDevice、空 EnableSequence、batch vs 单次。未定位。
+    不影响 amixer 直接控音（播放/采集通路本身是通的）。
+  - `alsaucm` 必须**在同一个进程里**先 `set _verb` 再 `set _dev`：
+    每次单独调用 `alsaucm` 都是新进程，verb 带不过去。用 `-b -`（batch）喂一串命令。
+  - 普通用户不在 audio 组时，`amixer -c 0 ...` 报的是
+    `Invalid card number '0'` —— 看着像卡不存在，实际是打不开 controlC0。
+    已把 user 加进 audio 组（setup-rootfs.sh）。
+  - `sshpass` 偶发失败（弹 `ssh_askpass: exec(/usr/X11R6/bin/ssh-askpass)`），
+    重试一次就好，别当成密码错了。
+  - 刷机脚本 stage 10 的备份这轮又没拉回来（curl rc=7，连不上 172.16.42.1:8080），
+    已知问题，不阻塞刷机。
