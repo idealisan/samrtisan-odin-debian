@@ -3119,3 +3119,29 @@ probe 也不阻止 OTG 尝试。要真禁掉得改驱动侧。
   - 刷机 stage 20 这次没能自动进 fastboot（改名 extlinux.conf 后重启，420s 没等到），
     最后靠用户手动按【音量减+电源键】进的原厂 fastboot，然后 `--from 30` 续刷成功。
     远程进 fastboot 那条路不是每次都灵。
+
+## 2026-09-05 里程碑：扬声器 / 听筒 / 麦克风全部打通
+
+- **07:50 完成** — v0.9.4-aw8738-2 刷入，验收 16/16；用户听音确认**扬声器、
+  听筒、麦克风全部正常**。整机音频链路打通。
+- 从"一条声卡都没有"（2026-09-04 早上）到全通，一共卡了四处，每一处都是
+  **不带日志**或**报错会带偏**的那种：
+  1. `&sound_card` 缺 `model` ⇒ `snd_soc_register_card()` 静默 -EINVAL
+     （dmesg 只有 driver core 那句通用的 `failed with error -22`）
+  2. initramfs 取固件脚本 git 模式是 100644 ⇒ `[ -x ]` 恒假 ⇒ ADSP 固件从未就位
+     （`apply-staging-fixes.sh` 会给 rootfs 里的 sbin 脚本补 0755，把这事实掩盖了）
+  3. 外置功放是 AW87318，MODE 脚要打 **6 个脉冲**才开机，不是拉高就开
+     （表现：DAPM 全 On、GPIO 132 确实是 high、可就是没声）
+  4. aw8738 的 DAPM 端点是 **IN / OUT**，不是 INL / OUTL；照 simple-amplifier
+     写两条路由全 ENODEV，**声卡直接注册不起来**（v0.9.4-aw8738 的教训）
+- 这四处共同的特点：**看内核源码能确认，但看日志看不出来**。真正省时间的是
+  原厂开源内核（`ext/smartisan-kernel`）和原厂 `mixer_paths_mtp.xml`——
+  机器自带的配置才是权威，比猜和比照抄同 SoC 的其他板子都靠谱。
+- 用户实测撞到的小坑：**`RXn Digital Volume` 不是百分比**
+  - `min=0 max=124`，**84 = 0 dB**，1 dB/档。填 30 = **−54 dB**。
+  - 表现：音量调到 30，扬声器还勉强有声，**听筒完全没声** —— 像听筒坏了。
+  - 主线**没有** `EAR PA Gain`（下游有）；原厂 handset 是 `RX1 Digital Volume=84`
+    **加** `EAR PA Gain=POS_6_DB`，缺的 6 dB 只能由数字音量补 ⇒ UCM 听筒给 90。
+  - 测试脚本改成扬声器/听筒各存各的音量（VOL / EVOL），所有显示处换算成 dB。
+- 刷机：这回 stage 20（远程改 extlinux.conf 再重启落 fastboot）**自动成功**了，
+  上一回超时 420s 需要手按【音量减+电源键】。同样的流程，结果不同 —— 待观察。

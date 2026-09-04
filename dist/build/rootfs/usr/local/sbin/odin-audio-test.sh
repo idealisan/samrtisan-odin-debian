@@ -28,8 +28,16 @@ set -u
 
 C=0                       # 声卡号
 WAV=/home/user/music/warm-30s.wav     # 《暖暖》前 30 秒，48k/立体声/S16
-VOL=${VOL:-100}           # RXn Digital Volume：84 = 0 dB，1 dB/档，上限 124
+#
+# ⚠️ RXn Digital Volume 的刻度是 **min=0 max=124，84 = 0 dB，1 dB/档**。
+#    它不是百分比！填 30 不是"30%"，是 **−54 dB** —— 扬声器还能勉强听见，
+#    听筒直接就没声了（听筒贴耳朵听、响度本就低得多，需要比扬声器**更大**的
+#    数字增益）。所以扬声器与听筒**必须各自独立保存音量**，不能共用一个值。
+VOL=${VOL:-100}           # 扬声器：100 = +16 dB
+EVOL=${EVOL:-100}         # 听筒：同样 +16 dB（实测可用）
 LOG=/home/user/audio-test.log
+
+db() { printf '%+d dB' $(( $1 - 84 )); }   # 数字音量 → dB，显示用
 
 # ---------------------------------------------------------------- root 检查
 if [ "$(id -u)" -ne 0 ]; then
@@ -70,7 +78,7 @@ spk_on() {
 ear_on() {
 	cset 'PRI_MI2S_RX Audio Mixer MultiMedia1' 1
 	cset 'RX1 MIX1 INP1' RX1
-	cset 'RX1 Digital Volume' "$VOL"
+	cset 'RX1 Digital Volume' "$EVOL"
 	cset 'EAR_S' Switch
 	cset 'Earpiece Switch' on
 	cset 'Ext Spk Switch' off
@@ -92,28 +100,28 @@ playwav() {
 
 # ---------------------------------------------------------------- 各项测试
 t_speaker() {
-	hdr "扬声器：3 秒 1 kHz 提示音（数字音量 $VOL = $((VOL-84)) dB）"
+	hdr "扬声器：3 秒 1 kHz 提示音（数字音量 $VOL = $(db "$VOL")）"
 	spk_on
 	say "  放音中……"
 	tone
 	ask "扬声器听到蜂鸣了吗？"
 }
 t_music() {
-	hdr "扬声器：播放《暖暖》前 30 秒"
+	hdr "扬声器：播放《暖暖》前 30 秒（数字音量 $VOL = $(db "$VOL")）"
 	spk_on
 	say "  播放中（30 秒，Ctrl-C 可中断）……"
 	playwav
 	ask "扬声器播出音乐了吗？"
 }
 t_earpiece() {
-	hdr "听筒：3 秒 1 kHz 提示音（请把耳朵贴到听筒上）"
+	hdr "听筒：3 秒 1 kHz 提示音（数字音量 $EVOL = $(db "$EVOL")，请把耳朵贴到听筒上）"
 	ear_on
 	say "  放音中……"
 	tone
 	ask "听筒听到蜂鸣了吗？"
 }
 t_emusic() {
-	hdr "听筒：播放《暖暖》前 30 秒（请把耳朵贴到听筒上）"
+	hdr "听筒：播放《暖暖》前 30 秒（数字音量 $EVOL = $(db "$EVOL")，请贴耳朵）"
 	ear_on
 	say "  播放中（30 秒，Ctrl-C 可中断）……"
 	playwav
@@ -147,20 +155,33 @@ t_mic() {
 	ask "听到自己的录音了吗？"
 }
 t_vol() {
-	hdr "调数字音量（84 = 0 dB，1 dB/档，上限 124）"
-	printf '  当前 %s（%s dB）。输入新值（直接回车不改）：' "$VOL" "$((VOL-84))"
+	hdr "调数字音量（84 = 0 dB，1 dB/档，0~124）"
+	say "  注意：这不是百分比。低于 84 就是负增益，"
+	say "  听筒会比扬声器先听不见（听筒本来响度就低得多）。"
+	printf '\n  1) 扬声器  当前 %s（%s）\n' "$VOL" "$(db "$VOL")"
+	printf '  2) 听筒    当前 %s（%s）\n' "$EVOL" "$(db "$EVOL")"
+	printf '  选 1/2（直接回车返回）：'
+	read -r which || which=
+	case "$which" in
+		1) prompt='扬声器'; cur=$VOL ;;
+		2) prompt='听筒';   cur=$EVOL ;;
+		*) return ;;
+	esac
+	printf '  %s 新音量（当前 %s = %s，直接回车不改）：' "$prompt" "$cur" "$(db "$cur")"
 	read -r v || v=
 	if [ -n "${v:-}" ]; then
 		case "$v" in
 			*[!0-9]*) warn "不是数字，忽略" ;;
 			*)
 				if [ "$v" -gt 124 ]; then v=124; fi
-				VOL=$v
-				ok "已设为 $VOL（$((VOL-84)) dB）"
+				if [ "$which" = 1 ]; then VOL=$v; else EVOL=$v; fi
+				ok "$prompt 已设为 $v（$(db "$v")）"
+				log "调音量：$prompt = $v（$(db "$v")）"
 				;;
 		esac
 	fi
 }
+
 t_status() {
 	hdr "当前状态"
 	say "--- 声卡 ---"; cat /proc/asound/cards
@@ -182,6 +203,11 @@ t_status() {
 		it=$(printf '%s\n' "$info" | grep -E "^  ; Item #$idx " | head -1 \
 		     | sed "s/.*'\(.*\)'.*/\1/")
 		[ -n "$it" ] && v="$v ($it)"
+		## RXn Digital Volume 是整数，单看数字看不出大小，附上 dB
+		case "$n" in
+			'RX3 Digital Volume') v="$v  [$(db "${v#values=}")]" ;;
+			'RX1 Digital Volume') v="$v  [$(db "${v#values=}")]" ;;
+		esac
 		printf '  %-40s %s\n' "$n" "$v"
 	done
 	say "--- 功放使能脚 GPIO 132 ---"
@@ -215,7 +241,8 @@ t_status
 
 while true; do
 	printf '\n\033[1m选择\033[0m  1)扬声器提示音  2)扬声器放音乐  3)听筒提示音  4)听筒放音乐\n'
-	printf '      5)麦克风录放  6)调音量(当前 %s)  7)看状态  0)退出\n' "$VOL"
+	printf '      5)麦克风录放  6)调音量(扬声器 %s / 听筒 %s)  7)看状态  0)退出\n' \
+		"$VOL" "$EVOL"
 	printf '> '
 	read -r sel || sel=0
 	log "选择：$sel"
