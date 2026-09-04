@@ -382,3 +382,47 @@ DEC1=DMIC2 CIC1=DMIC                 RMS = 0.0
    `Earpiece Switch=on`、`Ext Spk Switch=off` 再试。
 
 证据文件：`evidence/audio/audio-v094-audio-model.txt`
+
+---
+
+## 7. 人工听音结果（2026-09-04，用户用 odin-audio-test.sh 跑的）
+
+| 项目 | 结果 |
+|---|---|
+| 听筒 —— 3 秒 1 kHz 提示音 | ✅ **听到** |
+| 听筒 —— 《暖暖》前 30 秒 | ✅ **听到，正常** |
+| 麦克风 —— 录 6 秒 | ✅ **RMS ≈ 327**（本底 1~2），信号很强 |
+| 麦克风录音回放 | ❌ 听不到 —— 但这是"回放走扬声器"导致的，不是采集的问题 |
+| 扬声器 —— 3 秒提示音 / 《暖暖》30 秒 | ❌ 没声音 |
+
+### 7.1 三个结论
+
+1. **听筒通了** ⇒ ADSP、q6afe/q6routing、数字 codec、模拟 codec 全都是好的。
+   听筒走的是 `RX1 → PDM_RX1 → HPHL DAC → EAR PA → EAR_S → EAR`。
+2. **麦克风通了，而且就是 ADC1（AMIC1）**。RMS 327 对上本底 1~2，
+   §6.5 里那个"可疑"的 5.5 现在有了解释：当时是增益没开够（ADC1 Volume 默认 0），
+   本轮脚本里设了 `ADC1 Volume = 8` 之后信号一下就出来了。
+   **§6.5 末尾"待耳朵复核"的疑问解除**，UCM 里 `DEC1 MUX = ADC1` 是对的。
+3. **扬声器是剩下唯一的问题**，而且范围已经很窄了：
+   上游（ADSP → AFE → 数字 codec → PDM）被听筒证伪不了，
+   问题只可能落在"SPK 那一条腿"或"外置功放"上。
+
+### 7.2 扬声器的可疑点（下一轮的起点）
+
+听筒用的是 `HPHL DAC`，而扬声器这条腿我按 `SPK_OUT` 走的：
+
+```dts
+"Speaker Amp INL", "SPK_OUT",
+"Ext Spk", "Speaker Amp OUTL",
+```
+
+但主线 `msm8916-wingtech-wt88047` 的扬声器功放是**从 HPH_R 取的**：
+
+```dts
+"Speaker Amp INL", "HPH_R",
+"Speaker Amp INR", "HPH_R",
+```
+
+本机没有 3.5mm 耳机口，HPH_L / HPH_R 是空着的 —— 外置功放很可能就挂在
+它们上面，而不是挂在 SPK_OUT 上。原厂 `mixer_paths_mtp.xml`（reports/033 里
+已经解出来了）应当能直接给出答案，下一轮先去那里查。
