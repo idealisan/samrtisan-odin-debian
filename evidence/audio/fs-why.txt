@@ -1,0 +1,32 @@
+=== 磁盘空间 ===
+  Filesystem       Size  Used Avail Use% Mounted on
+  /dev/mmcblk0p57  112G  851M  107G   1% /
+  Filesystem       Inodes IUsed   IFree IUse% Mounted on
+  /dev/mmcblk0p57 2121728 16094 2105634    1% /
+
+=== ext4 特性与块信息 ===
+  Filesystem magic number:  0xEF53
+  Filesystem features:      has_journal ext_attr resize_inode dir_index filetype needs_recovery flex_bg sparse_super large_file
+  Filesystem state:         clean
+  Errors behavior:          Continue
+  Inode count:              2121728
+  Block count:              29338619
+  Reserved block count:     1175603
+  Free blocks:              29033119
+  Free inodes:              2105668
+  Block size:               4096
+  Reserved blocks uid:      0 (user root)
+  Reserved blocks gid:      0 (group root)
+
+=== 该 fs 上最大能建多大的文件（实测：用 dd 试探）===
+  已有 /swapfile 大小: 242221056
+
+=== 内核报错 ===
+  [   52.685044] EXT4-fs (mmcblk0p57): resizing filesystem from 225280 to 29338619 blocks
+  [   55.362890] EXT4-fs (mmcblk0p57): resized filesystem to 29338619
+
+=== 直接再试一次 dd，看具体能写多少 ===
+  5120+0 records in
+  5120+0 records out
+  5368709120 bytes (5.4 GB, 5.0 GiB) copied, 42.9654 s, 125 MB/s
+  结果: -rw-r--r-- 1 root root 5368709120 Sep  4 08:57 /swapfile

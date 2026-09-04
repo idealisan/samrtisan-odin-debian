@@ -1,9 +1,19 @@
 [Unit]
 Description=Prepare swapfile (first boot)
 Documentation=file:/usr/local/sbin/odin-swap.sh
-# 要在文件系统就绪之后、内存压力出现之前把 swap 挂上
+# 要在文件系统就绪**并且扩容完成**之后、内存压力出现之前把 swap 挂上。
+#
+# ⚠️ After 里那句 odin-firstboot-resize.service 是 2026-09-04 补的，血的教训：
+#    没有它的时候本服务跑在 resize2fs **之前** —— 面对的还是镜像里那个未扩容
+#    的小文件系统，dd 写出 231MB 就 `No space left on device`，5 GiB 的 swapfile
+#    根本建不出来。而服务照样 exit 0，看起来"成功"，实际 swap 一直是 0。
+#    时间线对得很清楚：
+#        08:46:25  odin-swap 开始
+#        08:46:55  dd: No space left on device
+#        dmesg     52.7s 才开始 resize，55.4s 才完成
+#    ⇒ 先 resize，再建 swapfile。
 DefaultDependencies=no
-After=local-fs.target
+After=local-fs.target odin-firstboot-resize.service
 Before=sysinit.target
 
 [Service]

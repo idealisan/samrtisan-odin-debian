@@ -1,0 +1,22 @@
+=== odin-adsp-fw.log ===
+  cat: /var/log/odin-adsp-fw.log: No such file or directory
+
+=== initramfs 里有没有这个脚本（看 init 的钩子是否打进去了）===
+  当前 /sbin 下:
+    ls: cannot access '/sbin/odin-*': No such file or directory
+
+=== 其它两个固件脚本的日志（作对照）===
+  -- wlan --
+    1970-01-01 00:00:06 已取 wcnss.b12 ← modem
+    1970-01-01 00:00:07 已取 WCNSS_qcom_wlan_nv.bin ← persist
+    1970-01-01 00:00:07 已取 WCNSS_wlan_dictionary.dat ← persist
+  -- venus --
+    1970-01-01 00:00:10 已取 venus.b04 (32 字节) ← modem
+    1970-01-01 00:00:10 已取 venus.mdt (6812 字节) ← modem
+    1970-01-01 00:00:10 venus 固件就位（本次新取 6 个文件）
+
+=== wcnss 固件在位吗 ===
+  /lib/firmware/wcnss.mdt
+
+=== 手动跑一次 adsp 取固件脚本看报什么 ===
+/tmp/odin-exec-adspwhy.sh: line 16: /sbin/odin-adsp-fw.sh: No such file or directory

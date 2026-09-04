@@ -1,0 +1,28 @@
+=== 跑之前 ===
+  /swapfile: 799014912
+
+=== 用新脚本跑（它会先判定大小，不够就重建）===
+  [odin-swap] /swapfile 不完整（799014912 < 5368709120 字节），删掉重建
+  [odin-swap] 创建 /swapfile（5G）
+  [odin-swap]   fallocate 不可用（ext4 关了 extents），改用 dd
+  [odin-swap]   已建好
+  [odin-swap] swapon 失败；删掉 /swapfile 后重试一次
+  [odin-swap] 重试后 swapon 成功
+
+=== 跑之后 ===
+  NAME      TYPE SIZE USED PRIO
+  /swapfile file   5G   0B   -1
+                 total        used        free      shared  buff/cache   available
+  Mem:            3544         241          35           9        3367        3302
+  Swap:           5119           0        5119
+
+=== fstab ===
+  /swapfile none swap sw 0 0
+
+=== 服务日志 ===
+  2026-09-04T09:00:04+08:00   fallocate 不可用（ext4 关了 extents），改用 dd
+  2026-09-04T09:01:34+08:00   已建好
+  2026-09-04T09:01:34+08:00 swapon 失败；删掉 /swapfile 后重试一次
+  2026-09-04T09:01:34+08:00 重试后 swapon 成功
+  2026-09-04T09:01:35+08:00 已写入 /etc/fstab
+  2026-09-04T09:02:21+08:00 重试后 swapon 成功

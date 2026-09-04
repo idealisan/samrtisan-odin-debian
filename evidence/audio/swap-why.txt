@@ -1,0 +1,41 @@
+=== 1. swap 现状 ===
+  Filename				Type		Size		Used		Priority
+                 total        used        free      shared  buff/cache   available
+  Mem:            3544         228        2977           9         422        3315
+  Swap:              0           0           0
+
+=== 2. /swapfile 存在吗 ===
+  -rw-r--r-- 1 root root 242221056 Sep  4 08:46 /swapfile
+
+=== 3. 服务状态 ===
+  is-enabled: enabled
+  is-active:  active
+  ● odin-swap.service - Prepare swapfile (first boot)
+       Loaded: loaded (/etc/systemd/system/odin-swap.service; enabled; preset: enabled)
+       Active: active (exited) since Fri 2026-09-04 08:46:56 CST; 9min ago
+         Docs: file:/usr/local/sbin/odin-swap.sh
+     Main PID: 527 (code=exited, status=0/SUCCESS)
+          CPU: 24.981s
+  
+  Sep 04 08:46:25 odin systemd[1]: Starting odin-swap.service - Prepare swapfile (first boot)...
+  Sep 04 08:46:26 odin odin-swap.sh[527]: [odin-swap] 创建 /swapfile（5G）
+  Sep 04 08:46:27 odin odin-swap.sh[527]: [odin-swap]   fallocate 不可用（ext4 关了 extents），改用 dd
+  Sep 04 08:46:55 odin odin-swap.sh[541]: dd: error writing '/swapfile': No space left on device
+  Sep 04 08:46:56 odin odin-swap.sh[527]: [odin-swap] dd 失败，放弃
+
+=== 4. wants 符号链接建了吗 ===
+  lrwxrwxrwx 1 root root 37 Sep  4 08:47 /etc/systemd/system/sysinit.target.wants/odin-swap.service -> /etc/systemd/system/odin-swap.service
+
+=== 5. 服务日志 ===
+  2026-09-04T08:46:26+08:00 创建 /swapfile（5G）
+  2026-09-04T08:46:27+08:00   fallocate 不可用（ext4 关了 extents），改用 dd
+  2026-09-04T08:46:56+08:00 dd 失败，放弃
+
+=== 6. 内核是否支持 swap ===
+  CONFIG_SWAP=y
+  (无输出=取不到 config，用下面实测)
+
+=== 7. 手动跑一次脚本看报什么 ===
+  [odin-swap] swapon 失败
+
+=== 8. 再查一次 ===
