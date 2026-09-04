@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,728 @@
+@@ -0,0 +1,734 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -721,8 +721,14 @@ index 000000000..3dc8f434d
 +		/* 扬声器：WCD 的 SPK_OUT → 外置功放（DRV 拉高 GPIO 132） */
 +		"Speaker Amp INL", "SPK_OUT",
 +		"Ext Spk", "Speaker Amp DRV",
-+		/* 听筒：WCD 的 EAR 直驱 */
-+		"Earpiece", "EAR";
++		/* 听筒：WCD 的 EAR 直驱（下游 mixer_paths_mtp.xml 里叫 handset，
++		 * 走 RX1 + EAR_S，与扬声器完全分开） */
++		"Earpiece", "EAR",
++		/* 耳机：下游走 RX1/RX2 → HPHL/HPHR，主线对应 HPH_L / HPH_R。
++		 * 依据同为 mixer_paths_mtp.xml 的 <path name="headphones">。
++		 * ⚠️ 插拔检测（MBHC）还没接，所以这里只是通路，没有 jack 开关。 */
++		"Headphone Jack", "HPH_L",
++		"Headphone Jack", "HPH_R";
 +
 +	pin-switches = "Ext Spk", "Earpiece";
 +	aux-devs = <&speaker_amp>;
