@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,734 @@
+@@ -0,0 +1,740 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -709,26 +709,32 @@ index 000000000..3dc8f434d
 +&sound_card {
 +	status = "okay";
 +
++	/*
++	 * widgets 的第一个字符串是**类型**，snd_soc_of_parse_audio_simple_widgets()
++	 * 只认四种：Microphone / Line / Headphone / Speaker。
++	 * 写 "Earpiece" 会直接把整个声卡的 probe 打成 -EINVAL：
++	 *     ASoC: DAPM widget 'Earpiece' is not supported
++	 *     qcom-apq8016-sbc: probe ... failed with error -22
++	 * （2026-09-04 实刷 v0.9.4-audio4 撞上，一条声卡都没出来。）
++	 * 听筒用 "Line" 类型、名字仍叫 Earpiece。
++	 *
++	 * 本机**没有 3.5mm 耳机接口**（用户确认），所以不做耳机通路，
++	 * 只保留扬声器 / 听筒 / 麦克风。
++	 */
 +	widgets =
 +		"Speaker", "Ext Spk",
-+		"Earpiece", "Earpiece";
++		"Line", "Earpiece";
 +
 +	audio-routing =
 +		/* 麦克风（沿用 dtsi 默认：AMIC1/2/3 → MIC BIAS External1/2/1） */
 +		"AMIC1", "MIC BIAS External1",
 +		"AMIC2", "MIC BIAS External2",
 +		"AMIC3", "MIC BIAS External1",
-+		/* 扬声器：WCD 的 SPK_OUT → 外置功放（DRV 拉高 GPIO 132） */
++		/* 扬声器：WCD 的 SPK_OUT → 外置功放（DRV 拉高 GPIO 132）→ Ext Spk */
 +		"Speaker Amp INL", "SPK_OUT",
 +		"Ext Spk", "Speaker Amp DRV",
-+		/* 听筒：WCD 的 EAR 直驱（下游 mixer_paths_mtp.xml 里叫 handset，
-+		 * 走 RX1 + EAR_S，与扬声器完全分开） */
-+		"Earpiece", "EAR",
-+		/* 耳机：下游走 RX1/RX2 → HPHL/HPHR，主线对应 HPH_L / HPH_R。
-+		 * 依据同为 mixer_paths_mtp.xml 的 <path name="headphones">。
-+		 * ⚠️ 插拔检测（MBHC）还没接，所以这里只是通路，没有 jack 开关。 */
-+		"Headphone Jack", "HPH_L",
-+		"Headphone Jack", "HPH_R";
++		/* 听筒：WCD 的 EAR 直驱，不经外置功放 */
++		"Earpiece", "EAR";
 +
 +	pin-switches = "Ext Spk", "Earpiece";
 +	aux-devs = <&speaker_amp>;

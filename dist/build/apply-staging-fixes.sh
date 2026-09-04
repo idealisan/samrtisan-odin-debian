@@ -231,6 +231,7 @@ enable_from_tree() { # enable_from_tree <unit> <target>
 }
 
 enable_from_tree odin-swap.service      sysinit.target
+enable_from_tree odin-adsp-fw.service  multi-user.target
 enable_from_tree odin-backlight.service multi-user.target
 
 # ------------------------------------------------- 6. 阶段 3：USB 角色自动切换

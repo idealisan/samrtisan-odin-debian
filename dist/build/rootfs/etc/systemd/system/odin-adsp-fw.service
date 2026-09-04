@@ -1,0 +1,26 @@
+[Unit]
+Description=Provision ADSP (audio DSP) firmware and start the remoteproc
+Documentation=file:/usr/local/sbin/odin-adsp-fw.sh
+
+# 音频整条链路（q6afe / q6adm / q6asm / q6routing）跑在 ADSP 上，
+# 没有它就一个声卡都出不来。ADSP 由 remoteproc 加载，带 auto_boot = true：
+# 一 probe 就 request_firmware("adsp.mdt")，失败不会自己重试。
+#
+# 正确时序在 initramfs（switch_root 之前），但 initramfs 的生成被
+# tools/ci/build-rootfs.sh 的 staging 层缓存守卫包住了 —— 缓存命中时不重建，
+# 新加的取固件脚本就进不了镜像。所以这里留一条用户态兜底。
+#
+# 排在 local-fs 之后即可：remoteproc 可以在用户态重新启动，
+# 不需要回到内核 probe 阶段。
+After=local-fs.target
+Before=sound.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# 取不到最坏只是没有声音，绝不能把启动拖住或搞挂
+TimeoutStartSec=60
+ExecStart=/usr/local/sbin/odin-adsp-fw.sh
+
+[Install]
+WantedBy=multi-user.target
