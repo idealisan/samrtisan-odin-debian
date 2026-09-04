@@ -46,7 +46,11 @@ spk_on() {
 	cset 'PRI_MI2S_RX Audio Mixer MultiMedia1' 1
 	cset 'RX3 MIX1 INP1' RX1
 	cset 'RX3 Digital Volume' "$VOL"
-	cset 'SPK DAC Switch' on
+	## 扬声器（大喇叭）走 LINEOUT，不是 SPK_OUT：
+	##   PDM_RX3 → LINEOUT DAC → LINEOUT(mux) → LINEOUT PA → LINEOUT_OUT → AW 功放
+	## 外置功放是 AW87318 一类，MODE 脚要打 6 个脉冲才开机（DTS 里 awinic,aw8738
+	## + awinic,mode = <6>），这个脚本不用管，驱动在 POST_PMU 自己会打。
+	cset 'LINEOUT' Switch
 	cset 'Ext Spk Switch' on
 	cset 'Earpiece Switch' off
 	cset 'EAR_S' ZERO
@@ -59,7 +63,7 @@ ear_on() {
 	cset 'EAR_S' Switch
 	cset 'Earpiece Switch' on
 	cset 'Ext Spk Switch' off
-	cset 'SPK DAC Switch' off
+	cset 'LINEOUT' ZERO
 	cset 'RX3 MIX1 INP1' ZERO
 }
 tone() {   # tone <秒数描述>
@@ -157,7 +161,7 @@ t_status() {
 	#
 	# 但 cget 对枚举只给下标（values=3），所以再把下标翻成项名（values=3 → RX1）。
 	for n in 'PRI_MI2S_RX Audio Mixer MultiMedia1' 'RX3 MIX1 INP1' \
-	         'RX3 Digital Volume' 'SPK DAC Switch' 'Ext Spk Switch' \
+	         'RX3 Digital Volume' 'LINEOUT' 'Ext Spk Switch' \
 	         'RX1 MIX1 INP1' 'RX1 Digital Volume' 'EAR_S' 'Earpiece Switch' \
 	         'MultiMedia2 Mixer TERT_MI2S_TX' 'DEC1 MUX' 'CIC1 MUX' 'ADC1 Volume'; do
 		info=$(amixer -c "$C" cget name="$n" 2>/dev/null)

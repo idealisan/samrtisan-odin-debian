@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,778 @@
+@@ -0,0 +1,808 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -677,36 +677,60 @@ index 000000000..3dc8f434d
 + *     };
 + *     &int_codec { status = "ok"; ... };          ← 用的就是 PMIC 内置 codec
 + *
-+ * ⚠️ 关键更正：GPIO 是 **132**，不是 96。
-+ *    96 是 pmOS 的 mido（红米 Note 4）用 awinic,aw8738 的引脚，
-+ *    09-01 那轮调试直接照抄了 mido，扬声器因此一直不响。
-+ *    下游驱动 sound/soc/codecs/msm8x16-wcd.c 里
++ * ⚠️ 关键更正（2026-09-04，听筒与麦克风都已出声、只剩扬声器不响之后查到的）：
++ *    那颗功放是 **AW87318 一类的 Awinic 功放**，而且**不是拉高就开** ——
++ *    它靠 MODE 脚上的**脉冲个数**选工作模式。原厂 msm8x16-wcd.c 第 5015 行：
++ *
++ *        （上一行是原厂注释 "lineout to AW87318"）
++ *        {"AW_SPK_PA", NULL, "LINEOUT PA"},          ← 音频来自 LINEOUT，不是 SPK_OUT
++ *        SND_SOC_DAPM_SPK("AW_SPK_PA", aw_speaker_pa_enable),
++ *
++ *        static int aw_speaker_pa_enable(...)
++ *        {
++ *            case SND_SOC_DAPM_POST_PMU:
++ *                gpio_set_value(ext_pa_en_gpio, 1);          ← 第 1 个上升沿
++ *                for (i = 0; i < mode; i++) {                ← mode = 5
++ *                    gpio_set_value(ext_pa_en_gpio, 0);
++ *                    gpio_set_value(ext_pa_en_gpio, 1);      ← 再来 5 个
++ *                }
++ *        }
++ *        #  define AW_BOOST_DEFAULT_MODE 6
++ *        #  static int aw_boost_mode = AW_BOOST_DEFAULT_MODE - 1;   即 5
++ *
++ *    加起来 **6 个上升沿**。
++ *
++ * 三个要点：
++ *   1. 用主线自带的 `awinic,aw8738`（sound/soc/codecs/aw8738.c），
++ *      它就是在 POST_PMU 里打脉冲的；`simple-audio-amplifier` 只会把脚拉高，
++ *      AW 芯片永远等不到模式脉冲 ⇒ 一直关着 ⇒ **扬声器不出声**。
++ *      这就解释了"DAPM 全 On、GPIO 132 也确实是 high、可就是没声"。
++ *   2. `awinic,mode = <6>`：上游驱动从 low 起打 `mode` 个 (0,1)，
++ *      要凑出下游那 1 + 5 = 6 个上升沿，这里就得写 6。
++ *   3. **音频输入是 LINEOUT，不是 SPK_OUT**。主线对应
++ *        {"LINEOUT_OUT", NULL, "LINEOUT PA"}
++ *        {"LINEOUT PA",  NULL, "LINEOUT"}
++ *        {"LINEOUT", "Switch", "LINEOUT DAC"}
++ *        {"LINEOUT DAC", NULL, "PDM_RX3"}
++ *      所以 routing 写 `"Speaker Amp INL", "LINEOUT_OUT"`，
++ *      运行时还要把 `LINEOUT` 这个 mux 打到 Switch（UCM 里做）。
++ *
++ * 顺带排掉一条：codec 里另一个功放 widget
 + *        SND_SOC_DAPM_SPK("Ext Spk", msm8x16_wcd_codec_enable_spk_ext_pa)
-+ *        → gpio_set_value_cansleep(ext_pa_en_gpio, 1)   ← 高电平开功放
-+ *        → 初始 gpio_request_one(..., GPIOF_OUT_INIT_LOW) ← 默认关
++ *  走的是**电平**驱动，GPIO 由 `qcom,msm-spk-ext-pa` 指定 ——
++ *  整个原厂 DTS 树里**没有任何一份**定义这个属性，所以那条路对 ODIN 是死代码。
 + *
-+ * 主线这边没有 aw8738 的驱动，也没有必要 —— 这颗功放只有一根使能脚，
-+ * 用主线自带的 `simple-audio-amplifier`（sound/soc/codecs/simple-amplifier.c）
-+ * 就够了：它的 DAPM 是 INL/INR → DRV → OUTL/OUTR，DRV 的 POST_PMU/PRE_PMD
-+ * 事件去拉 `enable-gpios`，正好等价于下游那个 "Ext Spk" widget。
++ * 拓扑：WCD 的 LINEOUT_OUT → 功放 INL → DRV(GPIO132 打 6 个脉冲) → Ext Spk
 + *
-+ * 拓扑：WCD 的 SPK_OUT → 功放 INL → DRV(拉高 GPIO132) → 卡片上的 Ext Spk
-+ *
-+ * 两点刻意的取舍：
-+ *   1. 从 **OUTL** 取信号而不是 DRV —— 照抄主线 msm8916-wingtech-wt88047：
-+ *      同样是 WCD + 同样的 simple-audio-amplifier。OUTL 还串着 simple-amp 的
-+ *      VCC regulator supply，但缺 VCC-supply 属性时它解析成 dummy regulator
-+ *      （wt88047 也没有这个属性），不挡路。DAPM 会顺着 OUTL 反向把 DRV 带上电，
-+ *      GPIO 132 照拉。
-+ *   2. 不建模 `qcom,speaker-id`（GPIO 93）—— 那是给安卓 HAL 选功放型号用的
-+ *      输入引脚，主线不需要。
++ * 另外不建模 `qcom,speaker-id`（GPIO 93）—— 那是给安卓 HAL 选功放型号用的
++ * 输入引脚，主线不需要。
 + *
 + * 听筒（EAR）由 WCD 直接驱动，不经外置功放，所以走 audio-routing 直连。
 + */
 +/ {
 +	speaker_amp: audio-amplifier {
-+		compatible = "simple-audio-amplifier";
-+		enable-gpios = <&tlmm 132 GPIO_ACTIVE_HIGH>;
++		compatible = "awinic,aw8738";
++		mode-gpios = <&tlmm 132 GPIO_ACTIVE_HIGH>;
++		awinic,mode = <6>;
 +		sound-name-prefix = "Speaker Amp";
 +	};
 +};
@@ -761,12 +785,18 @@ index 000000000..3dc8f434d
 +		"AMIC2", "MIC BIAS External2",
 +		"AMIC3", "MIC BIAS External1",
 +		/*
-+		 * 扬声器：WCD 的 SPK_OUT → 外置功放（DRV 拉高 GPIO 132）→ Ext Spk
-+		 * 写法照抄主线 msm8916-wingtech-wt88047 —— 同样是 WCD + 同样是
-+		 * simple-audio-amplifier：从 **OUTL** 取信号，不是从 DRV 取。
-+		 * DAPM 会顺着 OUTL 反向把 DRV 带上电，GPIO 132 照拉。
++		 * 扬声器：RX3 → PDM_RX3 → LINEOUT DAC → LINEOUT(mux=Switch)
++		 *          → LINEOUT PA → LINEOUT_OUT → 外置 AW 功放 → Ext Spk
++		 *
++		 * 取 **LINEOUT_OUT** 而不是 SPK_OUT —— 原厂 msm8x16-wcd.c 白纸黑字：
++		 *     {"AW_SPK_PA", NULL, "LINEOUT PA"},   （注释：lineout to AW87318）
++		 * 且 {"LINEOUT_OUT", NULL, "LINEOUT PA"} 在主线是无 mux 的直连，
++		 * 用它可以少开一个开关。
++		 *
++		 * 从 **OUTL** 取而不是 DRV：照抄主线 msm8916-wingtech-wt88047 的写法；
++		 * DAPM 会顺着 OUTL 反向把 DRV 带上电，POST_PMU 才会去打那 6 个脉冲。
 +		 */
-+		"Speaker Amp INL", "SPK_OUT",
++		"Speaker Amp INL", "LINEOUT_OUT",
 +		"Ext Spk", "Speaker Amp OUTL",
 +		/* 听筒：WCD 的 EAR 直驱，不经外置功放 */
 +		"Earpiece", "EAR";
