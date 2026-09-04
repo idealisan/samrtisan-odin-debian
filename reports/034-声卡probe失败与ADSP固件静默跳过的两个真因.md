@@ -550,3 +550,43 @@ DEC1=DMIC2 CIC1=DMIC                 RMS = 0.0
 - 测试脚本里扬声器与听筒**各存各的音量**（`VOL` / `EVOL`），
   并且在所有显示处把数字换算成 dB（`84 → 0 dB`、`30 → −54 dB`），
   免得再被当成百分比。
+
+### 9.2 最终确认：两条播放通路都完整通电（2026-09-05 07:58）
+
+改完音量（听筒 UCM 默认 90 = +6 dB、脚本 VOL/EVOL 分离）之后，
+用户再次听音：**扬声器与听筒都听到**。同时用 debugfs 做了客观复核——
+播放时两条链上的部件全 On，且 GPIO 132 在两条路之间正确互斥：
+
+```
+扬声器（RX3 → LINEOUT → 外置 AW 功放）
+  digital  AIF1 Playback On → I2S RX1 On → RX3 MIX1 On → RX3 MIX1 INP1 On
+           → RX3 INT On → PDM_RX3 On
+  analog   PDM_RX3 On → LINEOUT DAC On → LINEOUT On → LINEOUT PA On → LINEOUT_OUT On
+  card     Ext Spk On            Earpiece Off
+  GPIO132  out high              ← 功放开了
+
+听筒（RX1 → HPHL DAC → EAR PA → EAR）
+  digital  AIF1 Playback On → I2S RX1 On → RX1 MIX1 On → RX1 MIX1 INP1 On → PDM_RX1 On
+  analog   PDM_RX1 On → HPHL DAC On → EAR PA On → EAR_S On → EAR On
+  card     Earpiece On           Ext Spk Off
+  GPIO132  out low               ← 扬声器功放正确关闭
+```
+
+两条路的 `GPIO132` 状态相反，说明 `ConflictingDevice` 语义下的互斥是生效的
+（听筒响的时候外置功放没被误开）。
+
+证据：`evidence/audio/audio-all-paths-ok-20260905.txt`、
+`evidence/audio/audio-test-log-20260905.txt`
+
+### 9.3 音频专项收尾状态
+
+| 项 | 状态 |
+|---|---|
+| 声卡注册 | ✅ `smartisan-odin`，PCM device 0/1/2/4 齐全 |
+| ADSP 开机自起 | ✅ 固件由 initramfs 提供（时间戳 1970） |
+| 扬声器 | ✅ 外置 AW 功放（脉冲模式） |
+| 听筒 | ✅ |
+| 麦克风（AMIC1） | ✅ RMS ≈ 327 |
+| UCM 设备切换 `alsaucm set _dev` | ❌ 恒定 -EINVAL，**不影响 amixer 直接控音**，但桌面声音服务依赖它，未解决（§6.6） |
+| 音量百分比映射 | ⚠️ 0~124 且 84 = 0 dB，桌面音量条会表现异常，未做映射 |
+| 耳机通路 | — 本机无 3.5mm 口，不需要 |

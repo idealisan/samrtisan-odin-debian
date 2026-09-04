@@ -1,0 +1,47 @@
+[sudo] password for user: ############ 扬声器（RX3 → LINEOUT → 外置 AW 功放）############
+
+--- card ---
+  Ext Spk            Ext Spk: On  in 1 out 1
+  Earpiece           Earpiece: Off  in 0 out 0
+
+--- digital ---
+  AIF1 Playback      AIF1 Playback: On  in 1 out 1
+  I2S RX1            I2S RX1: On  in 1 out 1
+  RX3 MIX1           RX3 MIX1: On  in 1 out 1
+  RX3 MIX1 INP1      RX3 MIX1 INP1: On  in 1 out 1
+  RX3 INT            RX3 INT: On  in 1 out 1 - R32(0x20) mask 0x4
+  PDM_RX3            PDM_RX3: On  in 1 out 1
+
+--- analog ---
+  PDM_RX3            PDM_RX3: On  in 1 out 1
+  LINEOUT DAC        LINEOUT DAC: On  in 1 out 1
+  LINEOUT            LINEOUT: On  in 1 out 1
+  LINEOUT PA         LINEOUT PA: On  in 1 out 1 - R61869(0xf1ad) mask 0x40
+  LINEOUT_OUT        LINEOUT_OUT: On  in 1 out 1
+  GPIO132:  gpio132 : out high func0 2mA pull down
+
+############ 听筒（RX1 → HPHL DAC → EAR PA → EAR）############
+
+--- card ---
+  Earpiece           Earpiece: On  in 2 out 1
+  Ext Spk            Ext Spk: Off  in 0 out 0
+
+--- digital ---
+  AIF1 Playback      AIF1 Playback: On  in 1 out 1
+  I2S RX1            I2S RX1: On  in 1 out 1
+  RX1 MIX1           RX1 MIX1: On  in 1 out 1
+  RX1 MIX1 INP1      RX1 MIX1 INP1: On  in 1 out 1
+  PDM_RX1            PDM_RX1: On  in 1 out 1
+
+--- analog ---
+  PDM_RX1            PDM_RX1: On  in 1 out 2
+  HPHL DAC           HPHL DAC: On  in 1 out 1 - R61851(0xf19b) mask 0x8
+  EAR PA             EAR PA: On  in 2 out 1
+  EAR_S              EAR_S: On  in 2 out 1
+  EAR                EAR: On  in 2 out 1
+  GPIO132:  gpio132 : out low  func0 2mA pull down
+
+############ 音量对照 ############
+  扬声器 RX3 Digital Volume = 100  →  +16 dB
+  听筒   RX1 Digital Volume = 90   →  +6 dB
+  （你之前设的 30               →  -54 dB，听筒在这个值下无声是正常的）
