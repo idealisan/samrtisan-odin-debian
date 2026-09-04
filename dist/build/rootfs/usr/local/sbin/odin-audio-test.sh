@@ -1,8 +1,10 @@
 #!/bin/bash
 # odin-audio-test.sh —— ODIN（U2 Pro）音频通路人工验收
 #
-#   用法：  bash /home/user/odin-audio-test.sh          # 交互菜单
-#           bash /home/user/odin-audio-test.sh speaker  # 只跑一项（speaker|music|earpiece|emic|mic|status|vol）
+#   用法：  bash /usr/local/sbin/odin-audio-test.sh          # 交互菜单
+#           bash /usr/local/sbin/odin-audio-test.sh speaker  # 只跑一项
+#           （speaker / music / earpiece / emic / mic / vol / status）
+#           也可以直接敲 odin-audio-test.sh（在 /usr/local/sbin 里，PATH 上有）
 #
 # 为什么要人工跑：脚本/内核只能证明"电路打通了"（DAPM 全 On、功放使能脚拉高），
 # 证明不了"扬声器真的响了"。这一步只能靠耳朵。
@@ -13,6 +15,15 @@
 #
 # ⚠️ 需要 root（/dev/snd/* 是 root:audio 660，当前镜像里 user 还没进 audio 组）。
 #    脚本会自己检测并用 sudo 重跑。
+#
+# 关于测试音乐 $WAV：
+#     **不随镜像分发**（有版权，也不该进版本库）。重刷之后 /home/user/music/
+#     会被清空，放音乐会退化成 3 秒提示音。想听真音乐就自己放一个进去：
+#         scp 某首歌.mp3 user@手机:/tmp/
+#         ssh user@手机 "ffmpeg -i /tmp/某首歌.mp3 -t 30 -ar 48000 -ac 2 \
+#                        -c:a pcm_s16le /home/user/music/warm-30s.wav"
+#     或者在本机转好再传（手机里没有 ffmpeg）。必须是 48k / S16_LE，
+#     因为后端把格式钉死在 48000 Hz / 2 声道 / S16_LE。
 set -u
 
 C=0                       # 声卡号
@@ -73,7 +84,8 @@ playwav() {
 	if [ -f "$WAV" ]; then
 		aplay -D hw:0,0 "$WAV" >/dev/null 2>&1
 	else
-		warn "找不到 $WAV，改播 3 秒提示音"
+		warn "找不到 $WAV（重刷后 /home/user/music 会被清空，音乐不随镜像分发）"
+		warn "改播 3 秒 1 kHz 提示音。想听真音乐请看脚本头部的说明补一个 WAV。"
 		tone
 	fi
 }
