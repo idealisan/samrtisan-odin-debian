@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,808 @@
+@@ -0,0 +1,816 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -793,11 +793,19 @@ index 000000000..3dc8f434d
 +		 * 且 {"LINEOUT_OUT", NULL, "LINEOUT PA"} 在主线是无 mux 的直连，
 +		 * 用它可以少开一个开关。
 +		 *
-+		 * 从 **OUTL** 取而不是 DRV：照抄主线 msm8916-wingtech-wt88047 的写法；
-+		 * DAPM 会顺着 OUTL 反向把 DRV 带上电，POST_PMU 才会去打那 6 个脉冲。
++		 * 端点名是 **IN / OUT**，不是 INL / OUTL！
++		 * aw8738.c 的 DAPM 只有三个部件：IN(输入) → DRV → OUT(输出)，
++		 * 和 simple-amplifier 的 INL/INR → DRV → OUTL/OUTR **不一样**。
++		 * 加上 sound-name-prefix "Speaker Amp"，实际名字就是
++		 * "Speaker Amp IN" / "Speaker Amp OUT"。
++		 * （上一版照 simple-amplifier 写了 INL/OUTL，两条路由都 ENODEV，
++		 *   整张卡注册失败 —— 已刷机验证，务必记牢。）
++		 *
++		 * 从 **OUT** 取而不是 DRV：DAPM 会顺着 OUT 反向把 DRV 带上电，
++		 * POST_PMU 才会去打那 6 个脉冲。
 +		 */
-+		"Speaker Amp INL", "LINEOUT_OUT",
-+		"Ext Spk", "Speaker Amp OUTL",
++		"Speaker Amp IN", "LINEOUT_OUT",
++		"Ext Spk", "Speaker Amp OUT",
 +		/* 听筒：WCD 的 EAR 直驱，不经外置功放 */
 +		"Earpiece", "EAR";
 +
