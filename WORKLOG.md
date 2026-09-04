@@ -3086,3 +3086,36 @@ probe 也不阻止 OTG 尝试。要真禁掉得改驱动侧。
     贴之前要把里面的 `/*` `*/` 去掉或改成 `#`。中过两次（`/* = 5 */` 和原厂那行注释）。
   - 改完 patch 一定要 `git apply --check` + 真编一遍 DTB，光看 diff 看不出注释嵌套。
   - `dts/*.dtb` 在 .gitignore 里（`*.dtb`），`git add dts/*.dtb` 会静默不生效、提交变成空操作。
+
+## 2026-09-05（续）v0.9.4-aw8738 刷入后声卡注册失败：端点名 IN/OUT 不是 INL/OUTL
+
+- **00:45 完成** — 定位并修完，已推 v0.9.4-aw8738-2 触发 CI（run 33896890250）
+- 刷入 v0.9.4-aw8738 后**声卡直接没了**（比上一版更糟）：
+      qcom-apq8016-sbc c051000.sound-card:
+          ASoC: Failed to add route LINEOUT_OUT -> Speaker Amp INL(*)
+          ASoC: Failed to add route Speaker Amp OUTL(*) -> Ext Spk
+- ⚠️ **读这条报错要小心**：`(*)` 标的是**缺失的那一端**，不是"→ 左边那个"。
+  所以我第一反应是"LINEOUT_OUT 不存在"，方向全错。实际缺的是 `Speaker Amp INL` / `Speaker Amp OUTL`。
+- 真机上驱动那一侧都是对的（`audio-amplifier` 已绑到 aw8738 驱动、
+  `awinic,mode` 读到 6、`snd_soc_aw8738` 模块已加载），是我把 widget 名写错了：
+
+                    simple-amplifier        aw8738（本驱动）
+      输入          INL / INR               IN     ← 只有一个
+      输出          OUTL / OUTR             OUT    ← 只有一个
+
+      sound/soc/codecs/aw8738.c:
+          SND_SOC_DAPM_INPUT("IN"),
+          SND_SOC_DAPM_OUT_DRV_E("DRV", ...),
+          SND_SOC_DAPM_OUTPUT("OUT"),
+          routes: IN → DRV → OUT
+
+  我沿用了之前 `simple-audio-amplifier` 的 INL/OUTL（当时确实对），换驱动没跟着改。
+  加 sound-name-prefix "Speaker Amp" 后实际名字是 `Speaker Amp IN` / `Speaker Amp OUT`。
+- 改两处（`"Speaker Amp INL"` → `"Speaker Amp IN"`，`"Speaker Amp OUTL"` → `"Speaker Amp OUT"`），
+  hunk 头 808 → 816，DTB 重编 63431 / 63279 字节。
+- **踩坑**
+  - 换 codec 驱动时，**DAPM 端点名不是通用的**，必须重新看目标驱动的
+    `snd_soc_dapm_widget` 数组，不能沿用上一个驱动的写法。
+  - 刷机 stage 20 这次没能自动进 fastboot（改名 extlinux.conf 后重启，420s 没等到），
+    最后靠用户手动按【音量减+电源键】进的原厂 fastboot，然后 `--from 30` 续刷成功。
+    远程进 fastboot 那条路不是每次都灵。
