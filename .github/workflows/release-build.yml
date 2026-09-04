@@ -83,6 +83,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # 两步走：checkout 不带子模块，下一步只 init 构建真正需要的那个
+          submodules: false
+      - name: 初始化构建用子模块
+        # 刻意不拉参考用的 ext/smartisan-kernel —— 近 GB 的官方安卓内核源码，构建用不到，
+        # 只会白白拖慢每个 job。要看时本地手动：git submodule update --init ext/smartisan-kernel
+        # --filter=blob:none 是部分克隆（只要提交与树，blob 按需取），内核全历史整量要好几分钟，
+        # 这样就快得多；万一 runner 的 git 太老不支持 --filter，退回整量。
+        run: |
+          git submodule update --init --filter=blob:none ext/linux-msm8953 \
+            || git submodule update --init ext/linux-msm8953
       - name: 安装 dtc
         run: sudo apt-get update -qq && sudo apt-get install -y -qq device-tree-compiler
       - name: 取 DTB 产物缓存
@@ -108,6 +119,17 @@ jobs:
       CCACHE_DIR: /tmp/odin-ccache-lk2nd
     steps:
       - uses: actions/checkout@v4
+        with:
+          # 两步走：checkout 不带子模块，下一步只 init 构建真正需要的那个
+          submodules: false
+      - name: 初始化构建用子模块
+        # 刻意不拉参考用的 ext/smartisan-kernel —— 近 GB 的官方安卓内核源码，构建用不到，
+        # 只会白白拖慢每个 job。要看时本地手动：git submodule update --init ext/smartisan-kernel
+        # --filter=blob:none 是部分克隆（只要提交与树，blob 按需取），内核全历史整量要好几分钟，
+        # 这样就快得多；万一 runner 的 git 太老不支持 --filter，退回整量。
+        run: |
+          git submodule update --init --filter=blob:none ext/lk2nd \
+            || git submodule update --init ext/lk2nd
       - name: 安装 ARM32 裸机工具链
         id: lk2nd_toolchain
         run: |
@@ -166,6 +188,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # 两步走：checkout 不带子模块，下一步只 init 构建真正需要的那个
+          submodules: false
+      - name: 初始化构建用子模块
+        # 刻意不拉参考用的 ext/smartisan-kernel —— 近 GB 的官方安卓内核源码，构建用不到，
+        # 只会白白拖慢每个 job。要看时本地手动：git submodule update --init ext/smartisan-kernel
+        # --filter=blob:none 是部分克隆（只要提交与树，blob 按需取），内核全历史整量要好几分钟，
+        # 这样就快得多；万一 runner 的 git 太老不支持 --filter，退回整量。
+        run: |
+          git submodule update --init --filter=blob:none ext/linux-msm8953 \
+            || git submodule update --init ext/linux-msm8953
       # 先装工具链，再取缓存：缓存键要带上编译器身份（见下），没装就无从计算。
       - name: 安装交叉编译工具链
         id: toolchain
@@ -438,6 +471,9 @@ jobs:
     name: rootfs (${{ matrix.variant }})
     steps:
       - uses: actions/checkout@v4
+        with:
+          # 本 job 的源码全部来自 artifact（见下面的 download-artifact），不需要子模块
+          submodules: false
       - name: 安装 debootstrap 与 arm64 模拟执行环境
         id: debinst
         run: |

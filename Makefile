@@ -53,8 +53,10 @@ override OUT := $(abspath $(OUT))
 # CI 想用 /tmp 更快可覆盖：make KDIR=/tmp/linux-msm8953
 KDIR ?= $(REPO)/tmp/linux-msm8953
 
-# lk2nd 源码树（tarball 解开后就地打补丁、就地编译）
+# lk2nd 源码树（从子模块复制一份后就地打补丁、就地编译）
 LK2ND_SRC ?= $(REPO)/tmp/lk2nd-src
+# lk2nd 子模块所在位置（构建必需，参考用的 ext/smartisan-kernel 不参与构建）
+LK2ND_SRC_EXT := $(REPO)/ext/lk2nd
 
 DTB_OUT    := $(OUT)/dtb
 KERNEL_OUT := $(OUT)/kernel
@@ -284,12 +286,19 @@ $(STAMPS)/kernel-$(KDIR_TAG): | $(STAMPS) fetch-kernel
 # 两个变体共用一个源码树，必须串行，所以放在同一个 recipe 里。
 lk2nd: $(STAMPS)/lk2nd
 $(STAMPS)/lk2nd: | $(STAMPS)
-	@mkdir -p $(LK2ND_OUT) $(LK2ND_SRC)
-	@echo "[lk2nd] 取源码 $(LK2ND_VER) (msm8916-mainline/lk2nd)"
+	@mkdir -p $(LK2ND_OUT)
+	@echo "[lk2nd] 取源码 $(LK2ND_VER)（子模块 ext/lk2nd）"
 	rm -rf "$(LK2ND_SRC)"
 	mkdir -p "$(LK2ND_SRC)"
-	curl -sSL "https://github.com/msm8916-mainline/lk2nd/archive/refs/tags/$(LK2ND_VER).tar.gz" \
-		| tar -xz --strip-components=1 -C "$(LK2ND_SRC)"
+	@# 从子模块取，不再 curl tarball：子模块记录的是确切 commit，可复现、能离线、
+	@# 也不会出现"tag 被上游挪动"这类意外。子模块没初始化就响亮失败，不做网络回退。
+	@if [ ! -e "$(LK2ND_SRC_EXT)/.git" ] || [ -z "$$(ls -A "$(LK2ND_SRC_EXT)" 2>/dev/null)" ]; then \
+		echo "[lk2nd] ❌ lk2nd 子模块未初始化：$(LK2ND_SRC_EXT)" >&2; \
+		echo "[lk2nd]    先跑：git submodule update --init ext/lk2nd" >&2; \
+		exit 1; \
+	fi
+	@echo "[lk2nd]   子模块 HEAD = $$(git -C "$(LK2ND_SRC_EXT)" rev-parse --short HEAD) ($$(git -C "$(LK2ND_SRC_EXT)" describe --tags 2>/dev/null))"
+	cp -a $(LK2ND_SRC_EXT)/. "$(LK2ND_SRC)"/
 	test -f "$(LK2ND_SRC)/makefile"
 	@echo "[lk2nd] 打补丁 0001 0002 0003"
 	@for p in $(foreach n,0001 0002 0003,$(firstword $(wildcard $(REPO)/lk2nd/$(n)-*.patch))); do \

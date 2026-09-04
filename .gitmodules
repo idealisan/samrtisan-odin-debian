@@ -1,6 +1,11 @@
 [submodule "ext/smartisan-kernel"]
 	path = ext/smartisan-kernel
 	url = https://github.com/SmartisanTech/SmartisanOS_Kernel_Source.git
+	update = none
+	branch = U2ProKernel
 [submodule "ext/lk2nd"]
 	path = ext/lk2nd
 	url = https://github.com/msm8916-mainline/lk2nd.git
+[submodule "ext/linux-msm8953"]
+	path = ext/linux-msm8953
+	url = https://github.com/msm8953-mainline/linux.git

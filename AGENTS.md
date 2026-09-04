@@ -59,12 +59,22 @@
 > 补充：从 GitHub 下大文件要**显式去代理**（`env -u http_proxy -u https_proxy`），
 > 快 4.7 倍。详见 `docs/05` 第五节。
 
+9. **外部仓库走子模块，分两组**（`ext/`）：
+   - **构建必需**：`ext/linux-msm8953`（内核）、`ext/lk2nd`。构建前必须初始化：
+     `git submodule update --init ext/linux-msm8953 ext/lk2nd`。CI 也是两步走——checkout 时 `submodules: false`，再单独 init 需要的那一个（dtb/kernel 要内核，lk2nd 要 lk2nd；rootfs 用 artifact，一个都不用）。
+   - **仅参考**：`ext/smartisan-kernel`（官方安卓内核源码）。**刻意不在构建中拉取**——近 GB、构建用不到，只会拖慢每个 job。要看时本地手动 init。
+
+   取源码的 `tools/ci/fetch-kernel.sh` 与 Makefile 的 lk2nd 规则都**不提供网络回退**：子模块没初始化就响亮失败并提示该怎么跑，绝不悄悄编出一个"上游最新版"。子模块还顺带解决了老问题——GitHub 只让取 ref 能到达的 commit，而子模块记录确切 commit 且整量克隆，钉的 SHA 一定可达（老脚本那套三级回退就是为绕这个，现已不需要）。
+
+10. **别把 workaround 当需求**。看到"必须这样做"的约束，先问一句它解决的是什么、有没有更直接的修法。例子：`dtb` 与 `kernel` 曾要求各用一棵独立内核树，理由是"共用心会撞 0007 已应用"。真因只是 dtb 阶段用了裸 `patch --forward`（已应用返回 1），而 kernel 阶段用的 `apply-patches.sh` 一直都是幂等的。让 dtb 也走幂等脚本后，两棵树就不需要了（见 `18fdd33`）。
+
 ---
 
 ## 2. 目录地图
 
 | 路径 | 内容 |
 |---|---|
+| `ext/` | **外部 Git 仓库（子模块）**：构建必需 `ext/linux-msm8953`、`ext/lk2nd`；仅参考 `ext/smartisan-kernel`（官方安卓内核源码 U2ProKernel 分支）。见铁律 9。
 | `Makefile` | **构建入口** | `make help` / `make all`，见 `docs/05` |
 | `Dockerfile` | 编译专用镜像（依赖清单来自 CI 各 job 的 apt 行），见 `docs/05` 第一节 |
 | `tools/ci/` | 2 个构建脚本（取内核、装 rootfs） | 其余构建步骤已迁进 Makefile |
