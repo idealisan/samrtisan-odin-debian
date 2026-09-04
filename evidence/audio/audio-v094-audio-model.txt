@@ -1,0 +1,98 @@
+[sudo] password for user: ########## 1. 声卡 ##########
+ 0 [smartisanodin  ]: smartisan-odin - smartisan-odin
+                      smartisan-odin
+card 0: smartisanodin [smartisan-odin], device 0: MultiMedia1 (*) []
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+card 0: smartisanodin [smartisan-odin], device 2: MultiMedia3 (*) []
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+card 0: smartisanodin [smartisan-odin], device 4: VoiceMMode1 (*) []
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+card 0: smartisanodin [smartisan-odin], device 1: MultiMedia2 (*) []
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+card 0: smartisanodin [smartisan-odin], device 4: VoiceMMode1 (*) []
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+
+########## 2. ADSP / 固件来源 ##########
+/sys/class/remoteproc/remoteproc0: name=a204000.remoteproc state=running fw=wcnss.mdt
+/sys/class/remoteproc/remoteproc1: name=adsp state=running fw=adsp.mdt
+-rwxr-xr-x  1 root root     532 Jan  1  1970 adsp.b00
+-rwxr-xr-x  1 root root    6920 Jan  1  1970 adsp.b01
+-rwxr-xr-x  1 root root    7465 Jan  1  1970 adsp.b02
+-rwxr-xr-x  1 root root  379548 Jan  1  1970 adsp.b03
+-rwxr-xr-x  1 root root 6478181 Jan  1  1970 adsp.b04
+-rwxr-xr-x  1 root root  744664 Jan  1  1970 adsp.b05
+-rwxr-xr-x  1 root root     360 Jan  1  1970 adsp.b06
+-rwxr-xr-x  1 root root   60264 Jan  1  1970 adsp.b07
+-rwxr-xr-x  1 root root   80292 Jan  1  1970 adsp.b08
+-rwxr-xr-x  1 root root   32488 Jan  1  1970 adsp.b09
+-rwxr-xr-x  1 root root 1041668 Jan  1  1970 adsp.b10
+-rwxr-xr-x  1 root root   14132 Jan  1  1970 adsp.b11
+-rwxr-xr-x  1 root root   84684 Jan  1  1970 adsp.b12
+-rwxr-xr-x  1 root root  315756 Jan  1  1970 adsp.b13
+-rwxr-xr-x  1 root root    7452 Jan  1  1970 adsp.mdt
+-rwxr-xr-x  1 root root     212 Jan  1  1970 venus.b00
+-rwxr-xr-x  1 root root    6600 Jan  1  1970 venus.b01
+-rwxr-xr-x  1 root root  903464 Jan  1  1970 venus.b02
+-rwxr-xr-x  1 root root   29048 Jan  1  1970 venus.b03
+-rwxr-xr-x  1 root root      32 Jan  1  1970 venus.b04
+  ↑ 时间戳是 Jan 1 1970 = 在 initramfs 阶段放的（那时还没设 RTC）
+
+########## 3. 播放：整条 DAPM 链 + 功放使能脚 ##########
+-- card 级 --
+  Ext Spk      Ext Spk: On  in 2 out 1
+  Earpiece     Earpiece: Off  in 2 out 0
+-- digital (lpass) --
+  AIF1 Playback    AIF1 Playback: On  in 1 out 2
+  I2S RX1          I2S RX1: On  in 1 out 2
+  RX3 MIX1         RX3 MIX1: On  in 1 out 1
+  RX3 MIX1 INP1    RX3 MIX1 INP1: On  in 1 out 1
+  RX3 INT          RX3 INT: On  in 1 out 1 - R32(0x20) mask 0x4
+  PDM_RX3          PDM_RX3: On  in 1 out 1
+-- analog (wcd) --
+  PDM_RX3          PDM_RX3: On  in 1 out 2
+  SPK DAC          SPK DAC: On  in 1 out 2
+  SPK PA           SPK PA: On  in 1 out 2 - R61874(0xf1b2) mask 0x40
+  SPK_OUT          SPK_OUT: On  in 1 out 2
+  SPKR_CLK         SPKR_CLK: On  in 0 out 0 - R61513(0xf049) mask 0x10
+  RX_BIAS          RX_BIAS: On  in 0 out 0 - R61843(0xf193) mask 0x80
+-- 功放使能脚 GPIO 132 --
+ gpio132 : out high func0 2mA pull down
+
+########## 4. 采集：DAPM 链 ##########
+-- analog (wcd) --
+  MIC BIAS External1     MIC BIAS External1: On  in 0 out 0
+  MIC_BIAS1              MIC_BIAS1: On  in 0 out 0 - R61760(0xf140) mask 0x80
+  PDM_TX                 PDM_TX: On  in 3 out 1
+  PDM Capture            PDM Capture: On  in 3 out 1
+-- digital (lpass) --
+  ADC1                   ADC1: On  in 1 out 1
+  DEC1 MUX               DEC1 MUX: On  in 1 out 1 - R24(0x18) mask 0x1
+  CIC1 MUX               CIC1 MUX: On  in 1 out 1
+  I2S TX1                I2S TX1: On  in 1 out 1
+  AIF1 Capture           AIF1 Capture: On  in 1 out 1
+
+########## 5. 关键控件的原始名（cset 要用这个，不是 scontrols 显示的简化名）##########
+numid=47,iface=MIXER,name='ADC1 Volume'
+numid=77,iface=MIXER,name='ADC2 MUX'
+numid=48,iface=MIXER,name='ADC2 Volume'
+numid=67,iface=MIXER,name='DEC1 MUX'
+numid=71,iface=MIXER,name='EAR_S'
+numid=53,iface=MIXER,name='Earpiece Switch'
+numid=52,iface=MIXER,name='Ext Spk Switch'
+numid=151,iface=MIXER,name='PRI_MI2S_RX Audio Mixer MultiMedia1'
+numid=3,iface=MIXER,name='RX3 Digital Volume'
+numid=74,iface=MIXER,name='SPK DAC Switch'
+
+########## 6. alsaucm 的 _dev 设不上（已知问题）##########
+alsaucm: error failed to set _dev=Speaker: Invalid argument
+  0: Speaker
+    Internal speaker (external amplifier on GPIO 132)
+  1: Earpiece
+    Earpiece (WCD EAR, driven directly, no external amplifier)
+  2: Mic
+    Built-in microphone (AMIC2 -> ADC2 -> DEC1 -> MultiMedia2)
