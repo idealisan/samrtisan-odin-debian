@@ -1,0 +1,6 @@
+[submodule "ext/smartisan-kernel"]
+	path = ext/smartisan-kernel
+	url = https://github.com/SmartisanTech/SmartisanOS_Kernel_Source.git
+[submodule "ext/lk2nd"]
+	path = ext/lk2nd
+	url = https://github.com/msm8916-mainline/lk2nd.git

@@ -24,16 +24,29 @@
 # 产出的内核会缺某个驱动，而编译阶段完全看不出来。
 set -uo pipefail
 
-KDIR=${1:?用法: apply-patches.sh <内核树> <补丁目录>}
-PDIR=${2:?用法: apply-patches.sh <内核树> <补丁目录>}
+KDIR=${1:?用法: apply-patches.sh <内核树> <补丁目录> [只打哪些补丁的 glob，如 "0007-*"]}
+PDIR=${2:?用法: apply-patches.sh <内核树> <补丁目录> [只打哪些补丁的 glob，如 "0007-*"]}
+# 第三个参数是**可选过滤器**：只打匹配的那几个补丁。dtb 只需要设备树补丁 0007，
+# 用它就能和 kernel 走同一套幂等逻辑、共用同一棵内核树 —— 不必再为了"0007 被
+# 打两次"而维护两棵树。省略即打全部，向后兼容。
+FILTER=${3:-'*'}
 
-[ -d "$KDIR" ] || { echo "[patches] 内核树不存在: $KDIR" >&2; exit 1; }
-[ -d "$PDIR" ] || { echo "[patches] 补丁目录不存在: $PDIR" >&2; exit 1; }
+# 先转成绝对路径再用：下面会 cd 到内核树，届时相对路径会指到别处去 —— 实测传
+# `patches` 这种相对路径时，`ls patches/*.patch` 在 cd 之后匹配不到任何东西，
+# 循环一次都不跑，于是 rc=0 安然退出、一个补丁都没打。这正是本脚本最不能犯的错：
+# 静默跳过一个没打上的补丁，编出来的内核缺驱动，而编译阶段完全看不出来。
+KDIR=$(cd "$KDIR" 2>/dev/null && pwd) || { echo "[patches] 内核树不存在: ${1}" >&2; exit 1; }
+PDIR=$(cd "$PDIR" 2>/dev/null && pwd) || { echo "[patches] 补丁目录不存在: ${2}" >&2; exit 1; }
+[ -n "$KDIR" ] || { echo "[patches] 内核树不存在: ${1}" >&2; exit 1; }
+[ -n "$PDIR" ] || { echo "[patches] 补丁目录不存在: ${2}" >&2; exit 1; }
 
 cd "$KDIR" || exit 1
 
+# 过滤器必须至少匹配到一个补丁。匹配不到就报错，不要"一个都没打还假装成功"。
 rc=0
-for p in $(ls "$PDIR"/*.patch 2>/dev/null | sort); do
+matched=0
+for p in $(ls "$PDIR"/$FILTER.patch 2>/dev/null | sort); do
+	matched=$((matched + 1))
 	name=$(basename "$p")
 	if git apply --check --reverse "$p" 2>/dev/null; then
 		echo "[patches]   $name —— 已打过，跳过"
@@ -60,5 +73,16 @@ for p in $(ls "$PDIR"/*.patch 2>/dev/null | sort); do
 		rc=1
 	fi
 done
+
+# 一个都没匹配到 = 过滤器写错（或补丁目录不对）。这种情况必须炸：否则循环一次都
+# 不跑、rc=0，构建会拿着一棵没打补丁的树往下走。
+# 注意：变量后面紧跟中文时一定要用 ${} 包住，否则 bash 会把后面的多字节字符当成
+# 变量名的一部分（`PDIR）: unbound variable` 就是这么来的）。
+if [ "$matched" -eq 0 ]; then
+	echo "[patches]   ❌ 没有匹配到任何补丁" >&2
+	echo "[patches]      过滤器 = ${FILTER}" >&2
+	echo "[patches]      目录   = ${PDIR}" >&2
+	exit 1
+fi
 
 exit $rc

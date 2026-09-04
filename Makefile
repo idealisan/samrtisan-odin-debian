@@ -105,9 +105,15 @@ DTB_NAMES := msm8953-smartisan-odin \
 # make 会认为源码已取过、直接跳过 fetch ⇒ 补丁打进一个不存在的目录，
 # 报错是 `cd: /xxx: No such file or directory`，离真因有十万八千里。
 #
-# CI 上只有一棵树，永远不会遇到；本地必须给 dtb 与 kernel 各用一棵树
-# （dtb 只打 0007，kernel 打全部补丁，共用一棵会撞"0007 已应用"），
-# 这个坑是必然踩到的。见 docs/05 第一节。
+# 【历史】这里原本还写着"本地必须给 dtb 与 kernel 各用一棵树"，理由是
+#   dtb 只打 0007、kernel 打全部补丁，共用一棵会撞"0007 已应用"。
+# 2026-09-04 复盘：那不是需求，是 workaround —— 冲突的唯一来源是 dtb 阶段用了裸
+#   `patch --forward`（遇到已应用返回 1），而 kernel 阶段用的 apply-patches.sh 早
+#   就幂等了。把 dtb 也改成走 apply-patches.sh（传 '0007-*' 过滤）之后，同一棵树
+#   反复打补丁是安全的，两棵树不再需要：
+#     · 本地不必再复制一份上千兆的内核树
+#     · 也不会出现"那边打了这边没打"的状态漂移
+# 现在一个 KDIR 就够，戳文件照旧按绝对路径区分（换树自动失效的设计仍然有用）。
 KDIR_TAG := $(subst /,_,$(abspath $(KDIR)))
 
 .PHONY: all help print-config fetch-kernel dtb kernel lk2nd \
@@ -150,8 +156,15 @@ $(STAMPS)/fetch-$(KDIR_TAG): | $(STAMPS)
 	@mkdir -p $(STAMPS) && touch $@
 
 # ================================================================ 设备树
-# DTB 只依赖 0007（设备树）；0001-0006/0008 是驱动，编 DTB 用不到，
-# 少打几个补丁就少几个失配点。
+# DTB 在编译上只依赖 0007（设备树）；0001-0006/0008 是驱动，编 DTB 用不到。
+#
+# 但**打补丁这件事统一走 apply-patches.sh**，只把过滤条件设成 0007 —— 而不是
+# 另写一段裸 `patch --forward`。这一点很要紧：裸 patch 遇到"已应用"会返回 1，
+# 于是 kernel 阶段再打一次 0007 就失败 —— 本仓库曾因此要求 dtb / kernel 各用
+# 一棵独立内核树（见 WORKLOG 2026-09-01）。两棵树是 workaround，不是需求：
+#   · 复制一份上千兆的内核树，本地构建白白多占一倍空间
+#   · 两棵树的补丁状态会各自漂移，出现"这边打了那边没打"的诡异问题
+# 统一走幂等脚本后，dtb 与 kernel 共用同一棵树即可，重复调用是安全的。
 dtb: $(STAMPS)/dtb-$(KDIR_TAG)
 $(STAMPS)/dtb-$(KDIR_TAG): | $(STAMPS) fetch-kernel
 	@mkdir -p $(DTB_OUT)
@@ -160,13 +173,8 @@ $(STAMPS)/dtb-$(KDIR_TAG): | $(STAMPS) fetch-kernel
 		[ -s "$(DTB_OUT)/msm8953-smartisan-odin-ft8716.dtb" ]; then \
 		echo "[dtb] 命中产物缓存，跳过预处理与 dtc"; \
 	else \
-		echo "[dtb] 应用设备树补丁 0007"; \
-		if [ ! -f "$(KDIR)/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts" ]; then \
-			cd "$(KDIR)" && patch -p1 --forward --no-backup-if-mismatch \
-				< $(firstword $(wildcard $(REPO)/patches/0007-*.patch)); \
-		else \
-			echo "[dtb]   已打过，跳过"; \
-		fi; \
+		echo "[dtb] 应用设备树补丁 0007（幂等）"; \
+		bash $(REPO)/tools/ci/apply-patches.sh "$(KDIR)" "$(REPO)/patches" '0007-*'; \
 		echo "[dtb] 编译四个 DTB"; \
 		KDIR="$(KDIR)" bash $(REPO)/dts/build-dtb.sh && \
 		cp -f $(addprefix $(REPO)/dts/,$(addsuffix .dtb,$(DTB_NAMES))) $(DTB_OUT)/; \
