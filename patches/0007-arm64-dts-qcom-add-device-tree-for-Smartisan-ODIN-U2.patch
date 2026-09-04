@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,704 @@
+@@ -0,0 +1,728 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -633,8 +633,32 @@ index 000000000..3dc8f434d
 +	status = "okay";
 +};
 +
++/*
++ * 麦克风偏置 —— 官方 `u3-p1-msm8953-special-odin-audio.dtsi` 给的：
++ *     &pm8953_diangu_dig { qcom,cdc-micbias-cfilt-mv = <2700000>; }   /* 2.7V *\/
++ *     &int_codec        { qcom,msm-micbias2-ext-cap; ... }
++ *
++ * 主线 `sound/soc/codecs/msm8916-wcd-analog.c` 认的属性名不同，要换算：
++ *     qcom,cdc-micbias-cfilt-mv (uV)  →  qcom,micbias-lvl (mV)：2700000 uV = 2700
++ *     qcom,msm-micbias2-ext-cap       →  qcom,micbias2-ext-cap
++ * 都写在 &wcd_codec 上（它的 compatible 是 qcom,pm8916-wcd-analog-codec，
++ * 驱动就是 msm8916-wcd-analog.c）。见
++ * Documentation/devicetree/bindings/sound/qcom,pm8916-wcd-analog-codec.yaml。
++ *
++ * 另外几条官方参数主线没有对应，不建模：
++ *   - qcom,msm-hs-micbias-type = "external"：主线的 micbias 供电由
++ *     MIC BIAS External1/2 在 audio-routing 里表达，没有这个属性。
++ *   - qcom,msm-mbhc-hphl-swh / qcom,cdc-us-euro-gpios（GPIO 128，US/EURO
++ *     耳机检测）：主线没有 us-euro 切换。主线有
++ *     qcom,hphl-jack-type-normally-open 与 qcom,gnd-jack-type-normally-open，
++ *     但**极性没有官方依据**，不乱猜 —— 等实测耳机插拔行为再定。
++ *   - 官方 &int_codec 那一大组 pinctrl（cdc_pdm_lines_*）是下游 PDM 引脚专用，
++ *     主线不走这套。
++ */
 +&wcd_codec {
 +	status = "okay";
++	qcom,micbias2-ext-cap;
++	qcom,micbias-lvl = <2700>;
 +};
 +
 +/*
