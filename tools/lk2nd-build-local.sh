@@ -59,8 +59,8 @@ if [ "$CLEAN" = 1 ] || [ ! -d "$SRC" ]; then
 	test -f "$SRC/makefile" || { echo "源码副本不完整" >&2; exit 1; }
 fi
 
-date '+[%F %T] 打补丁 0001 0002 0003 0005 0006 0007 0008'
-for p in $(for n in 0001 0002 0003 0005 0006 0007 0008; do ls "$REPO"/lk2nd/$n-*.patch 2>/dev/null; done); do
+date '+[%F %T] 打补丁 0001 0002 0003 0005 0006 0007 0008 0009'
+for p in $(for n in 0001 0002 0003 0005 0006 0007 0008 0009; do ls "$REPO"/lk2nd/$n-*.patch 2>/dev/null; done); do
 	echo "  $(basename "$p")"
 	patch -p1 --forward --no-backup-if-mismatch -d "$SRC" < "$p" || {
 		echo "补丁失败：$p" >&2; exit 1; }

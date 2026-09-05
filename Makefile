@@ -300,14 +300,14 @@ $(STAMPS)/lk2nd: | $(STAMPS)
 	@echo "[lk2nd]   子模块 HEAD = $$(git -C "$(LK2ND_SRC_EXT)" rev-parse --short HEAD) ($$(git -C "$(LK2ND_SRC_EXT)" describe --tags 2>/dev/null))"
 	cp -a $(LK2ND_SRC_EXT)/. "$(LK2ND_SRC)"/
 	test -f "$(LK2ND_SRC)/makefile"
-	@echo "[lk2nd] 打补丁 0001 0002 0003 0005 0006 0007 0008"
+	@echo "[lk2nd] 打补丁 0001 0002 0003 0005 0006 0007 0008 0009"
 	@#
 	@# 0005（只读 ext4 extents）、0006（放行 metadata_csum）、0007（引导失败进 fastboot）、
-	@# 0008（按键）放在这一组、而不是 0004 那组：它们**完整版和精简版都要**，
-	@# 所以必须在编完整版之前打上。
+	@# 0008（按键）、0009（菜单默认项改 Continue）放在这一组、而不是 0004 那组：
+	@# 它们**完整版和精简版都要**，所以必须在编完整版之前打上。
 	@# 0004 是"精简版专用"（从 qcdt 表里去掉 markw / rosy），得等完整版编完再打。
 	@# 两组顺序不能对调。
-	@for p in $(foreach n,0001 0002 0003 0005 0006 0007 0008,$(firstword $(wildcard $(REPO)/lk2nd/$(n)-*.patch))); do \
+	@for p in $(foreach n,0001 0002 0003 0005 0006 0007 0008 0009,$(firstword $(wildcard $(REPO)/lk2nd/$(n)-*.patch))); do \
 		echo "[lk2nd]   $$(basename $$p)"; \
 		patch -p1 --forward --no-backup-if-mismatch -d "$(LK2ND_SRC)" < "$$p"; \
 	done

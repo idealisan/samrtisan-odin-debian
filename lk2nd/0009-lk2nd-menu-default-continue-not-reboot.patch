@@ -1,0 +1,75 @@
+From: Smartisan ODIN mainline porting effort
+Subject: [PATCH 9/9] lk2nd: default the fastboot menu to Continue, not Reboot
+
+The menu initialises `sel = 0`, and index 0 is "Reboot". On this device that
+turns the boot-failure menu into a reset loop.
+
+Observed: after lk2nd reaches fastboot the menu is drawn -- with a
+LK2ND_FORCE_FASTBOOT=1 build the version string is plainly visible on screen --
+and then the board resets. It happens with no key held. That rules out "the
+operator is still holding power" as the trigger.
+
+What fires the action is wait_key() returning a *confirm* key. KEY_POWER has no
+GPIO on this board (the stock tree puts it on the PMIC PON), so
+lk2nd_keys_pressed(KEY_POWER) falls through to target_powerkey() ->
+pm8x41_get_pwrkey_is_pressed(), and that path is not trustworthy here. However
+it is being read, the consequence is what matters: the very first confirm that
+the menu sees runs menu_options[0].action() == opt_reboot == reboot_device(0),
+so the device resets, comes back into fastboot, and does it again. The harder
+you try to rescue it, the faster it loops.
+
+So this does not fix "why is a confirm seen"; it fixes "a stray confirm must not
+reset the board". Defaulting the selection to Continue means the same event only
+retries the boot: lk2nd finds no bootable fs, cmd_continue returns early (see the
+go-to-fastboot patch), and the menu is drawn again. No reset, no lost state --
+the operator keeps a menu in front of them.
+
+The index is behind a named constant so it stays honest if the option array gets
+reordered.
+
+Generated against lk2nd 23.1.
+
+---
+diff --git a/lk2nd/device/menu/menu.c b/lk2nd/device/menu/menu.c
+index 6578757..2aec47b 100644
+--- a/lk2nd/device/menu/menu.c
++++ b/lk2nd/device/menu/menu.c
+@@ -147,6 +147,14 @@ static struct {
+ 	{ " Shutdown ", RED,    opt_shutdown },
+ };
+ 
++/*
++ * 开机进入菜单时默认选中的下标。取 "Continue" 而不是第一项的 "Reboot" ——
++ * 理由见 display_fastboot_menu() 里 sel 的初始化注释。
++ * 改动数组顺序时要同步改这个数。
++ */
++#define MENU_IDX_CONTINUE 1
++#define MENU_SEL_DEFAULT  MENU_IDX_CONTINUE
++
+ #define fbcon_printf_ln(color, y, incr, x...) \
+ 	do { \
+ 		fbcon_printf(color, y, x); \
+@@ -163,7 +171,22 @@ void display_fastboot_menu(void)
+ {
+ 	struct fbcon_config *fb = fbcon_display();
+ 	int y, y_menu, old_scale, incr;
+-	unsigned int sel = 0, i;
++	/*
++	 * 默认选中 "Continue"，**不要**用上游的 0（第一项是 Reboot）。
++	 *
++	 * 这是"菜单亮一下就重启"那个死循环的直接原因：菜单画出来之后 wait_key()
++	 * 会返回一个确认键（实测不用按任何键也会返回 —— KEY_POWER 在这台机器上没有
++	 * 对应的 GPIO，它走 PMIC 的 PON，见 lk2nd/device/keys.c 的 target_powerkey()），
++	 * 于是立刻执行 menu_options[0].action() = opt_reboot → reboot_device(0) →
++	 * 复位 → 再进 fastboot → 再被执行一次 Reboot。
++	 *
++	 * 默认落到 Continue 之后，同一个事件只会"再试一次引导"：lk2nd 找不到可启动 fs
++	 * 时 cmd_continue 直接返回（见补丁 0007），菜单重新画一遍 —— 不复位、不丢状态，
++	 * 操作者眼前始终有一个可用的菜单。
++	 *
++	 * 换句话说：这不是在修"为什么会误触发"，而是在修"误触发的后果不该是复位"。
++	 */
++	unsigned int sel = MENU_SEL_DEFAULT, i;
+ 	bool armv8 = is_scm_armv8_support();
+ 
+ 	if (!fb)
