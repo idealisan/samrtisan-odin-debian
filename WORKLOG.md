@@ -3488,3 +3488,63 @@ lk2nd 自己的会导出 0x80000，原厂的不导出这个分区名。
 
 收获（虽然被上面这些耽误了）：SPEW 那版**持续打印、没有重启** ——
 说明 lk2nd 在扫描阶段**没有崩溃**。上轮列为最可能的"扫描时崩"被排除。
+
+## 2026-09-05（终）lk2nd 重启循环：根因是 oem panel 命令注册用错宏
+
+### 结论：三个问题全部解决，完整流程走通
+
+完整流程（用户要的走法）：
+1. 刷 Linux 系统（userdata）
+2. 让 Linux 无法启动 —— 改名 `/extlinux/extlinux.conf`（系统保留完好）
+3. 重启，**不按任何键**
+
+实测（主机侧，不依赖屏幕）：
+```
+reboot rc=0
+[1s]  已离线
+[4s]  ✅ 自己回来了（离线 4s 后）
+✅     稳住 60 秒没重启
+       lk2nd:version    = 23.1-odin
+       lk2nd:model      = Smartisan U2 Pro (ODIN)
+       lk2nd:compatible = smartisan,odin
+       lk2nd:panel      = qcom,mdss_dsi_ft8716_1080p_video
+       partition-size:lk2nd = 0x80000
+```
+用户同时在屏幕侧确认"没按任何按钮，看着它自动停在了 fastboot 界面"。
+两边独立印证 —— 这是这个项目第一次有可靠证据的自动停机。
+
+### 根因（见提交 f1abcfe）
+
+0003 补丁加 `fastboot oem panel` 时用了 `FASTBOOT_INIT(cmd_oem_panel)`，用错了宏：
+
+    #define FASTBOOT_INIT(func) static void (*_fastboot_init_##func)(void) \
+            __SECTION(".fastboot_init") __USED = (func)
+    // 消费者（app/aboot/fastboot.h:65）
+    for (func = &__fastboot_init_start; func < &__fastboot_init_end; ++func)
+            (*func)();       ← 按 void(*)(void) 调用，不传参数
+
+`cmd_oem_panel` 是 `void (*)(const char*, void*, unsigned)`，类型不匹配。
+跳进去时 r0/r1/r2 没设置，函数却去读 arg/data/sz，读到垃圾 → 崩在
+`aboot_fastboot_register_commands()`。
+
+上游为这个用途准备了 `FASTBOOT_REGISTER(prefix, handlefunc)`（生成 void(void) 包装函数），
+所有 oem 命令都用它，只有我们用了 FASTBOOT_INIT。
+
+**0007 从头到尾都是对的**：`goto fastboot` 确实执行了，屏幕也打出了
+`Reverting to fastboot`，只是下一步注册命令就崩了，轮不到菜单和 USB。
+我前几轮把它判断成"补丁没生效"是错的。
+
+### 定位方法（这次真正管用的）
+
+不是读代码读出来的，是**用屏幕标记二分出来的**。在诊断版 `fastboot:` 之后沿调用序列
+插 INFO 级 dprintf：
+
+    M3(进标签) → M3a(注册命令后) → M3b(partition_dump 后) → M4(进菜单) → M5(返回什么键)
+
+实测最后一行停在 M3，一次就把范围缩到"注册命令那一步"，然后才回头看代码找到那个宏。
+**以后遇到"某个环节之后就没动静了"这类问题，优先用这种二分打点，别先去通读代码。**
+
+### 又一个坑：设备树字符串带 NUL
+
+`/proc/device-tree/chosen/lk2nd,version` 是 `23.1-odin\0`，直接 `cat` 会把后面的
+输出吞掉（表现为"命令没输出"）。要用 `tr '\0' '\n' < 文件`。
