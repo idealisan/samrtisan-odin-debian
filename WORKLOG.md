@@ -3684,3 +3684,61 @@ umount            ✅ 已卸载，sda 上无挂载点
    内联写死，别省这点字符。（同一天踩了三次。）
 3. 记录器踩样：只把 bMaxPower 放进"变化检测"变量却不打印 ⇒ 日志里看不到。
    变化检测和日志输出要用同一份字符串。
+
+## 2026-09-05 v0.9.6-usb-oops（方案 A）真机复测：Oops 不再触发，但暴露一个新问题
+
+### 环境
+
+用 CI 制品重刷（lk2nd + core rootfs），验收 16/16 全过。
+默认启动项 `l0`（完整版，带 OTG 角色切换），dtb 用的是
+`msm8953-smartisan-odin-ft8716.dtb`（**不是** norolesw）。ramoops 确认已加大：
+```
+ramoops: using 0x200000@0x9ff00000, ecc: 0      ← 2 MB（原 1 MB）
+```
+
+### 好消息：方案 A 生效，Oops 不再触发
+
+| 测试 | 之前 | 现在 |
+|---|---|---|
+| 硬盘只读挂载 | 成功后 67 秒掉电 | **成功并稳定** |
+| 连续读 220 MB | 一读就掉 | **正常（31 MB/s），无报错** |
+| 内核 Oops | 每次插拔都触发 | **未触发**（`/sys/fs/pstore/` 全程空 = 从未崩溃） |
+| 拔掉后 USB 网卡 | 不恢复 | **恢复**（PC 侧 en36 拿到 172.16.42.2，ping 通，dnsmasq active） |
+
+另外，之前反复发生、把系统搞坏两次的那个 Oops 现在一次都没出现。
+**这是最重要的进展。**
+
+### 但暴露了一个新问题：usb0 的 sysfs 节点变成悬空符号链接
+
+插回电脑后，同一瞬间对照两个来源，结论相反：
+
+```
+[ -L /sys/class/net/usb0 ] => YES      ← 符号链接还在
+[ -d ] [ -e ] [ -r ]      => NO        ← 但目标不可访问
+ip -o link show usb0      => usb0: <UP,LOWER_UP> state UP   ← netlink 里存在且 up
+
+根因：
+  usb0 -> ../../devices/platform/soc@0/7000000.usb/gadget.0/net/usb0
+  但 /sys/devices/platform/soc@0/7000000.usb/gadget.0/net/  目录已经不存在
+  （gadget.0 目录是 18:36 插回电脑时重建的，可 net/ 子目录没跟着建起来）
+
+⇒ 内核里网络设备还在（netlink 看得到、地址在、网络通），但它的 sysfs 目录已注销。
+```
+
+**对脚本的影响**：`usb0_exists()` 用的是 `[ -d /sys/class/net/usb0 ]`，
+在悬空链接下会误判为"不存在"，于是脚本走"跳过 ip 调用"分支，日志里持续出现
+```
+device: usb0 not present yet, skip ip calls
+device: usb0 10s 内未 up（exists=no），仍尝试启动 dnsmasq（看门狗会重试）
+```
+这次结果侥幸是对的（netlink 里残留的 usb0 还带着地址和 UP 状态，网络实际是通的），
+但**这很脆弱** —— 不能指望每次都这么幸运。
+
+### 下一步
+
+- 这个"sysfs 注销但设备还在"的状态本身要查：是 NCM gadget 在拔插重建时的
+  已知行为，还是另一种竞态。ramoops 现在 2 MB，下次能拿到转储，有条件查。
+- `usb0_exists()` 需要更稳健：现在至少应该把"悬空链接"和"真的不存在"区分开，
+  并且脚本在 usb0 不可用时要有明确的重建动作，而不是只 skip + 靠看门狗重试。
+- 方案 B（修 `rtnl_link_get_size()` / `rtnl_link_get_af_size()` 对 gadget 网卡的竞态）
+  仍是最终方案，等上述查清后做。
