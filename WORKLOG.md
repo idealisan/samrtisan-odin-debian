@@ -3201,3 +3201,40 @@ probe 也不阻止 OTG 尝试。要真禁掉得改驱动侧。
 - 改用 zram（CONFIG_ZRAM=m 已有，实测可用）：不写 eMMC、不碰磁盘（环自动消失）。
   1 GiB 逻辑容量 / 优先级 100 / 可 ODIN_ZRAM_SIZE 覆盖。swappiness 20→80。
   实测重启后 `Swap: 1.0Gi`、服务 `active (exited)`、journal 有记录。
+
+## 2026-09-05 lk2nd 只读 extents 专项完成并刷真机成功（详见 reports/036）
+
+- **结果：引导成功，swap 起来了 4.5 GiB，声音正常。刷机验收 16/16。**
+- 做了什么
+  - `lk2nd/0005`（新补丁，3 文件 +194/−2）：给 ext2 驱动加只读 ext4 extents 支持
+    - ext2_fs.h 补 ext4 常量与结构体（数值按内核 fs/ext4/ext4.h / ext4_extents.h 逐条核对）
+    - ext2.c 补 incompat 门禁（原来完全不检查 —— 遇到不支持特性不会拒绝，而是读文件时
+      用间接块方式解析 extent 树，读出**错误块号**而不是报错，比拒绝更难查
+  - io.c 新增 ext2_extent_lookup()，按 eh_depth 逐层下钻；i_block 未经 endian_swap_inode
+    （那里刻意跳过块指针），字段自己套 LE16/LE32；i_flags 过了 LE32SWAP，是主机序
+  - 顺带修 UB：pos[4] 未初始化 + LTRACEF 读 pos[1..3] ⇒ clang -O1 下 level 变垃圾
+    （本该 0，实测 3），本来能读的文件读不出来。-O0 与 -O1+sanitizer 都正常，是只在
+    特定编译配置现形的 bug。
+  - Makefile：0005 加进**第一组**补丁（它影响完整版和精简版，必须在编完整版之前打上）
+  - build-image.sh：extents 由「关」改「开」，自检改成正向断言
+  - odin-swap.sh 重写：swapfile 4 GiB（优先级 10）撑峰值 + zram 512 MiB（优先级 100）打底
+  - odin-swap.service：改挂 multi-user.target（建 swapfile 依赖 resize2fs，挂在 sysinit 会成环）
+- **宿主机仿真台 `tools/lk2nd-fs-sim`（新，已入库）—— 这个专项最值钱的东西**
+  - lk2nd 的 ext2 驱动只依赖 6 个函数（bio_read + 5 个 bcache_*）和 dprintf ⇒ 能整个搬到
+    宿主机编译。迭代从「刷机 5 分钟 + 变砖风险」变成「本地秒级」，还能做回归与矩阵测试
+  - build.sh 先把补丁打进源码副本再编译 —— **测的就是真正会编进 lk2nd.img 的那份代码**
+  - 矩阵：无 extents / 开 extents × 小文件(167B) / 大文件(30MiB 连续) / 稀疏(64MiB 含洞)
+    三种文件两种配置 fnv1a 校验和**完全相同**；稀疏文件 extent 树 depth=1，索引层下钻被走到
+    16392 次。NOPATCH=1 可复现改前失败做对照
+  - 刷机前用它直接读 CI 产出的真实镜像：新旧镜像的 /extlinux/extlinux.conf 校验和一致
+- 调研时决定工作量的两个发现
+  1. build-image.sh 的 -O **已经关掉了 64bit / metadata_csum / huge_file / dir_nlink /
+     extra_isize**，只差 extents 一个 ⇒ 不用处理 group descriptor 布局变化与校验和
+  2. ext2 驱动挂载时只校验 ro_compat，完全不检查 incompat（见上）
+- 真机：根分区 extents 已开、swapfile fallocate 秒级建成（无 extents 时 fallocate 不可用，
+  只能 dd 写 4 GiB。这也是开 extents 的直接好处）。声卡、扬声器/听筒 DAPM 链都正常，
+  用户听音确认声音正常。
+- 顺手修：刷机验收的「DSI 已使能」会随机失败（SSH 一通就查，DRM 还没 modeset）。改成等最多 20 秒再判。
+- **根分区还剩 5 个 ext4 特性没开**：64bit（lk2nd group desc 按 32 字节读）、metadata_csum
+  （ro_compat 白名单卡住）。huge_file / dir_nlink / extra_isize 影响为零（实测 crtime 都没丢）。
+  唯一有实际收益的后续项是 metadata_csum（lk2nd 只读不需真校验，放开白名单即可，能检测元数据损坏）。
