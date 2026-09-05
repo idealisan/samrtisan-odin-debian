@@ -3269,3 +3269,29 @@ probe 也不阻止 OTG 尝试。要真禁掉得改驱动侧。
 - 另两处描述同步：`docs/01-复现构建.md:275` 的约束表、`tools/lk2nd-fs-sim/test-csum.sh`
   的头部注释（仍把 0006 写成待办）。
 - 重发为 pre-release **v0.9.4-csum-gate**（版本号严格递增，不回头改旧号），run 33940084505。
+
+## 2026-09-05 v0.9.4 正式发布（首启 15min39s → 63s）
+
+- **首启耗时：63 秒**（12:05:57 reboot → 12:07:00 SSH 可达）。修之前 15min39s。
+  `Startup finished in 16.679s (kernel) + 38.427s (userspace) = 55.107s`
+- 阶段 80 验收 **16/16**；`odin-fs-verify.sh` **14/14**。
+- 关键证据：本次启动只挂载过 `mmcblk0p57`（根）与 `mmcblk0p24`（persist，取 WiFi
+  校准数据）——**没有 p53/p54** ⇒ initramfs 找根走的是快路径，没掉暴力扫描。
+- 改了三处（详见提交 f211334）
+  1. 找根第 1 顺位改按 **GPT 分区名 userdata**（读 sysfs PARTNAME），不用读超级块、
+     与 mmcblk0/1 编号无关。原来 findfs 与 devtmpfs 建节点一撞车就掉进扫 57 个
+     分区，而整轮扫描在**一次函数调用里**跑完，把 30s 重试循环钉死 2 分钟。
+  2. 暴力扫分区挪出循环（只在 30s 窗口失败后跑一次）+ `blkid -s TYPE` 筛掉非 ext4
+     ⇒ 真机实测要 mount 的次数 **57 → 5**。
+  3. 三段固件的 remount/sync 合并成一轮；三个 fw 脚本里 `copy_from` 的全局 sync
+     去掉（sync 是全局的，会把根分区所有脏页一起刷，init 抽完统一 sync 一次就够）。
+- **踩坑（判据写糙）**：`odin-fs-verify.sh` 首跑把 p24 persist 当成"退化到暴力扫
+  分区"的证据。其实取 WCNSS 校准数据每次都要挂它。改成按 PARTNAME 排除
+  persist/modem 之后才对。教训：写判据时先问"这个值在正常情况下会是什么"。
+- **踩坑（环境）**：宿主默认 shell 是 zsh，**未加引号的 `$OPTS` 不做词分割**，
+  整串 ssh 选项被当成一个参数传给 ssh，报 "keyword stricthostkeychecking extra
+  arguments at end of line"。脚本是 bash 不受影响，但我手敲命令踩了两次。
+  另：`sshpass` 时灵时不灵（有时走 ssh_askpass 然后 Permission denied），
+  走脚本自己的 `odin_sudo` 通道就稳。
+- 发版：`v0.9.4`（干净三段式，非 Pre-release），CI run 33943856041 排队中。
+  之前一共走过 27 个后缀版，收敛路径写在 Release 说明里。

@@ -1,0 +1,45 @@
+========== odin 根文件系统 / 启动路径验收 ==========
+时间: 2026-09-05 12:00:54
+根设备: /dev/mmcblk0p57
+
+[1m1. ext4 特性位（正反向都验）[0m
+     has_journal ext_attr resize_inode dir_index filetype needs_recovery extent flex_bg sparse_super large_file metadata_csum
+  [32m✅[0m extents 已开（swapfile 的前提）
+  [32m✅[0m metadata_csum 已开
+  [32m✅[0m 64bit 未开（lk2nd 按 32 字节读组描述符）（确无）
+  [32m✅[0m huge_file 未开（确无）
+  [32m✅[0m dir_nlink 未开（确无）
+  [32m✅[0m extra_isize 未开（确无）
+
+[1m2. lk2nd 挂载门禁（位掩码才是真正的门槛，不是特性名清单）[0m
+     s_feature_ro_compat = 0x403（放行 0x403，越界位 0x000）
+  [32m✅[0m lk2nd 会放行（ro_compat 没有越界位）
+
+[1m3. 启动以来的 ext4 报错[0m
+  [32m✅[0m 0 条 EXT4-fs error（校验和全部通过）
+  [32m✅[0m 0 条校验和错误
+
+[1m4. initramfs 找根的路径（有没有退化到暴力扫分区）[0m
+     本次启动挂载过的分区: mmcblk0p24 mmcblk0p57 
+     排除（固件脚本的源分区）: mmcblk0p24 mmcblk0p52
+  [32m✅[0m 除根与固件源分区外没有别的分区被挂载 —— 走的是快路径
+
+[1m5. swap（两级）[0m
+     /dev/zram0 partition 512M   0B  100
+     /swapfile  file        4G   0B   10
+  [32m✅[0m swapfile 在（依赖 extents）
+  [32m✅[0m zram 在（第一级）
+     swap 合计 4607 MiB
+  [32m✅[0m swap 总量 > 4 GiB
+
+[1m6. 启动耗时[0m
+     Startup finished in 16.679s (kernel) + 38.427s (userspace) = 55.107s 
+  [32m✅[0m 总启动 55.107s（< 5 分钟）
+
+[1m7. 块设备编号（仅记录，不作为判据）[0m
+     根设备现在是 /dev/mmcblk0p57
+     （历史上在 mmcblk0 / mmcblk1 之间漂过，两个 SDHCI 控制器注册顺序不稳定；
+       这也是 initramfs 改用 GPT 分区名找根的原因之一）
+
+==============================================
+[32m全部通过：14 项[0m
