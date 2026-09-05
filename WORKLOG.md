@@ -3238,3 +3238,34 @@ probe 也不阻止 OTG 尝试。要真禁掉得改驱动侧。
 - **根分区还剩 5 个 ext4 特性没开**：64bit（lk2nd group desc 按 32 字节读）、metadata_csum
   （ro_compat 白名单卡住）。huge_file / dir_nlink / extra_isize 影响为零（实测 crtime 都没丢）。
   唯一有实际收益的后续项是 metadata_csum（lk2nd 只读不需真校验，放开白名单即可，能检测元数据损坏）。
+
+## 2026-09-05 根分区开 metadata_csum，以及 v0.9.4-csum 的 CI 失败真因
+
+- **CI run 33938156357：dtb / kernel / lk2nd 全过，rootfs（core 与 gui 两条）都失败。
+  镜像本身是对的，是 build-image.sh 的自检把自己判死了。**
+- 失败输出里的自相矛盾是线索：
+
+      extent         OK
+      metadata_csum  OK
+      ro_compat      0x403 (masked 0x400)
+      lk2nd mountable WILL REFUSE
+      e2fsck -fn     clean
+      check_sparse   IDENTICAL
+
+  特性名清单说 metadata_csum OK，位掩码那边又说不行。
+- 真因：build-image.sh 里有**两处**独立判断 lk2nd 能不能挂
+  1. 正向断言 `for want in extent metadata_csum`（特性名清单）—— 上一版 dfebe72 改了
+  2. 一行硬编码位掩码 `MRO=$(( RO & ~3 ))` —— **漏了**
+  `~3` 只放行 sparse_super(0x1) 与 large_file(0x2)，正好挡掉新放行的 metadata_csum(0x400)。
+  0x403 是补丁 0006 之后的**期望**组合。
+- 修法：`~3` 换成按位命名的 `RO_ALLOWED = 0x1|0x2|0x400`，与 lk2nd 0006 的
+  `EXT2_FEATURE_RO_COMPAT_SUPP_READONLY` 对齐；并把这条教训写进注释。
+- **踩坑：同一件事在两个地方判断，改一处漏一处。** 而且这两处性质不同——特性名清单
+  是给人看的描述，位掩码才是 lk2nd 真正的挂载门槛。描述改了、门槛没改，表现就是
+  "明明都 OK 却判失败"，比直接报错难查。
+- 宿主机按位核对（tmp/audio/verify-mask.sh）：0x403 → masked 0x0 放行；
+  反向回归 huge_file(0x08) / dir_nlink(0x20) / extra_isize(0x40) 全部仍 WILL REFUSE；
+  边界 0x003 仍 OK。
+- 另两处描述同步：`docs/01-复现构建.md:275` 的约束表、`tools/lk2nd-fs-sim/test-csum.sh`
+  的头部注释（仍把 0006 写成待办）。
+- 重发为 pre-release **v0.9.4-csum-gate**（版本号严格递增，不回头改旧号），run 33940084505。
