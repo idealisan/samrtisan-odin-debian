@@ -106,10 +106,13 @@ U 盘插入 → udev(99-odin-automount.rules) → odin-automount.sh
 > 只认 `--options=`。所以光写 `TAG+="systemd"` 不会挂载，且选项必须走命令行。
 > 详见 `reports/017` 与 `WORKLOG.md`。
 
-关于 FAT32 中文：内核未编 `CONFIG_NLS_UTF8`（不为它重编内核模块），FAT32 默认按
-`iso8859-1` 解释文件名 ⇒ **中文名会乱码**。exFAT / NTFS3 走内核内建 UTF-16 转换
-（`fs/exfat/super.c:691-697`，不走 `load_nls`），中文正常。**需要中文名的盘请用
-exFAT 或 NTFS。**
+关于 FAT32 中文：**已解决（2026-09-06），不需要 `CONFIG_NLS_UTF8`，也不用重编内核**。
+关键是别写 `iocharset=utf8`（vfat 会在 `load_nls()` 里找 `nls_utf8`，找不到就挂载失败），
+正确写法是 **`utf8=1`**：名字转换改走 `utf16s_to_utf8s()`（在 `fs/nls/nls_base.c`，
+只要 `CONFIG_NLS=y` 就编进去），`iocharset` 仍用默认的 `iso8859-1`（本镜像 `=y`）。
+`odin-mount-opts.sh` 对 vfat 已默认带上它。
+exFAT / NTFS3 走内核内建 UTF-16 转换（`fs/exfat/super.c:696-706`，不走 `load_nls`），
+中文一直正常。
 
 ## 四、刷机包与用户态组件
 
@@ -238,7 +241,7 @@ sudo sed -i 's/^default .*/default l0/' /extlinux/extlinux.conf && sudo reboot
 
 | # | 决策 | 选择 |
 |---|---|---|
-| 1 | 阶段 2（UTF-8） | **放弃 FAT32 中文，不做 `nls_utf8`**；以 exFAT / NTFS 为主力 |
+| 1 | 阶段 2（UTF-8） | ~~放弃 FAT32 中文，不做 `nls_utf8`~~ → **2026-09-06 撤销**：用 `utf8=1` 就够（走 `fs/nls/nls_base.c` 的 `utf16s_to_utf8s`，与 `CONFIG_NLS_UTF8` 无关），**不重编内核、不改配置**即可支持 FAT32 中文名 |
 | 2 | 自动挂载方案 | **systemd mount unit**（不装 udisks2） |
 | 3 | 默认引导 label | 2026-08-30：**接受没有 OTG**，`l0-safe` 作为 default（当时 SSH 是唯一生命线）→ **2026-09-03 晚改回 `l0`**：WiFi 已打通，SSH 不再只依赖 usb0，而 `l0-safe` 是原理上不支持 OTG，留着它就永远用不了外接 USB 设备 |
 

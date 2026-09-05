@@ -5,8 +5,9 @@
 #       不含 KEY= 前缀 —— 由 odin-automount.sh 取用后传给 systemd-mount --options=
 #
 # 各文件系统能接受的选项（实测差异，写错会直接挂载失败）：
-#   vfat   : uid= gid= fmask= dmask= iocharset=
-#   exfat  : uid= gid= fmask= dmask=         ← **不支持 iocharset**，给了会报错
+#   vfat   : uid= gid= fmask= dmask= utf8= iocharset=（iocharset 别给 utf8，见下）
+#   msdos  : 同上但没有长文件名，utf8= 无意义
+#   exfat  : uid= gid= fmask= dmask= iocharset=（默认已是 utf8，不用给）
 #   ntfs3  : uid= gid= umask= iocharset=
 #   ntfs   : 同上（走 mount.ntfs → ntfs-3g，FUSE）
 #   ext4/btrfs/xfs/f2fs : 只有 POSIX 权限，给 uid= 会被拒绝 → 仅 noatime
@@ -15,16 +16,29 @@
 # SYSTEMD_MOUNT_OPTIONS 环境变量（实测挂出来是默认选项），必须用 --options= 传。
 # 所以这里输出纯字符串，由调用方拼进 --options=。
 #
-# 关于 iocharset：本镜像内核 CONFIG_NLS_UTF8 未编译（用户决策：不为 FAT32
-# 中文重编内核模块），vfat 默认按 iso8859-1 解释文件名 ⇒ 中文名会乱码。
-# exFAT / NTFS3 走内核内建 UTF-16 转换（fs/exfat/super.c:691-697 不调用
-# load_nls），不依赖 nls_utf8，中文正常。需要中文名的盘请用这两种格式。
+# 关于中文文件名（FAT32 这条已修好，2026-09-06）：
+#   FAT32 上 **不能用 iocharset=utf8** —— fs/fat/inode.c 会警告
+#   "utf8 is not a recommended IO charset"，而且在 vfat 上仍要走
+#   load_nls(iocharset)，缺 nls_utf8 就挂载失败（"IO charset utf8 not found"）。
+#   正确的写法是 **utf8=1**：它把 opts->utf8 置 1，名字转换改走
+#   utf16s_to_utf8s() / utf8s_to_utf16s()（fs/nls/nls_base.c，**只要 CONFIG_NLS=y
+#   就编进去**，与 CONFIG_NLS_UTF8 无关），iocharset 仍用默认值 iso8859-1。
+#   本镜像 CONFIG_NLS=y、CONFIG_NLS_ISO8859_1=y、CONFIG_NLS_CODEPAGE_437=y
+#   且 CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1" ⇒ utf8=1 **不需要重编内核**，
+#   load_nls("cp437") 与 load_nls("iso8859-1") 都能拿到。
+#   副作用只有一个：大小写比较仍走 nls_strnicmp(nls_io=iso8859-1)，
+#   即 **ASCII 仍不区分大小写、非 ASCII 不折叠** —— 对中文名无影响。
+#   exFAT / NTFS3 走内核内建 UTF-16 转换，不依赖 nls_utf8，中文一直正常。
 
 fstype="${1:-}"
 uid="${ODIN_MOUNT_UID:-1000}"
 
 case "$fstype" in
-	vfat|msdos)
+	vfat)
+		echo "noatime,uid=$uid,gid=$uid,fmask=0133,dmask=0022,utf8=1"
+		;;
+	msdos)
+		# msdos 没有长文件名，utf8 对它没意义，别给
 		echo "noatime,uid=$uid,gid=$uid,fmask=0133,dmask=0022"
 		;;
 	exfat)
