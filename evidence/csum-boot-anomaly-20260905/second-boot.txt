@@ -1,0 +1,58 @@
+Warning: Permanently added '172.16.42.1' (ED25519) to the list of known hosts.
+########## 第二次启动（同一次刷机后，单纯 reboot）##########
+采集时间(设备): 2026-09-05 11:14:21
+
+########## 耗时 ##########
+Startup finished in 5.400s (kernel) + 43.139s (userspace) = 48.539s 
+graphical.target reached after 43.096s in userspace.
+
+########## blame 前 15 ##########
+17.118s odin-adsp-fw.service
+15.406s dev-mmcblk0p57.device
+14.649s odin-swap.service
+12.302s systemd-resolved.service
+ 6.048s systemd-timesyncd.service
+ 4.533s systemd-modules-load.service
+ 3.549s dbus.service
+ 3.326s e2scrub_reap.service
+ 3.026s systemd-udev-trigger.service
+ 2.207s systemd-fsck-root.service
+ 1.776s systemd-udevd.service
+ 1.752s dev-hugepages.mount
+ 1.730s dev-mqueue.mount
+ 1.705s sys-kernel-debug.mount
+ 1.655s sys-kernel-tracing.mount
+
+########## critical-chain ##########
+The time when unit became active or started is printed after the "@" character.
+The time the unit took to start is printed after the "+" character.
+
+graphical.target @43.096s
+└─multi-user.target @43.095s
+  └─odin-adsp-fw.service @25.975s +17.118s
+    └─basic.target @23.373s
+      └─sockets.target @23.332s
+        └─dbus.socket @23.301s
+          └─sysinit.target @22.914s
+            └─systemd-backlight@backlight:backlight.service @28.975s +71ms
+              └─system-systemd\x2dbacklight.slice @28.877s
+                └─system.slice @2.515s
+                  └─-.slice @2.514s
+
+########## 关键：这次挂了哪些 ext4（有没有扫分区）##########
+[Sat Sep  5 11:12:34 2026] EXT4-fs (mmcblk0p57): mounted filesystem 853d755c-e870-4270-b905-674526ddedf2 ro with ordered data mode. Quota mode: none.
+[Sat Sep  5 11:12:42 2026] EXT4-fs (mmcblk0p57): re-mounted 853d755c-e870-4270-b905-674526ddedf2 r/w.
+
+########## 根设备 / 特性 / swap ##########
+/dev/mmcblk0p57
+Filesystem features:      has_journal ext_attr resize_inode dir_index filetype needs_recovery extent flex_bg sparse_super large_file metadata_csum
+NAME       TYPE      SIZE USED PRIO
+/dev/zram0 partition 512M   0B  100
+/swapfile  file        4G   0B   10
+
+########## ext4 错误计数 ##########
+0
+
+########## 块设备号 ##########
+brw-rw---- 1 root disk 179, 32 Sep  5 11:12 /dev/mmcblk0boot0
+brw-rw---- 1 root disk 259, 25 Sep  5 11:12 /dev/mmcblk0p57
