@@ -1,0 +1,130 @@
+From: Smartisan ODIN mainline porting effort
+Subject: [PATCH 7/8] lk2nd: go to fastboot instead of booting the stale android image
+
+When lk2nd fails to boot from any file system it currently just logs
+"Reverting to android boot." and returns, letting aboot fall through to
+boot_linux_from_mmc().
+
+On ODIN that fallback is harmful. The 'boot' partition still carries the
+stock android boot images -- measured on the running device, there are
+four ANDROID! headers in /dev/mmcblk0p21, at byte offsets 0, 271236,
+524288 and 787184. One of them gets booted, finds no system partition and
+resets; lk2nd then runs again and repeats. The device reboot-loops until
+someone holds power+vol-down, which makes the flash/debug cycle impossible
+to automate.
+
+Fix it in three places:
+
+- lk2nd/boot/boot.c: set boot_into_fastboot once we fall off the end of
+  lk2nd_scan_devices(). Reaching that point already means nothing was
+  booted -- a successful boot jumps into the kernel and never returns --
+  so no return value needs to be threaded through.
+
+- app/aboot/aboot.c (normal_boot): re-check boot_into_fastboot right after
+  lk2nd_boot() and jump to the fastboot label. The existing check happens
+  *before* lk2nd_boot() runs, so without this the flag would be ignored
+  and we would still fall through to the android image.
+
+- app/aboot/aboot.c (cmd_continue): same story for the "Continue" menu
+  entry. It calls lk2nd_boot() and then unconditionally
+  boot_linux_from_mmc(); without this, picking "Continue" from the menu
+  with no bootable fs would boot the stale image and loop.
+
+History: this change existed briefly as 0005 but was dropped in b9b5899
+when the tree moved to lk2nd 21.0, and was never restored when we went
+back to 23.1 -- which is why the reboot loop came back. The 0005 slot has
+since been taken by the ext4 extents patch, so this is 0007.
+
+Generated against lk2nd 23.1.
+
+---
+diff --git a/app/aboot/aboot.c b/app/aboot/aboot.c
+index b44a5c2..9196f2d 100644
+--- a/app/aboot/aboot.c
++++ b/app/aboot/aboot.c
+@@ -4672,6 +4672,14 @@ void cmd_continue(const char *arg, void *data, unsigned sz)
+ #if WITH_LK2ND_BOOT
+ 		if (!boot_into_recovery)
+ 			lk2nd_boot();
++
++		/*
++		 * 菜单里的 "Continue" 也走这条：lk2nd 没引导起任何东西时，
++		 * 同样别去引导 boot 分区里残留的原厂 Android 镜像（理由见
++		 * lk2nd/boot/boot.c）。直接返回，fastboot 主循环会重新显示菜单。
++		 */
++		if (boot_into_fastboot)
++			return;
+ #endif
+ 		boot_linux_from_mmc();
+ 	}
+@@ -5655,6 +5663,18 @@ normal_boot:
+ #if WITH_LK2ND_BOOT
+ 		if (!boot_into_recovery)
+ 			lk2nd_boot();
++
++		/*
++		 * lk2nd 没能从任何文件系统引导起来时会置 boot_into_fastboot
++		 * （见 lk2nd/boot/boot.c 的 lk2nd_scan_devices() 末尾）。
++		 *
++		 * 这里的重新判断**不能省**：外面那个 if (!boot_into_fastboot)
++		 * 在 lk2nd_boot() **之前**就判过了，不重判就会继续往下走，
++		 * 去引导 boot 分区里残留的原厂 Android 镜像 —— 它起不来就复位，
++		 * 于是设备在 lk2nd 与那个镜像之间反复重启。
++		 */
++		if (boot_into_fastboot)
++			goto fastboot;
+ #endif
+ 
+ 		if (target_is_emmc_boot())
+diff --git a/lk2nd/boot/boot.c b/lk2nd/boot/boot.c
+index 7f37c61..769d697 100644
+--- a/lk2nd/boot/boot.c
++++ b/lk2nd/boot/boot.c
+@@ -5,6 +5,7 @@
+ #include <lib/bio.h>
+ #include <lib/fs.h>
+ #include <list.h>
++#include <stdbool.h>
+ #include <stdlib.h>
+ #include <target.h>
+ 
+@@ -13,6 +14,14 @@
+ 
+ #include "boot.h"
+ 
++/*
++ * aboot.c 里的全局标志（app/aboot/aboot.c 顶部 `bool boot_into_fastboot`）。
++ * lk2nd 没能从任何文件系统引导起来时置位，让 aboot 直接进 fastboot，
++ * 而不是回退去引导 boot 分区里残留的原厂 Android 镜像。
++ * 说明见下面 lk2nd_scan_devices() 的末尾。
++ */
++extern bool boot_into_fastboot;
++
+ #ifndef LK2ND_BOOT_MIN_SIZE
+ #define LK2ND_BOOT_MIN_SIZE (16 * 1024 * 1024)
+ #endif
+@@ -60,7 +69,23 @@ static void lk2nd_scan_devices(void)
+ 		lk2nd_try_extlinux(mountpoint);
+ 	}
+ 
+-	dprintf(INFO, "boot: Bootable file system not found. Reverting to android boot.\n");
++	/*
++	 * 能走到这里，就意味着**什么都没引导起来** —— 引导成功是要跳进内核的，
++	 * 不会返回。
++	 *
++	 * 上游的默认行为是打一行日志就返回，让 aboot 继续去引导 boot 分区里的
++	 * Android 镜像。在 ODIN 上这条回退是**有害的**：实测 boot 分区
++	 * （/dev/mmcblk0p21）里现在还留着 4 个原厂 ANDROID! 镜像，偏移分别在
++	 * 0 / 271236 / 524288 / 787184。boot_linux_from_mmc() 会真的把其中一个
++	 * 引导起来，那个原厂内核找不到 system 分区就复位 —— 于是设备在
++	 * "lk2nd 亮屏 → 原厂安卓内核 → 复位"之间反复重启，只能人工按住电源键
++	 * 打断，整个刷机/调试流程没法自动跑完。
++	 *
++	 * 改为置 boot_into_fastboot，由 aboot 跳到 fastboot 标签
++	 * （见 app/aboot/aboot.c 里 lk2nd_boot() 之后那个判断）。
++	 */
++	dprintf(INFO, "boot: Bootable file system not found. Reverting to fastboot.\n");
++	boot_into_fastboot = true;
+ }
+ 
+ /**

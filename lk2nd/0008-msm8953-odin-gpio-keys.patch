@@ -1,0 +1,127 @@
+From: Smartisan ODIN mainline porting effort
+Subject: [PATCH 8/8] msm8953: odin: wire up the three physical buttons
+
+The buttons did not behave: volume-up moved the selection the wrong way,
+volume-down did nothing at all and the power key did nothing either.
+
+Root cause: lk2nd only consults its device-tree gpio-keys override if the
+DT actually has one (lk2nd/device/keys.c, LK2ND_DEVICE_INIT("gpio-keys")).
+ODIN's device entry had none, so every lookup fell through to the target
+defaults in target/msm8953/init.c:
+
+  volume up   -> GPIO 85                    (works)
+  volume down -> pm8x41_resin_status()      (PMIC RESIN)
+  power       -> pm8x41_get_pwrkey_is_pressed() (PMIC PON bit0)
+  home        -> no fallback at all, always false
+
+The stock device tree settles it. From
+arch/arm64/boot/dts/qcom/u3-p1-msm8953-key-odin.dtsi:
+
+    gpio_keys {
+        compatible = "gpio-keys";
+        vol_up   { gpios = <&tlmm 85 0x1>; linux,code = <115>; };
+        vol_down { gpios = <&tlmm 86 0x1>; linux,code = <114>; };
+        key_home { gpios = <&tlmm 87 0x1>; linux,code = <102>; };
+    };
+
+  and, crucially, the RESIN PON source is disabled there:
+
+    qcom,pon_2 { qcom,pon-type = <1>; ...; status = "disable"; };
+
+All three buttons are plain TLMM GPIOs, active low. Volume down is *not*
+RESIN, and RESIN is explicitly off -- so pm8x41_resin_status() can only
+ever read 0, which is exactly why volume-down did nothing.
+
+Fix: add the gpio-keys node with lk2nd,code for GPIO 85/86/87, so the early
+return in lk2nd_keys_pressed() is taken and the RESIN path is never used.
+
+Mind the keycode namespace: lk2nd uses its own
+(dt-bindings/lk2nd/key-codes.h) -- KEY_VOLUMEUP 0x115, KEY_VOLUMEDOWN
+0x116, KEY_HOME 0x122. These are *not* the Linux 115/114/102 from the stock
+tree; copying linux,code verbatim would silently map the wrong keys.
+
+On top of that, accept KEY_HOME as a confirm key in the fastboot menu.
+Upstream only handles KEY_POWER there, and POWER on this device goes
+through the PMIC and is unreliable, whereas the physical Home button is a
+plain GPIO that we can already read. This guarantees a working way to
+actually pick a menu entry.
+
+Generated against lk2nd 23.1.
+
+---
+diff --git a/lk2nd/device/dts/msm8953/msm8953-smartisan-odin.dts b/lk2nd/device/dts/msm8953/msm8953-smartisan-odin.dts
+index 690abb3..cffb576 100644
+--- a/lk2nd/device/dts/msm8953/msm8953-smartisan-odin.dts
++++ b/lk2nd/device/dts/msm8953/msm8953-smartisan-odin.dts
+@@ -16,6 +16,49 @@
+ 
+ 	lk2nd,dtb-files = "msm8953-smartisan-odin";
+ 
++	/*
++	 * 按键：三个实体键全是 GPIO，不是 PMIC 的 PON。
++	 *
++	 * 不加这一段时 lk2nd 会退回 target/msm8953/init.c 的默认实现：
++	 *   - 音量上 = GPIO 85            → 能用
++	 *   - 音量下 = pm8x41_resin_status() 读 PMIC RESIN
++	 *   - 电源   = pm8x41_get_pwrkey_is_pressed() 读 PON bit0
++	 *   - Home   = 根本没有对应的 fallback，恒为未按下
++	 *
++	 * 而原厂设备树
++	 *   arch/arm64/boot/dts/qcom/u3-p1-msm8953-key-odin.dtsi
++	 * 写得很清楚：这台机器三个键都在 TLMM 上，且原厂**显式 disable 了 RESIN**
++	 * （pon_2 status = "disable"）：
++	 *     vol_up   gpios = <&tlmm 85 0x1>  linux,code = <115>
++	 *     vol_down gpios = <&tlmm 86 0x1>  linux,code = <114>
++	 *     key_home gpios = <&tlmm 87 0x1>  linux,code = <102>
++	 * 所以读 RESIN 必然恒为 0，音量下键必然毫无反应。
++	 *
++	 * 0x1 是 GPIO_ACTIVE_LOW（低电平=按下），这里再加 PULL_UP。
++	 *
++	 * 注意键码用 **LK 自己的** 命名空间（dt-bindings/lk2nd/key-codes.h）：
++	 * KEY_VOLUMEUP=0x115 / KEY_VOLUMEDOWN=0x116 / KEY_HOME=0x122，
++	 * 和 Linux 那套 115/114/102 不是一回事，别照抄原厂的 linux,code。
++	 */
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		vol_up {
++			lk2nd,code = <KEY_VOLUMEUP>;
++			gpios = <&tlmm 85 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
++		};
++
++		vol_down {
++			lk2nd,code = <KEY_VOLUMEDOWN>;
++			gpios = <&tlmm 86 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
++		};
++
++		home {
++			lk2nd,code = <KEY_HOME>;
++			gpios = <&tlmm 87 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
++		};
++	};
++
+ 	panel {
+ 		compatible = "smartisan,odin-panel", "lk2nd,panel";
+ 
+diff --git a/lk2nd/device/menu/menu.c b/lk2nd/device/menu/menu.c
+index 28ab377..6578757 100644
+--- a/lk2nd/device/menu/menu.c
++++ b/lk2nd/device/menu/menu.c
+@@ -260,7 +260,17 @@ void display_fastboot_menu(void)
+ 		fbcon_flush();
+ 
+ 		switch (wait_key()) {
++		/*
++		 * HOME 与 POWER 都当"确认"。
++		 *
++		 * 上游只认 POWER。但 POWER 在这台机器上走的是 PMIC 的 PON
++		 * （lk2nd/device/keys.c 的 target_powerkey() →
++		 * pm8x41_get_pwrkey_is_pressed()），实测不响应；而机器正面
++		 * 有一颗实体的 Home 键（TLMM GPIO 87，见设备树的 gpio-keys）。
++		 * 给它加上和 POWER 一样的动作，菜单就有一个一定能用的确认键。
++		 */
+ 		case KEY_POWER:
++		case KEY_HOME:
+ 			y = y_menu + incr * sel;
+ 			fbcon_printf_ln(
+ 				menu_options[sel].color,

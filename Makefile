@@ -300,32 +300,42 @@ $(STAMPS)/lk2nd: | $(STAMPS)
 	@echo "[lk2nd]   子模块 HEAD = $$(git -C "$(LK2ND_SRC_EXT)" rev-parse --short HEAD) ($$(git -C "$(LK2ND_SRC_EXT)" describe --tags 2>/dev/null))"
 	cp -a $(LK2ND_SRC_EXT)/. "$(LK2ND_SRC)"/
 	test -f "$(LK2ND_SRC)/makefile"
-	@echo "[lk2nd] 打补丁 0001 0002 0003 0005 0006"
+	@echo "[lk2nd] 打补丁 0001 0002 0003 0005 0006 0007 0008"
 	@#
-	@# 0005（只读 ext4 extents）和 0006（放行 metadata_csum）放在这一组、而不是 0004 那组：
-	@# 它们改的是 lib/fs/ext2 驱动，**完整版和精简版都要**，所以必须在编完整版之前打上。
-	@# 0004 是"精简版专用"（从 qcdt 表里去掉 markw / rosy），得等完整版编完再打，
-	@# 靠增量重编产出第二份镜像。两组顺序不能对调。
-	@for p in $(foreach n,0001 0002 0003 0005 0006,$(firstword $(wildcard $(REPO)/lk2nd/$(n)-*.patch))); do \
+	@# 0005（只读 ext4 extents）、0006（放行 metadata_csum）、0007（引导失败进 fastboot）、
+	@# 0008（按键）放在这一组、而不是 0004 那组：它们**完整版和精简版都要**，
+	@# 所以必须在编完整版之前打上。
+	@# 0004 是"精简版专用"（从 qcdt 表里去掉 markw / rosy），得等完整版编完再打。
+	@# 两组顺序不能对调。
+	@for p in $(foreach n,0001 0002 0003 0005 0006 0007 0008,$(firstword $(wildcard $(REPO)/lk2nd/$(n)-*.patch))); do \
 		echo "[lk2nd]   $$(basename $$p)"; \
 		patch -p1 --forward --no-backup-if-mismatch -d "$(LK2ND_SRC)" < "$$p"; \
 	done
 	@echo "[lk2nd] 构建完整版"
 	make -j"$(JOBS)" -C "$(LK2ND_SRC)" TOOLCHAIN_PREFIX=arm-none-eabi- \
 		CCACHE="$(if $(shell command -v ccache 2>/dev/null),ccache,)" \
-		LK2ND_VERSION="$(LK2ND_VER)-full-odinport" PROJECT=lk2nd-msm8953 2>&1 \
+		LK2ND_VERSION="$(LK2ND_VER)-full" PROJECT=lk2nd-msm8953 2>&1 \
 		| tee /tmp/lk2nd-build-full.log
 	cp -f "$(LK2ND_SRC)/build-lk2nd-msm8953/lk2nd.img" "$(LK2ND_OUT)/lk2nd.img"
 	@echo "[lk2nd]   lk2nd.img         $$($(call SIZE,$(LK2ND_OUT)/lk2nd.img)) 字节"
-	@echo "[lk2nd] 打补丁 0004 → 构建精简版（增量重编即可）"
+	@echo "[lk2nd] 打补丁 0004 → 构建精简版"
 	@for p in $(wildcard $(REPO)/lk2nd/0004-*.patch); do \
 		echo "[lk2nd]   $$(basename $$p)"; \
 		patch -p1 --forward --no-backup-if-mismatch -d "$(LK2ND_SRC)" < "$$p"; \
 	done
+	@#
+	@# 必须清掉构建目录再编第二份。**不能用增量重编**：0004 改的是
+	@# lk2nd/device/dts/msm8953/rules.mk，而 make 不把 rules.mk 当依赖，
+	@# 于是 QCDT 设备表不会重造 —— 第二份镜像里照样带着 markw / rosy，
+	@# 而 `strings | grep xiaomi-markw` 那道自检也就形同虚设。
+	@# 实测（本地复现）：不清目录时两份镜像尺寸完全相同，strings 里 markw 还在。
+	@# CI 上一直没暴露纯属时序侥幸，不是它真的对。整个 lk2nd 全量编一次约 20 秒，
+	@# 为这点时间赌一个"自检其实没在检"的洞，不值。
+	rm -rf "$(LK2ND_SRC)/build-lk2nd-msm8953"
 	make -j"$(JOBS)" -C "$(LK2ND_SRC)" TOOLCHAIN_PREFIX=arm-none-eabi- \
 		CCACHE="$(if $(shell command -v ccache 2>/dev/null),ccache,)" \
-		LK2ND_VERSION="$(LK2ND_VER)-nomarkw-odinport" PROJECT=lk2nd-msm8953 2>&1 \
-		| tee /tmp/lk2nd-build-nomarkw.log
+		LK2ND_VERSION="$(LK2ND_VER)-odin" PROJECT=lk2nd-msm8953 2>&1 \
+		| tee /tmp/lk2nd-build-trimmed.log
 	@command -v ccache >/dev/null 2>&1 && ccache -s || true
 	cp -f "$(LK2ND_SRC)/build-lk2nd-msm8953/lk2nd.img" "$(LK2ND_OUT)/lk2nd-nomarkw.img"
 	@echo "[lk2nd]   lk2nd-nomarkw.img $$($(call SIZE,$(LK2ND_OUT)/lk2nd-nomarkw.img)) 字节"
