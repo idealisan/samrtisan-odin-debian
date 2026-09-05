@@ -3742,3 +3742,30 @@ device: usb0 10s 内未 up（exists=no），仍尝试启动 dnsmasq（看门狗�
   并且脚本在 usb0 不可用时要有明确的重建动作，而不是只 skip + 靠看门狗重试。
 - 方案 B（修 `rtnl_link_get_size()` / `rtnl_link_get_af_size()` 对 gadget 网卡的竞态）
   仍是最终方案，等上述查清后做。
+
+## 2026-09-05 内核基线升级：6.19.5/main → 7.1.3/main（落后 33279 提交）
+
+- **23:45 完成** — 换钉点 + 删 0011，提交推送并发 `v0.9.7-upstream-713` 触发 CI
+- **为什么升级**：038 报告里那个把我们折腾了两个版本的内核 Oops，上游早就修好了
+  - `ec35c1969650`（2026-03-09）f_ncm: Fix net_device lifecycle with device_move
+  - `e1eabb072c75`（2026-03-11）u_ether: Fix race between gether_disconnect and eth_stop
+  - `e002e92e88e1`（2026-03-16）u_ether: Fix NULL pointer deref in eth_get_drvinfo
+  - 三个都**晚于我们的钉点（2026-02-21/03-01）16~23 天**。我们钉在 `6.19.5/main` 的 tip 上，
+    这根分支上游从此不再推进 —— **光看"自己这根分支有没有新提交"永远看不到进展**
+- **关键认知**：上游按内核稳定版**开新分支**（6.19.5 → 7.0.9 → 7.0.2 → 7.1.3），
+  判断"是否落后"要看 `git branch -r` 的分支列表，不是看自己分支的提交数
+- **实测过的兼容性**
+  - 9 个补丁用项目自己的 `tools/ci/apply-patches.sh` 在 7.1.3 上跑：**9/9 打上，退出码 0**
+  - 0010（OTG pulse skip）**仍需**：7.1.3 的 `smbchg_otg_switch()` 里只有 `OTG_EN_BIT`
+    一个写操作，grep `TRIM6|pulse` 为空
+  - 配置漂移：olddefconfig 会静默丢弃 14 个符号（ARM64_PAN/LSE、CRYPTO_AES_ARM64_CE、
+    CRYPTO_GHASH、CRYPTO_SM3_*、CRYPTO_RNG_DEFAULT、NFS_V4_1、NF_CT_PROTO_UDPLITE、
+    MDIO_BUS、以及 3 个内部 select 符号），**逐一定性后确认对本机无影响**
+  - 新增 315 个符号，按硬件关键词筛完全是别家机器的驱动，默认 =n 正确
+- **删了 0011**：我们手写的 `ncm_unbind` 清 `netdev->dev.parent`，
+  被上游 `ec35c1969650` 取代（人家是用 device_move 管生命周期，更正规）。
+  原件存 `tmp/superseded-patches/`
+- 详见 `reports/041-我们与上游的关系-基线从6.19.5升到7.1.3.md`
+- **风险待 CI 回答**：补丁落得上去 ≠ 编得过。DRM panel / DSI 的 API 若在 7.1 有变化，
+  0004/0005/0006/0008 可能编译失败；0007 的 binding 若改名，dtb job 会失败
+- **不假设**：不认为"升了基线 OTG 掉电就好了" —— 040 已量过那是电池内阻 0.54Ω，硬件问题

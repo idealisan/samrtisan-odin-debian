@@ -118,7 +118,7 @@ dtb / kernel / lk2nd 与变体无关，两变体共用一份产物；core 是 gu
 
 | 项 | 值 |
 |---|---|
-| 内核 commit | `770e10fa15a00051eaef862e4cb2724f2f8fa568`（`6.19.5/main`，即 pmOS msm8953 分支） |
+| 内核 commit | `7213855948c70fd165356526f1de1c3b6bf4d554`（`7.1.3/main`，即 pmOS msm8953 分支） |
 | lk2nd | `23.1` |
 | Debian | `bookworm` |
 | 编译镜像基础层 | `debian:bookworm@sha256:813017…`（钉在 `Dockerfile` 里，钉 digest 不钉 tag） |

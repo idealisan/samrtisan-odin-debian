@@ -24,7 +24,7 @@
 set -uo pipefail
 
 DIR=${1:?用法: fetch-kernel.sh <目录>}
-KERNEL_SHA=${KERNEL_SHA:-770e10fa15a00051eaef862e4cb2724f2f8fa568}
+KERNEL_SHA=${KERNEL_SHA:-7213855948c70fd165356526f1de1c3b6bf4d554}
 REPO=${REPO:-$(cd "$(dirname "$0")/../.." && pwd)}
 SRC=${ODIN_KERNEL_SRC:-$REPO/ext/linux-msm8953}
 

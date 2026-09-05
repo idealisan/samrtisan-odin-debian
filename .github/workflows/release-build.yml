@@ -4,8 +4,8 @@
 # 每次提交都跑纯属浪费公共资源。要验证就发一个 pre-release。
 #
 # 三个外部依赖全部固定到具体 commit / tag，上游再动也不影响复现：
-#   · 内核        msm8953-mainline/linux  @ 770e10fa15a00051eaef862e4cb2724f2f8fa568
-#                 （Linux 6.19，pmOS 的 6.19.5/main 分支）
+#   · 内核        msm8953-mainline/linux  @ 7213855948c70fd165356526f1de1c3b6bf4d554
+#                 （Linux 7.1，pmOS 的 7.1.3/main 分支）
 #   · lk2nd       msm8916-mainline/lk2nd @ tag 21.0（设备上跑过的是
 #                 21.0-r0-postmarketOS，但我们的 QCDT/面板补丁只对 23.x
 #                 的 rules.mk 成立：19.x 的设备表条目与上下文完全不同，
@@ -73,7 +73,7 @@ env:
   # （770e10fa）时没有同步这里，CI 于是仍按旧基线 05f7e89 取树，补丁 0004
   # （R69006 面板）在旧树上打不上 ⇒ kernel job 在"应用补丁"就失败了。
   # make 的 `?=` 不会覆盖环境变量，所以这里一旦写错就会静默生效。
-  KERNEL_SHA: 770e10fa15a00051eaef862e4cb2724f2f8fa568
+  KERNEL_SHA: 7213855948c70fd165356526f1de1c3b6bf4d554
   # 必须加引号：不加引号 YAML 会把 19.0 解析成浮点数 19，URL 就错了
   LK2ND_VER: "23.1"
 
