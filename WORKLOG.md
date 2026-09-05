@@ -3174,3 +3174,30 @@ probe 也不阻止 OTG 尝试。要真禁掉得改驱动侧。
   - 现在按**百分比**输入、内部换算，同时显示原始值和 dB：
     0%→0（−84 dB） / 68%→84（0 dB） / 100%→124（+40 dB）。
     保留 `r<数字>` 直通原始值。
+
+## 2026-09-05 内存与 swap 两个问题（详见 reports/035）
+
+- **内存 4 GiB 只识别 3.46 GiB —— 不是故障，是这台机器的正常水位**
+  - 3840 MiB：bootloader 只把 0x10000000..0x100000000 报成 RAM（两个 bank：
+    0x10000000+1792MiB、0x80000000+2048MiB，其实首尾相接）。低 256 MiB 没报。
+    `msm8953.dtsi` 里 memory 节点基址写死 0x10000000，大小由 bootloader 填。
+  - −205 MiB reserved-memory（modem/mpss 106 占大头，还有 other-ext 30、
+    cont-splash 20、adsp 17、qseecom 8、wcnss 7、venus 7、ramoops 1 …）
+  - −32 MiB CMA，−58 MiB 内核自身 ⇒ MemTotal 3629956 kB = 3.46 GiB
+  - 可抠的只有零头：cont-splash 我们只用 6.2 MB 却预留 20 MB（补丁里没改写这个节点，
+    所以还是 dtsi 的 20 MB）；CMA 32→16。不值得为十几 MiB 重刷。
+  - **⚠️ 读 /proc/device-tree 的 reg 时，`od -tx8` 在 ARM64 上按小端解释会骗人**
+    （会把 0x0000000010000000 显示成 0000001000000000）。必须用 `-tx1` 逐字节看。
+- **swap 一直是 0 —— 两个毛病叠在一起**
+  1. **unit 被 systemd 静默丢弃**：`sysinit.target → odin-swap → firstboot-resize
+     → multi-user.target → sysinit.target` 成环（swap 服务 After 了一个属于
+     multi-user.target 的单元）。systemd 的破环手段是把本 unit 整个丢掉 ⇒
+     脚本一次都没跑过，journal 0 条、日志不存在、status 是 `inactive (dead)`。
+     指纹：`Type=oneshot`+`RemainAfterExit=yes` 成功跑完应是 `active (exited)`。
+  2. **swapfile 在本机根本建不起来**：根分区 ext4 为 lk2nd 能读 extlinux.conf
+     而 `mke2fs -O ^extents`，而 swapfile 走 iomap **需要 extents**。对照实验：
+     块设备(loop)✅、zram✅、带 extents 的 ext4✅、根分区(无 extents)❌。
+     失败时内核不打任何日志，只剩 `Invalid argument`。
+- 改用 zram（CONFIG_ZRAM=m 已有，实测可用）：不写 eMMC、不碰磁盘（环自动消失）。
+  1 GiB 逻辑容量 / 优先级 100 / 可 ODIN_ZRAM_SIZE 覆盖。swappiness 20→80。
+  实测重启后 `Swap: 1.0Gi`、服务 `active (exited)`、journal 有记录。

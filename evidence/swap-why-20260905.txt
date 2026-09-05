@@ -1,0 +1,53 @@
+[sudo] password for user: ########## A. 内存节点 reg ##########
+/home/user/swap-why.sh: line 8: warning: command substitution: ignored null byte in input
+节点: /proc/device-tree/memory@10000000  device_type=memory
+    reg:  0000001000000000 0000007000000000
+    reg:  0000008000000000 0000008000000000
+    base = 0x10000000 = 256 MiB
+    size = 0x70000000 = 1792 MiB = 0.00 GiB
+    base+size = 2048 MiB
+
+########## B. 内核的内存账 ##########
+[    0.000000] NUMA: Faking a node at [mem 0x0000000010000000-0x00000000ffffffff]
+[    0.000000] cma: Reserved 32 MiB at 0x00000000f9c00000
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 983040
+[    0.000000] Policy zone: DMA
+
+########## C. swapon 到底为什么失败 ##########
+--- mkswap ---
+Setting up swapspace version 1, size = 256 MiB (268431360 bytes)
+no label, UUID=9181b76a-5e78-4614-b5ea-e49858e5b9e6
+
+--- swapon -v（要真实错误）---
+swapon: /tmp/t.swap: found signature [pagesize=4096, signature=swap]
+swapon: /tmp/t.swap: pagesize=4096, swapsize=268435456, devsize=268435456
+swapon: /tmp/t.swap: swapon failed: Invalid argument
+swapon /tmp/t.swap
+  swapon 退出码 = 0
+
+--- swapon 之后 dmesg 尾部 ---
+[   47.838183] input: smartisan-odin Headset Jack as /devices/platform/soc@0/c051000.sound-card/sound/card0/input4
+[   47.839187] msm_dpu 1a01000.display-controller: [drm] fb0: msmdrmfb frame buffer device
+[   48.099038] Bluetooth: MGMT ver 1.23
+[   48.680755] wcn36xx: firmware WLAN version 'WCN v2.0 RadioPhy vIris_TSMC_4.0 with 48MHz XO' and CRM version 'CNSS-PR-4-0-00412'
+[   48.680934] wcn36xx: firmware API 1.5.1.2, 41 stations, 2 bssids
+[   50.308364] EXT4-fs (mmcblk0p57): resized filesystem to 29338619
+
+--- 内核是否支持 swap / 文件 swap ---
+CONFIG_SWAP=y
+CONFIG_ZRAM=m
+CONFIG_ZRAM_BACKEND_FORCE_LZO=y
+CONFIG_ZRAM_BACKEND_LZO=y
+CONFIG_ZRAM_DEF_COMP_LZORLE=y
+CONFIG_ZRAM_DEF_COMP="lzo-rle"
+  （/proc/config.gz 不存在时看下面）
+
+--- 文件系统挂载选项 ---
+/dev/mmcblk0p57 ext4   rw,noatime,errors=remount-ro,mb_optimize_scan=0
+
+--- 用 strace 看不到的话，试 loop 设备方式 ---
+  losetup /dev/loop0 OK
+  swapon(loop) 退出码 = 0
+
+########## D. 清理 ##########
+  done

@@ -1,0 +1,115 @@
+[sudo] password for user: ########## 1. 内存总量 ##########
+               total        used        free      shared  buff/cache   available
+Mem:           3.5Gi       226Mi       3.1Gi        10Mi       209Mi       3.2Gi
+Swap:             0B          0B          0B
+
+--- /proc/meminfo 前几行 ---
+MemTotal:        3629956 kB
+MemFree:         3270220 kB
+MemAvailable:    3398032 kB
+Buffers:           15100 kB
+Cached:           176636 kB
+SwapCached:            0 kB
+Active:            51200 kB
+Inactive:         175248 kB
+
+--- MemTotal 换算 ---
+  MemTotal:         3629956 kB =   3.46 GiB
+  MemAvailable:     3398032 kB =   3.24 GiB
+  SwapTotal:              0 kB =   0.00 GiB
+  CmaTotal:           32768 kB =   0.03 GiB
+  CmaFree:            30416 kB =   0.03 GiB
+
+########## 2. swap ##########
+--- free 里的 Swap 行 ---
+Swap:             0B          0B          0B
+--- swapon --show ---
+--- /proc/swaps ---
+Filename				Type		Size		Used		Priority
+--- /swapfile 是否存在 ---
+ls: cannot access '/swapfile': No such file or directory
+--- fstab 里的 swap 行 ---
+
+########## 3. swap 服务 ##########
+○ odin-swap.service - Prepare swapfile (first boot)
+     Loaded: loaded (/etc/systemd/system/odin-swap.service; enabled; preset: enabled)
+     Active: inactive (dead)
+       Docs: file:/usr/local/sbin/odin-swap.sh
+
+--- 服务日志 ---
+tail: cannot open '/var/log/odin-swap.log' for reading: No such file or directory
+
+########## 4. 内存是怎么少的：内核启动时的账 ##########
+[    0.000000] OF: reserved mem: 0x0000000085b00000..0x00000000862fffff (8192 KiB) nomap non-reusable qseecom@85b00000
+[    0.000000] OF: reserved mem: 0x0000000086300000..0x00000000863fffff (1024 KiB) nomap non-reusable smem@86300000
+[    0.000000] OF: reserved mem: 0x0000000086400000..0x00000000867fffff (4096 KiB) nomap non-reusable reserved@86400000
+[    0.000000] OF: reserved mem: 0x0000000086c00000..0x000000008d5fffff (108544 KiB) nomap non-reusable mpss@86c00000
+[    0.000000] OF: reserved mem: 0x000000008d600000..0x000000008e6fffff (17408 KiB) nomap non-reusable adsp@8d600000
+[    0.000000] OF: reserved mem: 0x000000008e700000..0x000000008edfffff (7168 KiB) nomap non-reusable wcnss@8e700000
+[    0.000000] OF: reserved mem: 0x0000000090000000..0x0000000090000fff (4 KiB) nomap non-reusable dfps-data@90000000
+[    0.000000] OF: reserved mem: 0x0000000090001000..0x00000000913fffff (20476 KiB) nomap non-reusable cont-splash@90001000
+[    0.000000] OF: reserved mem: 0x0000000091400000..0x0000000091afffff (7168 KiB) nomap non-reusable venus@91400000
+[    0.000000] OF: reserved mem: 0x0000000092000000..0x00000000920fffff (1024 KiB) nomap non-reusable mba@92000000
+[    0.000000] OF: reserved mem: 0x0000000093000000..0x00000000931fffff (2048 KiB) nomap non-reusable gps@93000000
+[    0.000000] Reserved memory: created DMA memory pool at 0x0000000095000000, size 0 MiB
+[    0.000000] OF: reserved mem: initialized node zap@95000000, compatible id shared-dma-pool
+[    0.000000] OF: reserved mem: 0x0000000095000000..0x0000000095001fff (8 KiB) nomap non-reusable zap@95000000
+[    0.000000] OF: reserved mem: 0x00000000f2d00000..0x00000000f2e7ffff (1536 KiB) nomap non-reusable rmtfs@f2d00000
+[    0.000000] OF: reserved mem: 0x0000000084a00000..0x00000000867fffff (30720 KiB) nomap non-reusable other-ext@84a00000
+[    0.000000] OF: reserved mem: 0x000000009ff00000..0x000000009fffffff (1024 KiB) map non-reusable ramoops@9ff00000
+[    0.000000] OF: reserved mem: OVERLAP DETECTED!
+[    0.000000] NUMA: Faking a node at [mem 0x0000000010000000-0x00000000ffffffff]
+[    0.000000] Zone ranges:
+[    0.000000] Movable zone start for each node
+[    0.000000] cma: Reserved 32 MiB at 0x00000000f9c00000
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 983040
+[    0.000000] Policy zone: DMA
+[    0.045194] Memory: 3583872K/3932160K available (15424K kernel code, 2554K rwdata, 5728K rodata, 5952K init, 406K bss, 309124K reserved, 32768K cma-reserved)
+[    0.065525] futex hash table entries: 2048 (131072 bytes on 1 NUMA nodes, total 128 KiB, linear).
+[    0.197284] Freeing initrd memory: 968K
+[    2.712178] Freeing unused kernel memory: 5952K
+
+########## 5. 内核看到的物理内存布局 ##########
+--- /proc/iomem 里的 System RAM ---
+10000000-849fffff : System RAM
+  114d0000-11a9ffff : reserved
+  12f0d000-12f1cfff : reserved
+  1310d000-131fffff : reserved
+84a00000-867fffff : reserved
+86800000-86bfffff : System RAM
+86c00000-8edfffff : reserved
+8ee00000-8fffffff : System RAM
+90000000-91afffff : reserved
+91b00000-91ffffff : System RAM
+92000000-920fffff : reserved
+92100000-92ffffff : System RAM
+93000000-931fffff : reserved
+93200000-94ffffff : System RAM
+95000000-95001fff : reserved
+95002000-f2cfffff : System RAM
+  9ff00000-9fffffff : reserved
+f2d00000-f2e7ffff : reserved
+f2e80000-ffffffff : System RAM
+  f90f0000-ff7fffff : reserved
+
+--- DT 里声明的 memory 节点 ---
+/home/user/mem-audit.sh: line 45: warning: command substitution: ignored null byte in input
+  /proc/device-tree/memory@10000000 device_type=memory
+    （设备里没有 python3，跳过解析）
+
+########## 6. reserved-memory（被扣掉的部分）##########
+  adsp@8d600000                    (无 size)
+  cont-splash@90001000             (无 size)
+  dfps-data@90000000               (无 size)
+  gps@93000000                     (无 size)
+  mba@92000000                     (无 size)
+  mpss@86c00000                    (无 size)
+  other-ext@84a00000               (无 size)
+  qseecom@85b00000                 (无 size)
+  ramoops@9ff00000                 (无 size)
+  reserved@86400000                (无 size)
+  rmtfs@f2d00000                   (无 size)
+  smem@86300000                    (无 size)
+  venus@91400000                   (无 size)
+  wcnss@8e700000                   (无 size)
+  zap@95000000                     (无 size)
