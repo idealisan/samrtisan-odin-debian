@@ -1,0 +1,31 @@
+
+[2026-09-05 11:05:41] [1m== 00 precheck ==[0m
+[2026-09-05 11:05:41] [32m ok [0m    镜像就绪 lk2nd-nomarkw.img  364560 字节
+[2026-09-05 11:05:41] [32m ok [0m    镜像就绪 odin-debian-sparse.img  621503368 字节
+[2026-09-05 11:05:41] [32m ok [0m    设备状态：Debian 运行中（SSH 可达）
+
+[2026-09-05 11:05:41] [1m== 10 backup ==[0m
+
+[2026-09-05 11:05:43] [1m== 在手机上生成全量备份 → 设备 /root/odin-backup/rootfs-full.tar ==[0m
+[2026-09-05 11:05:43] 采集真机用量快照...
+  /dev/mmcblk1p57  112G  4.8G  103G   5% /
+  tar 已在后台启动，pid=6009
+[2026-09-05 11:05:45] 等待打包完成（每 5s 轮询一次，最多 10 分钟）...
+  [11:05:51]   534 MB  running
+  [11:05:57]   719 MB  running
+/Volumes/caseSensitiveBar/odin-work/flash/stages/10-backup.sh: line 143: Permission: unbound variable
+[2026-09-05 11:06:02] [31mFAIL[0m  设备无 SSH 响应（172.16.42.1）——先确认 USB 线连着、PC 已拿到 172.16.42.2
+
+[2026-09-05 11:06:02] [1m== 20 fastboot ==[0m
+[2026-09-05 11:06:03] [36minfo[0m  设备在 Debian 里。远程进 fastboot：改名 extlinux.conf，lk2nd 找不到配置会停在 fastboot
+ssh_askpass: exec(/usr/X11R6/bin/ssh-askpass): No such file or directory
+Permission denied, please try again.
+ssh_askpass: exec(/usr/X11R6/bin/ssh-askpass): No such file or directory
+Permission denied, please try again.
+ssh_askpass: exec(/usr/X11R6/bin/ssh-askpass): No such file or directory
+user@172.16.42.1: Permission denied (publickey,password).
+[2026-09-05 11:06:35] 等设备落到 fastboot（最多 180s，10s 一查）
+[2026-09-05 11:09:36] [31mFAIL[0m  设备进入 fastboot 超时 (180s)
+[2026-09-05 11:09:36] [31mFAIL[0m  没能自动进 fastboot
+  请人工操作：关机后按住【音量减 + 电源键】进入原厂 fastboot，然后重跑
+      flash/flash-all.sh --from 30

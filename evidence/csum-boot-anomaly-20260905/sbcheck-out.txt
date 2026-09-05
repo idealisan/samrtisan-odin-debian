@@ -1,0 +1,15 @@
+=== dist/odin-debian.img ===
+  magic 0xef53 (OK)  卷标 'pmOS_root'
+  compat    0x3c     has_journal ext_attr resize_inode dir_index
+  incompat  0x242    filetype extents flex_bg
+  ro_compat 0x403    sparse_super large_file metadata_csum
+  lk2nd 挂载门禁：ro_compat & ~0x403 = 0x0 -> 放行
+  超级块校验和：存储 0x3a06d8d5  重算 0x3a06d8d5  -> 一致，内核会接受
+
+=== tmp/ci-csum/dist-prev/odin-debian.img.odin-bak ===
+  magic 0xef53 (OK)  卷标 'pmOS_root'
+  compat    0x3c     has_journal ext_attr resize_inode dir_index
+  incompat  0x242    filetype extents flex_bg
+  ro_compat 0x3      sparse_super large_file
+  lk2nd 挂载门禁：ro_compat & ~0x403 = 0x0 -> 放行
+  超级块校验和：metadata_csum 未开，内核不校验（存储值 0x00000000）

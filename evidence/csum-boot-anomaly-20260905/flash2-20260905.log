@@ -1,0 +1,30 @@
+
+[2026-09-05 11:12:29] [1m== 30 boot（刷 lk2nd） ==[0m
+[2026-09-05 11:12:29] 刷入 lk2nd-nomarkw.img → lk2nd 分区
+Sending 'lk2nd' (356 KB)                           OKAY [  0.033s]
+Writing 'lk2nd'                                    OKAY [  0.037s]
+Finished. Total time: 0.140s
+[2026-09-05 11:12:30] [32m ok [0m  lk2nd 分区刷写完成
+
+[2026-09-05 11:12:30] [1m== 40 data（刷 Debian → userdata 分区） ==[0m
+[2026-09-05 11:12:30] 刷入 odin-debian-sparse.img（sparse 版，fastboot 自动分块传输）
+Sending sparse 'userdata' 1/2 (521468 KB)          OKAY [ 14.011s]
+Writing 'userdata'                                 OKAY [  6.767s]
+Sending sparse 'userdata' 2/2 (85468 KB)           OKAY [  2.419s]
+Writing 'userdata'                                 OKAY [ 21.898s]
+Finished. Total time: 45.136s
+[2026-09-05 11:13:15] [32m ok [0m  userdata 分区刷写完成
+
+[2026-09-05 11:13:15] [1m== 50 reboot ==[0m
+Rebooting                                          OKAY [  0.010s]
+Finished. Total time: 0.010s
+[2026-09-05 11:13:15] 等 USB 网卡出现（最多 240s）
+[2026-09-05 11:13:35] [32m ok [0m  PC 上出现 USB 网卡 (20s)
+[2026-09-05 11:13:35] [32m ok [0m  USB 网络已通
+
+[2026-09-05 11:13:35] [1m== 60 usbnet（等 PC 拿到 172.16.42.2） ==[0m
+[2026-09-05 11:13:35] [32m ok [0m  PC 已持有 172.16.42.2
+
+[2026-09-05 11:13:35] [1m== 70 ssh（等 22 端口；首启含文件系统扩容，会比较慢） ==[0m
+[2026-09-05 11:18:01] [31mFAIL[0m  SSH 可达 超时 (240s)
+[2026-09-05 11:18:01] [31mFAIL[0m  SSH 一直不可达。救援通道（initramfs telnet / IPv6 / UART）见 reports/018

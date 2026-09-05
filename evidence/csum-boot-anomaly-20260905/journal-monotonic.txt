@@ -1,0 +1,1147 @@
+Warning: Permanently added '172.16.42.1' (ED25519) to the list of known hosts.
+[    0.000000] odin kernel: Booting Linux on physical CPU 0x0000000000 [0x410fd034]
+[    0.000000] odin kernel: Linux version 6.19.5-postmarketos-qcom-msm8953 (runner@runnervmejwal) (aarch64-linux-gnu-gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, GNU ld (GNU Binutils for Ubuntu) 2.42) #1 SMP PREEMPT Sat Sep  5 02:51:58 UTC 2026
+[    0.000000] odin kernel: KASLR enabled
+[    0.000000] odin kernel: random: crng init done
+[    0.000000] odin kernel: Machine model: Smartisan U2 Pro (ODIN)
+[    0.000000] odin kernel: earlycon: msm_serial_dm0 at MMIO 0x00000000078af000 (options '')
+[    0.000000] odin kernel: printk: legacy bootconsole [msm_serial_dm0] enabled
+[    0.000000] odin kernel: OF: reserved mem: 0x0000000085b00000..0x00000000862fffff (8192 KiB) nomap non-reusable qseecom@85b00000
+[    0.000000] odin kernel: OF: reserved mem: 0x0000000086300000..0x00000000863fffff (1024 KiB) nomap non-reusable smem@86300000
+[    0.000000] odin kernel: OF: reserved mem: 0x0000000086400000..0x00000000867fffff (4096 KiB) nomap non-reusable reserved@86400000
+[    0.000000] odin kernel: OF: reserved mem: 0x0000000086c00000..0x000000008d5fffff (108544 KiB) nomap non-reusable mpss@86c00000
+[    0.000000] odin kernel: OF: reserved mem: 0x000000008d600000..0x000000008e6fffff (17408 KiB) nomap non-reusable adsp@8d600000
+[    0.000000] odin kernel: OF: reserved mem: 0x000000008e700000..0x000000008edfffff (7168 KiB) nomap non-reusable wcnss@8e700000
+[    0.000000] odin kernel: OF: reserved mem: 0x0000000090000000..0x0000000090000fff (4 KiB) nomap non-reusable dfps-data@90000000
+[    0.000000] odin kernel: OF: reserved mem: 0x0000000090001000..0x00000000913fffff (20476 KiB) nomap non-reusable cont-splash@90001000
+[    0.000000] odin kernel: OF: reserved mem: 0x0000000091400000..0x0000000091afffff (7168 KiB) nomap non-reusable venus@91400000
+[    0.000000] odin kernel: OF: reserved mem: 0x0000000092000000..0x00000000920fffff (1024 KiB) nomap non-reusable mba@92000000
+[    0.000000] odin kernel: OF: reserved mem: 0x0000000093000000..0x00000000931fffff (2048 KiB) nomap non-reusable gps@93000000
+[    0.000000] odin kernel: Reserved memory: created DMA memory pool at 0x0000000095000000, size 0 MiB
+[    0.000000] odin kernel: OF: reserved mem: initialized node zap@95000000, compatible id shared-dma-pool
+[    0.000000] odin kernel: OF: reserved mem: 0x0000000095000000..0x0000000095001fff (8 KiB) nomap non-reusable zap@95000000
+[    0.000000] odin kernel: OF: reserved mem: 0x00000000f2d00000..0x00000000f2e7ffff (1536 KiB) nomap non-reusable rmtfs@f2d00000
+[    0.000000] odin kernel: OF: reserved mem: 0x0000000084a00000..0x00000000867fffff (30720 KiB) nomap non-reusable other-ext@84a00000
+[    0.000000] odin kernel: OF: reserved mem: 0x000000009ff00000..0x000000009fffffff (1024 KiB) map non-reusable ramoops@9ff00000
+[    0.000000] odin kernel: OF: reserved mem: OVERLAP DETECTED!
+                            other-ext@84a00000 (0x0000000084a00000--0x0000000086800000) overlaps with qseecom@85b00000 (0x0000000085b00000--0x0000000086300000)
+[    0.000000] odin kernel: NUMA: Faking a node at [mem 0x0000000010000000-0x00000000ffffffff]
+[    0.000000] odin kernel: NODE_DATA(0) allocated [mem 0xff875a40-0xff8781bf]
+[    0.000000] odin kernel: Zone ranges:
+[    0.000000] odin kernel:   DMA      [mem 0x0000000010000000-0x00000000ffffffff]
+[    0.000000] odin kernel:   DMA32    empty
+[    0.000000] odin kernel:   Normal   empty
+[    0.000000] odin kernel: Movable zone start for each node
+[    0.000000] odin kernel: Early memory node ranges
+[    0.000000] odin kernel:   node   0: [mem 0x0000000010000000-0x00000000849fffff]
+[    0.000000] odin kernel:   node   0: [mem 0x0000000084a00000-0x00000000867fffff]
+[    0.000000] odin kernel:   node   0: [mem 0x0000000086800000-0x0000000086bfffff]
+[    0.000000] odin kernel:   node   0: [mem 0x0000000086c00000-0x000000008edfffff]
+[    0.000000] odin kernel:   node   0: [mem 0x000000008ee00000-0x000000008fffffff]
+[    0.000000] odin kernel:   node   0: [mem 0x0000000090000000-0x0000000091afffff]
+[    0.000000] odin kernel:   node   0: [mem 0x0000000091b00000-0x0000000091ffffff]
+[    0.000000] odin kernel:   node   0: [mem 0x0000000092000000-0x00000000920fffff]
+[    0.000000] odin kernel:   node   0: [mem 0x0000000092100000-0x0000000092ffffff]
+[    0.000000] odin kernel:   node   0: [mem 0x0000000093000000-0x00000000931fffff]
+[    0.000000] odin kernel:   node   0: [mem 0x0000000093200000-0x0000000094ffffff]
+[    0.000000] odin kernel:   node   0: [mem 0x0000000095000000-0x0000000095001fff]
+[    0.000000] odin kernel:   node   0: [mem 0x0000000095002000-0x00000000f2cfffff]
+[    0.000000] odin kernel:   node   0: [mem 0x00000000f2d00000-0x00000000f2e7ffff]
+[    0.000000] odin kernel:   node   0: [mem 0x00000000f2e80000-0x00000000ffffffff]
+[    0.000000] odin kernel: Initmem setup node 0 [mem 0x0000000010000000-0x00000000ffffffff]
+[    0.000000] odin kernel: cma: Reserved 32 MiB at 0x00000000f9c00000
+[    0.000000] odin kernel: psci: probing for conduit method from DT.
+[    0.000000] odin kernel: psci: PSCIv1.0 detected in firmware.
+[    0.000000] odin kernel: psci: Using standard PSCI v0.2 function IDs
+[    0.000000] odin kernel: psci: MIGRATE_INFO_TYPE not supported.
+[    0.000000] odin kernel: psci: SMC Calling Convention v1.0
+[    0.000000] odin kernel: psci: OSI mode supported.
+[    0.000000] odin kernel: psci: [Firmware Bug]: failed to set PC mode: -1
+[    0.000000] odin kernel: percpu: Embedded 34 pages/cpu s99800 r8192 d31272 u139264
+[    0.000000] odin kernel: pcpu-alloc: s99800 r8192 d31272 u139264 alloc=34*4096
+[    0.000000] odin kernel: pcpu-alloc: [0] 0 [0] 1 [0] 2 [0] 3 [0] 4 [0] 5 [0] 6 [0] 7 
+[    0.000000] odin kernel: Detected VIPT I-cache on CPU0
+[    0.000000] odin kernel: CPU features: kernel page table isolation forced ON by KASLR
+[    0.000000] odin kernel: CPU features: detected: Kernel page table isolation (KPTI)
+[    0.000000] odin kernel: CPU features: detected: ARM erratum 845719
+[    0.000000] odin kernel: alternatives: applying boot alternatives
+[    0.000000] odin kernel: Kernel command line: console=ttyMSM0,115200n8 earlycon=msm_serial_dm,0x78af000 root=/dev/disk/by-label/pmOS_root rootwait rw console=tty0
+[    0.000000] odin kernel: printk: log buffer data + meta data: 131072 + 458752 = 589824 bytes
+[    0.000000] odin kernel: Dentry cache hash table entries: 524288 (order: 10, 4194304 bytes, linear)
+[    0.000000] odin kernel: Inode-cache hash table entries: 262144 (order: 9, 2097152 bytes, linear)
+[    0.000000] odin kernel: software IO TLB: SWIOTLB bounce buffer size adjusted to 3MB
+[    0.000000] odin kernel: software IO TLB: area num 8.
+[    0.000000] odin kernel: software IO TLB: SWIOTLB bounce buffer size roundup to 4MB
+[    0.000000] odin kernel: software IO TLB: mapped [mem 0x00000000f90f0000-0x00000000f94f0000] (4MB)
+[    0.000000] odin kernel: Fallback order for Node 0: 0 
+[    0.000000] odin kernel: Built 1 zonelists, mobility grouping on.  Total pages: 983040
+[    0.000000] odin kernel: Policy zone: DMA
+[    0.000000] odin kernel: mem auto-init: stack:off, heap alloc:off, heap free:off
+[    0.000000] odin kernel: SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=8, Nodes=1
+[    0.000000] odin kernel: ftrace: allocating 49059 entries in 192 pages
+[    0.000000] odin kernel: ftrace: allocated 192 pages with 2 groups
+[    0.000000] odin kernel: rcu: Preemptible hierarchical RCU implementation.
+[    0.000000] odin kernel: rcu:         RCU event tracing is enabled.
+[    0.000000] odin kernel:         Trampoline variant of Tasks RCU enabled.
+[    0.000000] odin kernel:         Rude variant of Tasks RCU enabled.
+[    0.000000] odin kernel:         Tracing variant of Tasks RCU enabled.
+[    0.000000] odin kernel: rcu: RCU calculated value of scheduler-enlistment delay is 25 jiffies.
+[    0.000000] odin kernel: RCU Tasks: Setting shift to 3 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=8.
+[    0.000000] odin kernel: RCU Tasks Rude: Setting shift to 3 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=8.
+[    0.000000] odin kernel: RCU Tasks Trace: Setting shift to 3 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=8.
+[    0.000000] odin kernel: NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[    0.000000] odin kernel: Root IRQ handler: gic_handle_irq
+[    0.000000] odin kernel: rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] odin kernel: arch_timer: cp15 timer running at 19.20MHz (virt).
+[    0.000000] odin kernel: clocksource: arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x46d987e47, max_idle_ns: 440795202767 ns
+[    0.000001] odin kernel: sched_clock: 56 bits at 19MHz, resolution 52ns, wraps every 4398046511078ns
+[    0.011033] odin kernel: Console: colour dummy device 80x25
+[    0.018663] odin kernel: printk: legacy console [tty0] enabled
+[    0.023169] odin kernel: printk: legacy bootconsole [msm_serial_dm0] disabled
+[    0.028081] odin kernel: Calibrating delay loop (skipped), value calculated using timer frequency.. 38.40 BogoMIPS (lpj=76800)
+[    0.028129] odin kernel: pid_max: default: 32768 minimum: 301
+[    0.028419] odin kernel: Mount-cache hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[    0.028463] odin kernel: Mountpoint-cache hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[    0.031910] odin kernel: rcu: Hierarchical SRCU implementation.
+[    0.031992] odin kernel: rcu:         Max phase no-delay instances is 1000.
+[    0.032288] odin kernel: Timer migration: 1 hierarchy levels; 8 children per group; 1 crossnode level
+[    0.033234] odin kernel: smp: Bringing up secondary CPUs ...
+[    0.034175] odin kernel: Detected VIPT I-cache on CPU1
+[    0.034457] odin kernel: CPU1: Booted secondary processor 0x0000000001 [0x410fd034]
+[    0.035497] odin kernel: Detected VIPT I-cache on CPU2
+[    0.035723] odin kernel: CPU2: Booted secondary processor 0x0000000002 [0x410fd034]
+[    0.036758] odin kernel: Detected VIPT I-cache on CPU3
+[    0.036982] odin kernel: CPU3: Booted secondary processor 0x0000000003 [0x410fd034]
+[    0.038065] odin kernel: Detected VIPT I-cache on CPU4
+[    0.038314] odin kernel: CPU4: Booted secondary processor 0x0000000100 [0x410fd034]
+[    0.039271] odin kernel: Detected VIPT I-cache on CPU5
+[    0.039472] odin kernel: CPU5: Booted secondary processor 0x0000000101 [0x410fd034]
+[    0.040414] odin kernel: Detected VIPT I-cache on CPU6
+[    0.040617] odin kernel: CPU6: Booted secondary processor 0x0000000102 [0x410fd034]
+[    0.041663] odin kernel: Detected VIPT I-cache on CPU7
+[    0.041867] odin kernel: CPU7: Booted secondary processor 0x0000000103 [0x410fd034]
+[    0.042024] odin kernel: smp: Brought up 1 node, 8 CPUs
+[    0.042216] odin kernel: SMP: Total of 8 processors activated.
+[    0.042234] odin kernel: CPU: All CPU(s) started at EL1
+[    0.042268] odin kernel: CPU features: detected: 32-bit EL0 Support
+[    0.042287] odin kernel: CPU features: detected: 32-bit EL1 Support
+[    0.042309] odin kernel: CPU features: detected: CRC32 instructions
+[    0.042338] odin kernel: CPU features: detected: PMUv3
+[    0.042448] odin kernel: alternatives: applying system-wide alternatives
+[    0.045208] odin kernel: Memory: 3583872K/3932160K available (15424K kernel code, 2554K rwdata, 5728K rodata, 5952K init, 406K bss, 309124K reserved, 32768K cma-reserved)
+[    0.046935] odin kernel: devtmpfs: initialized
+[    0.065356] odin kernel: clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
+[    0.065430] odin kernel: posixtimers hash table entries: 4096 (order: 4, 65536 bytes, linear)
+[    0.065554] odin kernel: futex hash table entries: 2048 (131072 bytes on 1 NUMA nodes, total 128 KiB, linear).
+[    0.066290] odin kernel: 2G module region forced by RANDOMIZE_MODULE_REGION_FULL
+[    0.066329] odin kernel: 0 pages in range for non-PLT usage
+[    0.066335] odin kernel: 516704 pages in range for PLT usage
+[    0.068216] odin kernel: NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[    0.069943] odin kernel: DMA: preallocated 512 KiB GFP_KERNEL|GFP_DMA pool for atomic allocations
+[    0.070025] odin kernel: audit: initializing netlink subsys (disabled)
+[    0.070283] odin kernel: audit: type=2000 audit(0.056:1): state=initialized audit_enabled=0 res=1
+[    0.072193] odin kernel: thermal_sys: Registered thermal governor 'bang_bang'
+[    0.072207] odin kernel: thermal_sys: Registered thermal governor 'step_wise'
+[    0.072233] odin kernel: thermal_sys: Registered thermal governor 'user_space'
+[    0.072288] odin kernel: thermal_sys: Registered thermal governor 'power_allocator'
+[    0.072385] odin kernel: cpuidle: using governor menu
+[    0.072695] odin kernel: hw-breakpoint: found 6 breakpoint and 4 watchpoint registers.
+[    0.073007] odin kernel: ASID allocator initialised with 32768 entries
+[    0.073311] odin kernel: Serial: AMBA PL011 UART driver
+[    0.075702] odin kernel: pstore: Using crash dump compression: deflate
+[    0.075737] odin kernel: printk: legacy console [ramoops-1] enabled
+[    0.076872] odin kernel: pstore: Registered ramoops as persistent store backend
+[    0.076903] odin kernel: ramoops: using 0x100000@0x9ff00000, ecc: 0
+[    0.091256] odin kernel: /soc@0/clock-controller@1800000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/phy@1a94400
+[    0.091440] odin kernel: /soc@0/display-subsystem@1a00000/display-controller@1a01000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[    0.091561] odin kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0
+[    0.091656] odin kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/display-controller@1a01000
+[    0.091873] odin kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[    0.091974] odin kernel: /soc@0/display-subsystem@1a00000/phy@1a94400: Fixed dependency cycle(s) with /soc@0/clock-controller@1800000
+[    0.092725] odin kernel: /soc@0/clock-controller@b011050: Fixed dependency cycle(s) with /soc@0/clock-controller@b011050
+[    0.099559] odin kernel: /soc@0/clock-controller@1800000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/phy@1a94400
+[    0.100930] odin kernel: /soc@0/display-subsystem@1a00000: Fixed dependency cycle(s) with /soc@0/interconnect@500000
+[    0.101162] odin kernel: /soc@0/display-subsystem@1a00000: Fixed dependency cycle(s) with /soc@0/clock-controller@1800000
+[    0.101401] odin kernel: /soc@0/display-subsystem@1a00000/display-controller@1a01000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[    0.101616] odin kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0
+[    0.101731] odin kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/display-controller@1a01000
+[    0.101981] odin kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[    0.102081] odin kernel: /soc@0/display-subsystem@1a00000/phy@1a94400: Fixed dependency cycle(s) with /soc@0/clock-controller@1800000
+[    0.109004] odin kernel: /soc@0/clock-controller@b011050: Fixed dependency cycle(s) with /soc@0/clock-controller@b011050
+[    0.113054] odin kernel: HugeTLB: registered 1.00 GiB page size, pre-allocated 0 pages
+[    0.113101] odin kernel: HugeTLB: 0 KiB vmemmap can be freed for a 1.00 GiB page
+[    0.113131] odin kernel: HugeTLB: registered 32.0 MiB page size, pre-allocated 0 pages
+[    0.113157] odin kernel: HugeTLB: 0 KiB vmemmap can be freed for a 32.0 MiB page
+[    0.113185] odin kernel: HugeTLB: registered 2.00 MiB page size, pre-allocated 0 pages
+[    0.113212] odin kernel: HugeTLB: 0 KiB vmemmap can be freed for a 2.00 MiB page
+[    0.113239] odin kernel: HugeTLB: registered 64.0 KiB page size, pre-allocated 0 pages
+[    0.113266] odin kernel: HugeTLB: 0 KiB vmemmap can be freed for a 64.0 KiB page
+[    0.116639] odin kernel: iommu: Default domain type: Translated
+[    0.116680] odin kernel: iommu: DMA domain TLB invalidation policy: strict mode
+[    0.121200] odin kernel: SCSI subsystem initialized
+[    0.121510] odin kernel: usbcore: registered new interface driver usbfs
+[    0.121588] odin kernel: usbcore: registered new interface driver hub
+[    0.121667] odin kernel: usbcore: registered new device driver usb
+[    0.122970] odin kernel: Advanced Linux Sound Architecture Driver Initialized.
+[    0.124418] odin kernel: clocksource: Switched to clocksource arch_sys_counter
+[    0.125004] odin kernel: VFS: Disk quotas dquot_6.6.0
+[    0.125058] odin kernel: VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+[    0.135870] odin kernel: NET: Registered PF_INET protocol family
+[    0.136129] odin kernel: IP idents hash table entries: 65536 (order: 7, 524288 bytes, linear)
+[    0.140293] odin kernel: tcp_listen_portaddr_hash hash table entries: 2048 (order: 3, 32768 bytes, linear)
+[    0.140465] odin kernel: Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    0.140515] odin kernel: TCP established hash table entries: 32768 (order: 6, 262144 bytes, linear)
+[    0.140853] odin kernel: TCP bind hash table entries: 32768 (order: 8, 1048576 bytes, linear)
+[    0.141990] odin kernel: TCP: Hash tables configured (established 32768 bind 32768)
+[    0.142199] odin kernel: UDP hash table entries: 2048 (order: 5, 131072 bytes, linear)
+[    0.142414] odin kernel: UDP-Lite hash table entries: 2048 (order: 5, 131072 bytes, linear)
+[    0.142798] odin kernel: NET: Registered PF_UNIX/PF_LOCAL protocol family
+[    0.143410] odin kernel: RPC: Registered named UNIX socket transport module.
+[    0.143445] odin kernel: RPC: Registered udp transport module.
+[    0.143469] odin kernel: RPC: Registered tcp transport module.
+[    0.143491] odin kernel: RPC: Registered tcp-with-tls transport module.
+[    0.143515] odin kernel: RPC: Registered tcp NFSv4.1 backchannel transport module.
+[    0.143849] odin kernel: Unpacking initramfs...
+[    0.148855] odin kernel: kvm [1]: HYP mode not available
+[    0.150695] odin kernel: Initialise system trusted keyrings
+[    0.151015] odin kernel: workingset: timestamp_bits=42 max_order=20 bucket_order=0
+[    0.151919] odin kernel: NFS: Registering the id_resolver key type
+[    0.151972] odin kernel: Key type id_resolver registered
+[    0.151997] odin kernel: Key type id_legacy registered
+[    0.152043] odin kernel: nfs4filelayout_init: NFSv4 File Layout Driver Registering...
+[    0.152081] odin kernel: nfs4flexfilelayout_init: NFSv4 Flexfile Layout Driver Registering...
+[    0.152363] odin kernel: 9p: Installing v9fs 9p2000 file system support
+[    0.197430] odin kernel: Freeing initrd memory: 968K
+[    0.234024] odin kernel: NET: Registered PF_ALG protocol family
+[    0.234090] odin kernel: Key type asymmetric registered
+[    0.234118] odin kernel: Asymmetric key parser 'x509' registered
+[    0.234143] odin kernel: Asymmetric key parser 'pkcs8' registered
+[    0.234330] odin kernel: Block layer SCSI generic (bsg) driver version 0.4 loaded (major 248)
+[    0.234633] odin kernel: io scheduler mq-deadline registered
+[    0.234665] odin kernel: io scheduler kyber registered
+[    0.239613] odin kernel: ledtrig-cpu: registered to indicate activity on CPUs
+[    0.245950] odin kernel: Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+[    0.248849] odin kernel: msm_serial: driver initialized
+[    0.258529] odin kernel: loop: module loaded
+[    0.259975] odin kernel: spmi_pmic_arb 200f000.spmi: PMIC arbiter version v2 (0x20010000)
+[    0.271918] odin kernel: tun: Universal TUN/TAP device driver, 1.6
+[    0.273943] odin kernel: usbcore: registered new interface driver uas
+[    0.274043] odin kernel: usbcore: registered new interface driver usb-storage
+[    0.274982] odin kernel: i2c_dev: i2c /dev entries driver
+[    0.288985] odin kernel: device-mapper: ioctl: 4.50.0-ioctl (2025-04-28) initialised: dm-devel@lists.linux.dev
+[    0.291643] odin kernel: sdhci: Secure Digital Host Controller Interface driver
+[    0.291679] odin kernel: sdhci: Copyright(c) Pierre Ossman
+[    0.292045] odin kernel: sdhci-pltfm: SDHCI platform and OF driver helper
+[    0.292964] odin kernel: clocksource: arch_mmio_counter: mask: 0xffffffffffffff max_cycles: 0x46d987e47, max_idle_ns: 440795202767 ns
+[    0.293017] odin kernel: arch-timer-mmio b120000.timer: mmio timer running at 19.20MHz (virt)
+[    0.293338] odin kernel: hid: raw HID events driver (C) Jiri Kosina
+[    0.294747] odin kernel: usbcore: registered new interface driver usbhid
+[    0.294780] odin kernel: usbhid: USB HID core driver
+[    0.297290] odin kernel: hw perfevents: enabled with armv8_cortex_a53 PMU driver, 7 (0,8000003f) counters available
+[    0.302601] odin kernel: NET: Registered PF_PACKET protocol family
+[    0.302745] odin kernel: 9pnet: Installing 9P2000 support
+[    0.302843] odin kernel: Key type dns_resolver registered
+[    0.316725] odin kernel: Loading compiled-in X.509 certificates
+[    0.331288] odin kernel: Demotion targets for Node 0: null
+[    0.332382] odin kernel: Key type .fscrypt registered
+[    0.332438] odin kernel: Key type fscrypt-provisioning registered
+[    0.340800] odin kernel: qcom-smsm smsm: mbox_request_channel: can't parse "mboxes" property
+[    0.340866] odin kernel: qcom-smsm smsm: mbox_request_channel: can't parse "mboxes" property
+[    0.340909] odin kernel: qcom-smsm smsm: mbox_request_channel: can't parse "mboxes" property
+[    0.343823] odin kernel: qcom-cpr4pd b018000.power-controller: boot time voltage: 870000 uV
+[    0.344031] odin kernel: qcom-cpr4pd b018000.power-controller: speed_bin=7 fusing_revision=3
+[    0.344082] odin kernel: genpd_provider cpr_pd_pwr: level= 6528 voltage=650000 uV step=13 uV
+[    0.344118] odin kernel: genpd_provider cpr_pd_pwr: level=10368 voltage=700000 uV step=18 uV
+[    0.344153] odin kernel: genpd_provider cpr_pd_pwr: level=16896 voltage=820000 uV step=37 uV
+[    0.344187] odin kernel: genpd_provider cpr_pd_pwr: level=22080 voltage=1015000 uV
+[    0.367854] odin kernel: s1: Bringing 0uV into 870000-870000uV
+[    0.368272] odin kernel: s3: Bringing 0uV into 984000-984000uV
+[    0.368592] odin kernel: s4: Bringing 0uV into 1900000-1900000uV
+[    0.368868] odin kernel: l1: Bringing 0uV into 1000000-1000000uV
+[    0.369166] odin kernel: l2: Bringing 0uV into 1200000-1200000uV
+[    0.369458] odin kernel: l3: Bringing 0uV into 925000-925000uV
+[    0.369735] odin kernel: l5: Bringing 0uV into 1800000-1800000uV
+[    0.370063] odin kernel: l6: Bringing 0uV into 1800000-1800000uV
+[    0.370376] odin kernel: l7: Bringing 0uV into 1800000-1800000uV
+[    0.370687] odin kernel: l8: Bringing 0uV into 2900000-2900000uV
+[    0.370970] odin kernel: l9: Bringing 0uV into 3000000-3000000uV
+[    0.371243] odin kernel: l10: Bringing 0uV into 2800000-2800000uV
+[    0.371550] odin kernel: l11: Bringing 0uV into 2950000-2950000uV
+[    0.371830] odin kernel: l12: Bringing 0uV into 1800000-1800000uV
+[    0.372120] odin kernel: l13: Bringing 0uV into 3125000-3125000uV
+[    0.372469] odin kernel: l16: Bringing 0uV into 1800000-1800000uV
+[    0.372763] odin kernel: l17: Bringing 0uV into 2850000-2850000uV
+[    0.373059] odin kernel: l19: Bringing 0uV into 1200000-1200000uV
+[    0.373367] odin kernel: l22: Bringing 0uV into 2800000-2800000uV
+[    0.373659] odin kernel: l23: Bringing 0uV into 1200000-1200000uV
+[    1.400231] odin kernel: cpu cpu0: Failed to set OPP config
+[    1.436736] odin kernel: qcom_scm: convention: smc arm 64
+[    1.445411] odin kernel: msm_serial 78af000.serial: msm_serial: detected port #0
+[    1.445535] odin kernel: msm_serial 78af000.serial: uartclk = 7372798
+[    1.445961] odin kernel: 78af000.serial: ttyMSM0 at MMIO 0x78af000 (irq = 52, base_baud = 460799) is a MSM
+[    1.446784] odin kernel: msm_serial: console setup on port #0
+[    1.446875] odin kernel: printk: legacy console [ttyMSM0] enabled
+[    3.241619] odin kernel: qcom-iommu soc@0:iommu@1c48000: iommu sec: pgtable size: 135168
+[    3.249661] odin kernel: platform 1c00000.gpu: Adding to iommu group 0
+[    3.255683] odin kernel: platform 1d00000.venus: Adding to iommu group 1
+[    3.257376] odin kernel: platform 7900000.ipa: Adding to iommu group 2
+[    3.263888] odin kernel: i2c_qup 78b7000.i2c: using default clock-frequency 100000
+[    3.270959] odin kernel: i2c_qup 7af6000.i2c: using default clock-frequency 100000
+[    3.281525] odin kernel: genpd_provider cpr_pd_pwr: Freq=652800 Voltage=650000 uV
+[    3.281618] odin kernel: genpd_provider cpr_pd_pwr: Freq=844800 Voltage=675000 uV
+[    3.287362] odin kernel: genpd_provider cpr_pd_pwr: Freq=1036800 Voltage=700000 uV
+[    3.293678] odin kernel: genpd_provider cpr_pd_pwr: Freq=1228800 Voltage=735000 uV
+[    3.299995] odin kernel: genpd_provider cpr_pd_pwr: Freq=1420800 Voltage=770000 uV
+[    3.306429] odin kernel: genpd_provider cpr_pd_pwr: Freq=1612800 Voltage=805000 uV
+[    3.312854] odin kernel: genpd_provider cpr_pd_pwr: Freq=1804800 Voltage=865000 uV
+[    3.319265] odin kernel: genpd_provider cpr_pd_pwr: Freq=2016000 Voltage=945000 uV
+[    3.325700] odin kernel: genpd_provider cpr_pd_pwr: Freq=2208000 Voltage=1015000 uV
+[    3.333451] odin kernel: cpufreq: cpufreq_policy_online: CPU0: Running at unlisted initial frequency: 748800 kHz, changing to: 844800 kHz
+[    3.338930] odin kernel: cpu cpu0: EM: created perf domain
+[    3.402193] odin kernel: input: gpio-keys as /devices/platform/gpio-keys/input/input0
+[    3.402742] odin kernel: clk: Disabling unused clocks
+[    3.434177] odin kernel: PM: genpd: Disabling unused power domains
+[    3.770395] odin kernel: ALSA device list:
+[    3.770821] odin kernel:   No soundcards found.
+[    5.586505] odin kernel: mmc1: SDHCI controller on 7864900.mmc [7864900.mmc] using ADMA 64-bit
+[    6.065470] odin kernel: mmc0: SDHCI controller on 7824900.mmc [7824900.mmc] using ADMA 64-bit
+[    6.835490] odin kernel: Freeing unused kernel memory: 5952K
+[    6.878629] odin kernel: Run /init as init process
+[    6.880013] odin kernel:   with arguments:
+[    6.880264] odin kernel:     /init
+[    6.880386] odin kernel:   with environment:
+[    6.880789] odin kernel:     HOME=/
+[    6.880834] odin kernel:     TERM=linux
+[    9.567447] odin kernel: configfs-gadget.odin gadget.0: HOST MAC 5e:bd:d9:b9:b7:e0
+[    9.573492] odin kernel: configfs-gadget.odin gadget.0: MAC 2a:c1:88:a4:36:ab
+[   12.091734] odin kernel: mmc0: new HS400 MMC card at address 0001
+[   12.351165] odin kernel: mmcblk0: mmc0:0001 DJNB4R 116 GiB
+[   14.699127] odin kernel:  mmcblk0: p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15 p16 p17 p18 p19 p20 p21 p22 p23 p24 p25 p26 p27 p28 p29 p30 p31 p32 p33 p34 p35 p36 p37 p38 p39 p40 p41 p42 p43 p44 p45 p46 p47 p48 p49 p50 p51 p52 p53 p54 p55 p56 p57
+[   16.915619] odin kernel: mmcblk0boot0: mmc0:0001 DJNB4R 4.00 MiB
+[   17.461697] odin kernel: mmcblk0boot1: mmc0:0001 DJNB4R 4.00 MiB
+[   18.106804] odin kernel: EXT4-fs (mmcblk0p1): unable to read superblock
+[   19.984068] odin kernel: gcc-msm8953 1800000.clock-controller: sync_state() pending due to e3000.rng
+[   19.995915] odin kernel: qnoc-msm8953 500000.interconnect: sync_state() pending due to 1a00000.display-subsystem
+[   20.001452] odin kernel: qnoc-msm8953 400000.interconnect: sync_state() pending due to 1a00000.display-subsystem
+[   20.010131] odin kernel: gcc-msm8953 1800000.clock-controller: sync_state() pending due to 1a00000.display-subsystem
+[   20.020325] odin kernel: qnoc-msm8953 500000.interconnect: sync_state() pending due to 1c00000.gpu
+[   20.028259] odin kernel: qnoc-msm8953 400000.interconnect: sync_state() pending due to 1c00000.gpu
+[   20.036061] odin kernel: gcc-msm8953 1800000.clock-controller: sync_state() pending due to 1c00000.gpu
+[   20.043779] odin kernel: qnoc-msm8953 500000.interconnect: sync_state() pending due to 1d00000.venus
+[   20.051961] odin kernel: qnoc-msm8953 400000.interconnect: sync_state() pending due to 1d00000.venus
+[   20.059147] odin kernel: gcc-msm8953 1800000.clock-controller: sync_state() pending due to 1d00000.venus
+[   20.068740] odin kernel: qnoc-msm8953 500000.interconnect: sync_state() pending due to 7900000.ipa
+[   20.076006] odin kernel: qnoc-msm8953 400000.interconnect: sync_state() pending due to 7900000.ipa
+[   20.083212] odin kernel: qnoc-msm8953 580000.interconnect: sync_state() pending due to 7900000.ipa
+[   20.092064] odin kernel: qnoc-msm8953 580000.interconnect:interconnect-snoc: sync_state() pending due to 1d00000.venus
+[   20.098765] odin kernel: qnoc-msm8953 580000.interconnect:interconnect-snoc: sync_state() pending due to 1a00000.display-subsystem
+[   20.318103] odin kernel: mmcblk0rpmb: mmc0:0001 DJNB4R 4.00 MiB, chardev (243:0)
+[   25.384608] odin kernel: EXT4-fs (mmcblk0p13): mounted filesystem af32c008-2a39-7e5b-a5dc-201456d93103 ro with ordered data mode. Quota mode: none.
+[   26.904985] odin kernel: EXT4-fs (mmcblk0p13): unmounting filesystem af32c008-2a39-7e5b-a5dc-201456d93103.
+[   33.806656] odin kernel: ibb: disabling
+[   47.843255] odin kernel: EXT4-fs (mmcblk0p24): mounted filesystem 57f8f4bc-abf4-655f-bf67-946fc0f9f25b ro with ordered data mode. Quota mode: none.
+[   49.101608] odin kernel: EXT4-fs (mmcblk0p24): unmounting filesystem 57f8f4bc-abf4-655f-bf67-946fc0f9f25b.
+[  103.126931] odin kernel: EXT4-fs (mmcblk0p53): mounted filesystem f73de97f-7017-ca5e-9b47-ca9c8f633e83 ro with ordered data mode. Quota mode: none.
+[  104.000156] odin kernel: EXT4-fs (mmcblk0p53): unmounting filesystem f73de97f-7017-ca5e-9b47-ca9c8f633e83.
+[  106.625593] odin kernel: EXT4-fs (mmcblk0p54): mounted filesystem 57f8f4bc-abf4-655f-bf67-946fc0f9f25b ro with ordered data mode. Quota mode: none.
+[  107.993028] odin kernel: EXT4-fs (mmcblk0p54): unmounting filesystem 57f8f4bc-abf4-655f-bf67-946fc0f9f25b.
+[  113.340917] odin kernel: EXT4-fs (mmcblk0p57): mounted filesystem 853d755c-e870-4270-b905-674526ddedf2 ro with ordered data mode. Quota mode: none.
+[  117.126826] odin kernel: EXT4-fs (mmcblk0p57): re-mounted 853d755c-e870-4270-b905-674526ddedf2 r/w.
+[  163.279936] odin kernel: INFO: The task sync:400 has been waiting for writeback completion for more than 1 seconds.
+[  174.708352] odin kernel: EXT4-fs (mmcblk0p24): mounted filesystem 57f8f4bc-abf4-655f-bf67-946fc0f9f25b ro with ordered data mode. Quota mode: none.
+[  180.438426] odin kernel: INFO: The task sync:447 has been waiting for writeback completion for more than 1 seconds.
+[  181.091129] odin kernel: EXT4-fs (mmcblk0p24): unmounting filesystem 57f8f4bc-abf4-655f-bf67-946fc0f9f25b.
+[  184.137776] odin kernel: EXT4-fs (mmcblk0p57): re-mounted 853d755c-e870-4270-b905-674526ddedf2 ro.
+[  187.151308] odin kernel: EXT4-fs (mmcblk0p57): re-mounted 853d755c-e870-4270-b905-674526ddedf2 r/w.
+[  229.519026] odin kernel: INFO: The task sync:568 has been waiting for writeback completion for more than 1 seconds.
+[  229.544819] odin kernel: INFO: The task sync:568 has been waiting for writeback completion for more than 1 seconds.
+[  229.762396] odin kernel: INFO: The task sync:568 has been waiting for writeback completion for more than 1 seconds.
+[  229.764267] odin kernel: INFO: The task sync:568 has been waiting for writeback completion for more than 1 seconds.
+[  229.787677] odin kernel: INFO: The task sync:568 has been waiting for writeback completion for more than 1 seconds.
+[  234.063914] odin kernel: EXT4-fs (mmcblk0p57): re-mounted 853d755c-e870-4270-b905-674526ddedf2 ro.
+[  236.809710] odin kernel: EXT4-fs (mmcblk0p57): re-mounted 853d755c-e870-4270-b905-674526ddedf2 r/w.
+[  306.537858] odin kernel: INFO: The task sync:754 has been waiting for writeback completion for more than 2 seconds.
+[  306.541083] odin kernel: INFO: The task sync:754 has been waiting for writeback completion for more than 2 seconds.
+[  306.567631] odin kernel: INFO: The task sync:754 has been waiting for writeback completion for more than 2 seconds.
+[  306.570594] odin kernel: INFO: The task sync:754 has been waiting for writeback completion for more than 2 seconds.
+[  306.579571] odin kernel: INFO: The task sync:754 has been waiting for writeback completion for more than 2 seconds.
+[  306.587775] odin kernel: INFO: The task sync:754 has been waiting for writeback completion for more than 2 seconds.
+[  306.609034] odin kernel: INFO: The task sync:754 has been waiting for writeback completion for more than 2 seconds.
+[  306.611668] odin kernel: INFO: The task sync:754 has been waiting for writeback completion for more than 2 seconds.
+[  307.108885] odin kernel: INFO: The task sync:754 has been waiting for writeback completion for more than 3 seconds.
+[  310.721367] odin kernel: INFO: The task sync:759 has been waiting for writeback completion for more than 1 seconds.
+[  312.960672] odin kernel: EXT4-fs (mmcblk0p57): re-mounted 853d755c-e870-4270-b905-674526ddedf2 ro.
+[  328.259312] odin systemd[1]: System time before build time, advancing clock.
+[  336.520008] odin kernel: NET: Registered PF_INET6 protocol family
+[  336.794525] odin kernel: Segment Routing with IPv6
+[  336.825938] odin kernel: In-situ OAM (IOAM) with IPv6
+[  343.369309] odin systemd[1]: systemd 252.39-1~deb12u2 running in system mode (+PAM +AUDIT +SELINUX +APPARMOR +IMA +SMACK +SECCOMP +GCRYPT -GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 -IDN +IPTC +KMOD +LIBCRYPTSETUP +LIBFDISK +PCRE2 -PWQUALITY +P11KIT +QRENCODE +TPM2 +BZIP2 +LZ4 +XZ +ZLIB +ZSTD -BPF_FRAMEWORK -XKBCOMMON +UTMP +SYSVINIT default-hierarchy=unified)
+[  343.383392] odin systemd[1]: Detected architecture arm64.
+[  344.895944] odin systemd[1]: Hostname set to <odin>.
+[  345.007421] odin systemd[1]: Initializing machine ID from random generator.
+[  345.018356] odin systemd[1]: Installed transient /etc/machine-id file.
+[  398.389994] odin systemd[1]: Queued start job for default target graphical.target.
+[  398.999863] odin systemd[1]: Created slice system-getty.slice - Slice /system/getty.
+[  399.087516] odin systemd[1]: Created slice system-modprobe.slice - Slice /system/modprobe.
+[  399.170456] odin systemd[1]: Created slice system-serial\x2dgetty.slice - Slice /system/serial-getty.
+[  399.229220] odin systemd[1]: Created slice user.slice - User and Session Slice.
+[  399.252908] odin systemd[1]: Started systemd-ask-password-console.path - Dispatch Password Requests to Console Directory Watch.
+[  399.261820] odin systemd[1]: Started systemd-ask-password-wall.path - Forward Password Requests to Wall Directory Watch.
+[  399.337230] odin systemd[1]: Set up automount proc-sys-fs-binfmt_misc.automount - Arbitrary Executable File Formats File System Automount Point.
+[  399.353990] odin systemd[1]: Expecting device dev-ttyMSM0.device - /dev/ttyMSM0...
+[  399.361451] odin systemd[1]: Reached target cryptsetup.target - Local Encrypted Volumes.
+[  399.366296] odin systemd[1]: Reached target integritysetup.target - Local Integrity Protected Volumes.
+[  399.372964] odin systemd[1]: Reached target paths.target - Path Units.
+[  399.380346] odin systemd[1]: Reached target remote-fs.target - Remote File Systems.
+[  399.386385] odin systemd[1]: Reached target slices.target - Slice Units.
+[  399.393785] odin systemd[1]: Reached target swap.target - Swaps.
+[  399.399884] odin systemd[1]: Reached target veritysetup.target - Local Verity Protected Volumes.
+[  399.434115] odin systemd[1]: Listening on systemd-fsckd.socket - fsck to fsckd communication Socket.
+[  399.445675] odin systemd[1]: Listening on systemd-initctl.socket - initctl Compatibility Named Pipe.
+[  399.546436] odin systemd[1]: Listening on systemd-journald-audit.socket - Journal Audit Socket.
+[  399.579562] odin systemd[1]: Listening on systemd-journald-dev-log.socket - Journal Socket (/dev/log).
+[  399.609535] odin systemd[1]: Listening on systemd-journald.socket - Journal Socket.
+[  399.646400] odin systemd[1]: Listening on systemd-udevd-control.socket - udev Control Socket.
+[  399.664924] odin systemd[1]: Listening on systemd-udevd-kernel.socket - udev Kernel Socket.
+[  400.070165] odin systemd[1]: Mounting dev-hugepages.mount - Huge Pages File System...
+[  400.903567] odin systemd[1]: Mounting dev-mqueue.mount - POSIX Message Queue File System...
+[  401.457781] odin systemd[1]: Mounting sys-kernel-debug.mount - Kernel Debug File System...
+[  402.062024] odin systemd[1]: Mounting sys-kernel-tracing.mount - Kernel Trace File System...
+[  404.907488] odin systemd[1]: Starting fake-hwclock.service - Restore / save the current clock...
+[  405.713917] odin systemd[1]: Starting kmod-static-nodes.service - Create List of Static Device Nodes...
+[  407.400126] odin systemd[1]: Starting modprobe@configfs.service - Load Kernel Module configfs...
+[  408.480564] odin systemd[1]: Starting modprobe@dm_mod.service - Load Kernel Module dm_mod...
+[  409.668030] odin systemd[1]: Starting modprobe@drm.service - Load Kernel Module drm...
+[  410.821605] odin systemd[1]: Starting modprobe@efi_pstore.service - Load Kernel Module efi_pstore...
+[  412.064164] odin systemd[1]: Starting modprobe@fuse.service - Load Kernel Module fuse...
+[  412.951221] odin systemd[1]: Starting modprobe@loop.service - Load Kernel Module loop...
+[  413.909794] odin systemd[1]: Starting systemd-fsck-root.service - File System Check on Root Device...
+[  416.190870] odin systemd[1]: Starting systemd-journald.service - Journal Service...
+[  422.059644] odin systemd[1]: Starting systemd-modules-load.service - Load Kernel Modules...
+[  423.194109] odin systemd[1]: Starting systemd-udev-trigger.service - Coldplug All udev Devices...
+[  424.656398] odin systemd[1]: Finished kmod-static-nodes.service - Create List of Static Device Nodes.
+[  424.691346] odin kernel: fuse: init (API version 7.45)
+[  425.220430] odin systemd[1]: modprobe@configfs.service: Deactivated successfully.
+[  425.358217] odin systemd[1]: Finished modprobe@configfs.service - Load Kernel Module configfs.
+[  425.469208] odin systemd[1]: modprobe@configfs.service: Consumed 1.632s CPU time.
+[  426.817342] odin systemd[1]: Mounted dev-hugepages.mount - Huge Pages File System.
+[  427.090856] odin systemd[1]: Mounted dev-mqueue.mount - POSIX Message Queue File System.
+[  427.248841] odin systemd[1]: Mounted sys-kernel-debug.mount - Kernel Debug File System.
+[  427.487369] odin systemd[1]: Mounted sys-kernel-tracing.mount - Kernel Trace File System.
+[  427.709768] odin systemd[1]: modprobe@dm_mod.service: Deactivated successfully.
+[  427.833807] odin systemd[1]: Finished modprobe@dm_mod.service - Load Kernel Module dm_mod.
+[  428.025827] odin systemd[1]: modprobe@dm_mod.service: Consumed 2.087s CPU time.
+[  428.714643] odin systemd[1]: modprobe@efi_pstore.service: Deactivated successfully.
+[  428.904055] odin systemd[1]: Finished modprobe@efi_pstore.service - Load Kernel Module efi_pstore.
+[  429.103444] odin systemd[1]: modprobe@efi_pstore.service: Consumed 2.082s CPU time.
+[  429.415101] odin systemd[1]: modprobe@fuse.service: Deactivated successfully.
+[  429.492838] odin systemd[1]: Finished modprobe@fuse.service - Load Kernel Module fuse.
+[  429.555892] odin systemd[1]: modprobe@fuse.service: Consumed 5.271s CPU time.
+[  430.102829] odin systemd[1]: modprobe@loop.service: Deactivated successfully.
+[  430.586941] odin systemd[1]: Finished modprobe@loop.service - Load Kernel Module loop.
+[  430.793554] odin systemd[1]: modprobe@loop.service: Consumed 2.327s CPU time.
+[  432.102702] odin systemd[1]: Mounting sys-fs-fuse-connections.mount - FUSE Control File System...
+[  434.122377] odin systemd[1]: Started systemd-fsckd.service - File System Check Daemon to report status.
+[  434.572536] odin systemd[1]: systemd-repart.service - Repartition Root Disk was skipped because no trigger condition checks were met.
+[  435.122271] odin systemd[1]: Finished fake-hwclock.service - Restore / save the current clock.
+[  436.437243] odin systemd-journald[804]: Journal started
+[  436.468967] odin systemd-journald[804]: Runtime Journal (/run/log/journal/32ed4cdfac984a4a8011df97cfca1e82) is 8.3M, max 70.8M, 62.5M free.
+[  436.547444] odin systemd[1]: Mounted sys-fs-fuse-connections.mount - FUSE Control File System.
+[  436.761958] odin systemd[1]: Started systemd-journald.service - Journal Service.
+[  436.822762] odin fake-hwclock[813]: Sat Sep  5 02:54:21 UTC 2026
+[  437.230750] odin systemd[1]: modprobe@drm.service: Deactivated successfully.
+[  437.618451] odin systemd[1]: Finished modprobe@drm.service - Load Kernel Module drm.
+[  437.675201] odin systemd[1]: modprobe@drm.service: Consumed 8.326s CPU time.
+[  441.599879] odin systemd-fsck[816]: pmOS_root: clean, 16066/16576 files, 163939/225280 blocks
+[  442.830225] odin systemd[1]: Finished systemd-fsck-root.service - File System Check on Root Device.
+[  444.022878] odin systemd[1]: Starting systemd-remount-fs.service - Remount Root and Kernel File Systems...
+[  451.493820] odin systemd[1]: Finished systemd-udev-trigger.service - Coldplug All udev Devices.
+[  451.896257] odin kernel: EXT4-fs (mmcblk0p57): re-mounted 853d755c-e870-4270-b905-674526ddedf2 r/w.
+[  452.838989] odin systemd[1]: Finished systemd-remount-fs.service - Remount Root and Kernel File Systems.
+[  453.176790] odin systemd[1]: systemd-firstboot.service - First Boot Wizard was skipped because of an unmet condition check (ConditionFirstBoot=yes).
+[  453.709857] odin systemd[1]: Starting systemd-journal-flush.service - Flush Journal to Persistent Storage...
+[  453.908768] odin systemd[1]: systemd-pstore.service - Platform Persistent Storage Archival was skipped because of an unmet condition check (ConditionDirectoryNotEmpty=/sys/fs/pstore).
+[  454.535859] odin systemd[1]: Starting systemd-random-seed.service - Load/Save Random Seed...
+[  455.165020] odin systemd[1]: Starting systemd-sysusers.service - Create System Users...
+[  462.192768] odin systemd-journald[804]: Time spent on flushing to /var/log/journal/32ed4cdfac984a4a8011df97cfca1e82 is 764.911ms for 463 entries.
+[  462.192768] odin systemd-journald[804]: System Journal (/var/log/journal/32ed4cdfac984a4a8011df97cfca1e82) is 8.5M, max 84.2M, 75.7M free.
+[  462.219993] odin systemd-journald[804]: Received client request to flush runtime journal.
+[  463.911548] odin kernel: cfg80211: Loading compiled-in X.509 certificates for regulatory database
+[  466.076933] odin kernel: Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+[  466.095251] odin kernel: Loaded X.509 cert 'wens: 61c038651aabdcf94bd0ac7ff06c7248db18c600'
+[  467.615742] odin kernel: cfg80211: loaded regulatory.db is malformed or signature is missing/invalid
+[  487.096634] odin systemd[1]: Finished systemd-random-seed.service - Load/Save Random Seed.
+[  487.501222] odin systemd[1]: first-boot-complete.target - First Boot Complete was skipped because of an unmet condition check (ConditionFirstBoot=yes).
+[  487.585104] odin systemd[1]: systemd-fsckd.service: Deactivated successfully.
+[  487.635770] odin systemd[1]: systemd-fsckd.service: Consumed 2.987s CPU time.
+[  487.665829] odin systemd[1]: Finished systemd-sysusers.service - Create System Users.
+[  487.687529] odin systemd[1]: Starting systemd-tmpfiles-setup-dev.service - Create Static Device Nodes in /dev...
+[  487.702390] odin systemd-modules-load[807]: Inserted module 'wcn36xx'
+[  488.015902] odin systemd[1]: Finished systemd-journal-flush.service - Flush Journal to Persistent Storage.
+[  489.731128] odin systemd[1]: dev-ttyMSM0.device: Job dev-ttyMSM0.device/start timed out.
+[  489.819976] odin systemd[1]: Timed out waiting for device dev-ttyMSM0.device - /dev/ttyMSM0.
+[  489.843321] odin systemd[1]: Dependency failed for serial-getty@ttyMSM0.service - Serial Getty on ttyMSM0.
+[  489.845747] odin systemd[1]: serial-getty@ttyMSM0.service: Job serial-getty@ttyMSM0.service/start failed with result 'dependency'.
+[  489.847449] odin systemd[1]: dev-ttyMSM0.device: Job dev-ttyMSM0.device/start failed with result 'timeout'.
+[  490.654533] odin systemd[1]: Finished systemd-tmpfiles-setup-dev.service - Create Static Device Nodes in /dev.
+[  490.856964] odin systemd[1]: Reached target local-fs-pre.target - Preparation for Local File Systems.
+[  493.002229] odin systemd[1]: Mounting tmp.mount - /tmp...
+[  494.133066] odin systemd[1]: Starting systemd-udevd.service - Rule-based Manager for Device Events and Files...
+[  494.527510] odin systemd[1]: Mounted tmp.mount - /tmp.
+[  494.682481] odin systemd[1]: Reached target local-fs.target - Local File Systems.
+[  496.663961] odin systemd[1]: systemd-binfmt.service - Set Up Additional Binary Formats was skipped because no trigger condition checks were met.
+[  497.688890] odin systemd[1]: Starting systemd-machine-id-commit.service - Commit a transient machine-id on disk...
+[  498.550213] odin systemd[1]: Starting systemd-tmpfiles-setup.service - Create System Files and Directories...
+[  505.982944] odin systemd-udevd[837]: Using default interface naming scheme 'v252'.
+[  508.976841] odin systemd[1]: Finished systemd-tmpfiles-setup.service - Create System Files and Directories.
+[  511.908848] odin systemd[1]: Starting systemd-timesyncd.service - Network Time Synchronization...
+[  512.177163] odin kernel: NET: Registered PF_QIPCRTR protocol family
+[  512.755635] odin kernel: remoteproc remoteproc0: a204000.remoteproc is available
+[  512.824164] odin kernel: remoteproc remoteproc0: powering up a204000.remoteproc
+[  512.829403] odin kernel: remoteproc remoteproc0: Booting fw image wcnss.mdt, size 7324
+[  513.465710] odin systemd[1]: Starting systemd-update-utmp.service - Record System Boot/Shutdown in UTMP...
+[  513.607582] odin systemd-modules-load[807]: Inserted module 'qcom_wcnss_pil'
+[  513.775535] odin systemd[1]: systemd-modules-load.service: start operation timed out. Terminating.
+[  514.254870] odin systemd[1]: systemd-modules-load.service: Main process exited, code=killed, status=15/TERM
+[  519.651684] odin systemd[1]: systemd-modules-load.service: Failed with result 'timeout'.
+[  520.316911] odin systemd[1]: Failed to start systemd-modules-load.service - Load Kernel Modules.
+[  520.821098] odin systemd[1]: systemd-modules-load.service: Consumed 24.060s CPU time.
+[  521.155507] odin systemd[1]: Starting systemd-sysctl.service - Apply Kernel Variables...
+[  521.282033] odin systemd[1]: etc-machine\x2did.mount: Deactivated successfully.
+[  521.507154] odin systemd[1]: Finished systemd-machine-id-commit.service - Commit a transient machine-id on disk.
+[  522.927042] odin systemd[1]: Finished systemd-update-utmp.service - Record System Boot/Shutdown in UTMP.
+[  524.840897] odin systemd[1]: Finished systemd-sysctl.service - Apply Kernel Variables.
+[  526.099493] odin systemd[1]: Starting systemd-resolved.service - Network Name Resolution...
+[  531.485463] odin systemd[1]: Started systemd-timesyncd.service - Network Time Synchronization.
+[  531.907426] odin systemd[1]: Reached target time-set.target - System Time Set.
+[  539.894881] odin systemd-resolved[849]: Positive Trust Anchors:
+[  540.060895] odin systemd-resolved[849]: . IN DS 20326 8 2 e06d44b80b8f1d39a95c0b0d7c65d08458e880409bbc683457104237c7f8ec8d
+[  540.069853] odin systemd-resolved[849]: . IN DS 38696 8 2 683d2d0acb8c9b712a1948b27f741219298d0a450d612c483af444a4c0fb2b16
+[  540.071374] odin systemd-resolved[849]: Negative trust anchors: home.arpa 10.in-addr.arpa 16.172.in-addr.arpa 17.172.in-addr.arpa 18.172.in-addr.arpa 19.172.in-addr.arpa 20.172.in-addr.arpa 21.172.in-addr.arpa 22.172.in-addr.arpa 23.172.in-addr.arpa 24.172.in-addr.arpa 25.172.in-addr.arpa 26.172.in-addr.arpa 27.172.in-addr.arpa 28.172.in-addr.arpa 29.172.in-addr.arpa 30.172.in-addr.arpa 31.172.in-addr.arpa 170.0.0.192.in-addr.arpa 171.0.0.192.in-addr.arpa 168.192.in-addr.arpa d.f.ip6.arpa ipv4only.arpa corp home internal intranet lan local private test
+[  552.127265] odin kernel: hrtimer: interrupt took 488425469 ns
+[  577.239356] odin kernel: sched: DL replenish lagged too much
+[  582.459648] odin kernel: sdhci_msm 7864900.mmc: mmc1: pwr_irq for req: (1) timed out
+[  582.566295] odin kernel: mmc1: Reset 0x1 never completed.
+[  582.568760] odin kernel: mmc1: sdhci: ============ SDHCI REGISTER DUMP ===========
+[  582.570751] odin kernel: qcom-wcnss-pil a204000.remoteproc: fatal error received: dog.c:1569:Watchdog startup timeout
+[  582.572630] odin kernel: mmc1: sdhci: Sys addr:  0x00000000 | Version:  0x00004d02
+[  582.572881] odin kernel: mmc1: sdhci: Blk size:  0x00000000 | Blk cnt:  0x00000000
+[  582.573094] odin kernel: mmc1: sdhci: Argument:  0x00000000 | Trn mode: 0x00000000
+[  582.573269] odin kernel: mmc1: sdhci: Present:   0x01f80000 | Host ctl: 0x00000000
+[  582.573495] odin kernel: mmc1: sdhci: Power:     0x00000000 | Blk gap:  0x00000000
+[  582.573884] odin kernel: mmc1: sdhci: Wake-up:   0x00000000 | Clock:    0x00000003
+[  582.575031] odin kernel: mmc1: sdhci: Timeout:   0x00000000 | Int stat: 0x00000000
+[  582.575715] odin kernel: mmc1: sdhci: Int enab:  0x00000000 | Sig enab: 0x00000000
+[  582.580091] odin kernel: remoteproc remoteproc0: crash detected in a204000.remoteproc: type fatal error
+[  582.583373] odin kernel: mmc1: sdhci: ACmd stat: 0x00000000 | Slot int: 0x00000000
+[  582.583907] odin kernel: mmc1: sdhci: Caps:      0x322dc8b2 | Caps_1:   0x00008007
+[  582.584217] odin kernel: mmc1: sdhci: Cmd:       0x00000000 | Max curr: 0x00000000
+[  582.585214] odin kernel: mmc1: sdhci: Resp[0]:   0x00000000 | Resp[1]:  0x00000000
+[  582.669886] odin kernel: mmc1: sdhci: Resp[2]:   0x00000000 | Resp[3]:  0x00000000
+[  582.675651] odin kernel: mmc1: sdhci: Host ctl2: 0x00000000
+[  582.682061] odin kernel: mmc1: sdhci: ADMA Err:  0x00000000 | ADMA Ptr: 0x0000000000000000
+[  582.687066] odin kernel: mmc1: sdhci_msm: ----------- VENDOR REGISTER DUMP -----------
+[  582.693870] odin kernel: mmc1: sdhci_msm: DLL sts: 0x00000000 | DLL cfg:  0x6000642c | DLL cfg2: 0x0020a000
+[  582.701732] odin kernel: mmc1: sdhci_msm: DLL cfg3: 0x00000000 | DLL usr ctl:  0x00000000 | DDR cfg: 0x80040873
+[  582.711207] odin kernel: mmc1: sdhci_msm: Vndr func: 0x00018a9c | Vndr func2 : 0xfa8018a8 Vndr func3: 0x00424040
+[  582.718272] odin kernel: mmc1: sdhci: ============================================
+[  583.056292] odin kernel: remoteproc remoteproc0: remote processor a204000.remoteproc is now up
+[  583.124494] odin kernel: remoteproc remoteproc0: handling crash #1 in a204000.remoteproc
+[  583.135794] odin kernel: remoteproc remoteproc0: recovering a204000.remoteproc
+[  584.044651] odin systemd[1]: systemd-udevd.service: start operation timed out. Terminating.
+[  584.148160] odin kernel:  remoteproc0:smd-edge: remote side did not enter opening state
+[  584.164258] odin kernel: qcom_wcnss_ctrl remoteproc0:smd-edge.WCNSS_CTRL.-1.-1: failed to create endpoint
+[  584.167908] odin kernel: qcom_wcnss_ctrl remoteproc0:smd-edge.WCNSS_CTRL.-1.-1: probe with driver qcom_wcnss_ctrl failed with error -12
+[  585.266946] odin kernel:  remoteproc0:smd-edge: remote side did not enter opening state
+[  585.278314] odin kernel: qcom_sysmon remoteproc0:smd-edge.sys_mon.-1.-1: failed to create endpoint
+[  585.279994] odin kernel: qcom_sysmon remoteproc0:smd-edge.sys_mon.-1.-1: probe with driver qcom_sysmon failed with error -12
+[  585.710646] odin systemd-udevd[837]: /etc/udev/rules.d/99-odin-usb-role.rules:26 Invalid key/value pair, ignoring.
+[  585.929076] odin systemd-udevd[837]: /etc/udev/rules.d/99-odin-usb-role.rules:27 Invalid key/value pair, ignoring.
+[  585.946490] odin systemd-udevd[837]: /etc/udev/rules.d/99-odin-usb-role.rules:30 Invalid key/value pair, ignoring.
+[  585.950025] odin systemd-udevd[837]: /etc/udev/rules.d/99-odin-usb-role.rules:33 Invalid key/value pair, ignoring.
+[  587.107980] odin systemd[1]: systemd-udevd.service: Failed with result 'timeout'.
+[  587.302457] odin systemd[1]: Failed to start systemd-udevd.service - Rule-based Manager for Device Events and Files.
+[  587.423577] odin systemd[1]: systemd-udevd.service: Consumed 12.916s CPU time.
+[  587.565249] odin systemd[1]: systemd-udevd.service: Scheduled restart job, restart counter is at 1.
+[  587.602069] odin systemd[1]: Stopped systemd-udevd.service - Rule-based Manager for Device Events and Files.
+[  587.733185] odin systemd[1]: systemd-udevd.service: Consumed 12.916s CPU time.
+[  588.867752] odin systemd[1]: Starting systemd-udevd.service - Rule-based Manager for Device Events and Files...
+[  590.599003] odin kernel: qcom-wcnss-pil a204000.remoteproc: timed out on wait
+[  590.642149] odin kernel: remoteproc remoteproc0: stopped remote processor a204000.remoteproc
+[  593.753984] odin systemd-udevd[858]: Using default interface naming scheme 'v252'.
+[  594.398734] odin systemd-udevd[858]: /etc/udev/rules.d/99-odin-usb-role.rules:26 Invalid key/value pair, ignoring.
+[  594.486752] odin systemd-udevd[858]: /etc/udev/rules.d/99-odin-usb-role.rules:27 Invalid key/value pair, ignoring.
+[  594.495383] odin systemd-udevd[858]: /etc/udev/rules.d/99-odin-usb-role.rules:30 Invalid key/value pair, ignoring.
+[  594.497261] odin systemd-udevd[858]: /etc/udev/rules.d/99-odin-usb-role.rules:33 Invalid key/value pair, ignoring.
+[  595.582003] odin systemd[1]: Started systemd-udevd.service - Rule-based Manager for Device Events and Files.
+[  599.977827] odin systemd[1]: Listening on systemd-rfkill.socket - Load/Save RF Kill Switch Status /dev/rfkill Watch.
+[  614.978932] odin (udev-worker)[861]: usb0: Could not set Alias=, MACAddress=/MACAddressPolicy=, TransmitQueues=, ReceiveQueues=, TransmitQueueLength=, MTUBytes=, GenericSegmentOffloadMaxBytes= or GenericSegmentOffloadMaxSegments=, ignoring: Device or resource busy
+[  615.833944] odin systemd[1]: systemd-resolved.service: start operation timed out. Terminating.
+[  683.334043] odin kernel: remoteproc remoteproc0: remote processor a204000.remoteproc is now up
+[  685.267099] odin kernel: qcom-wcnss-pil a204000.remoteproc: fatal error received: dog.c:1569:Watchdog startup timeout
+[  685.310496] odin kernel: remoteproc remoteproc0: crash detected in a204000.remoteproc: type fatal error
+[  685.338235] odin kernel: remoteproc remoteproc0: handling crash #2 in a204000.remoteproc
+[  685.343794] odin kernel:  remoteproc0:smd-edge: remote side did not enter opening state
+[  685.346083] odin kernel: remoteproc remoteproc0: recovering a204000.remoteproc
+[  685.375154] odin kernel: qcom_wcnss_ctrl remoteproc0:smd-edge.WCNSS_CTRL.-1.-1: failed to create endpoint
+[  685.380356] odin kernel: qcom_wcnss_ctrl remoteproc0:smd-edge.WCNSS_CTRL.-1.-1: probe with driver qcom_wcnss_ctrl failed with error -12
+[  689.073848] odin systemd-udevd[858]: mmcblk0p3: Worker [890] processing SEQNUM=1487 is taking a long time
+[  689.053989] odin kernel:  remoteproc0:smd-edge: remote side did not enter opening state
+[  689.254054] odin kernel: qcom_sysmon remoteproc0:smd-edge.sys_mon.-1.-1: failed to create endpoint
+[  689.280365] odin kernel: qcom_sysmon remoteproc0:smd-edge.sys_mon.-1.-1: probe with driver qcom_sysmon failed with error -12
+[  692.167565] odin systemd-udevd[858]: mmcblk0p21: Worker [880] processing SEQNUM=1478 is taking a long time
+[  692.698123] odin systemd-udevd[858]: mmcblk0p28: Worker [887] processing SEQNUM=1485 is taking a long time
+[  692.921275] odin systemd-udevd[858]: mmcblk0p29: Worker [889] processing SEQNUM=1486 is taking a long time
+[  698.375458] odin kernel: qcom-wcnss-pil a204000.remoteproc: timed out on wait
+[  698.495193] odin kernel: remoteproc remoteproc0: stopped remote processor a204000.remoteproc
+[  706.586495] odin systemd[1]: systemd-resolved.service: State 'stop-sigterm' timed out. Killing.
+[  706.925891] odin systemd[1]: systemd-resolved.service: Killing process 849 (systemd-resolve) with signal SIGKILL.
+[  707.375876] odin systemd-udevd[858]: mmcblk0p30: Worker [863] processing SEQNUM=1488 is taking a long time
+[  707.843844] odin systemd-udevd[858]: mmcblk0p45: Worker [860] processing SEQNUM=1504 is taking a long time
+[  708.004885] odin systemd-udevd[858]: mmcblk0p44: Worker [868] processing SEQNUM=1503 is taking a long time
+[  708.052700] odin systemd[1]: systemd-resolved.service: Main process exited, code=killed, status=9/KILL
+[  708.339063] odin systemd[1]: systemd-resolved.service: Failed with result 'timeout'.
+[  708.508623] odin systemd[1]: Failed to start systemd-resolved.service - Network Name Resolution.
+[  708.717296] odin systemd[1]: systemd-resolved.service: Consumed 1min 6.684s CPU time.
+[  709.975375] odin systemd[1]: systemd-resolved.service: Scheduled restart job, restart counter is at 1.
+[  722.368599] odin systemd[1]: Stopped systemd-resolved.service - Network Name Resolution.
+[  722.617721] odin systemd[1]: systemd-resolved.service: Consumed 1min 6.684s CPU time.
+[  725.547211] odin systemd[1]: Starting systemd-resolved.service - Network Name Resolution...
+[  738.111119] odin systemd-resolved[897]: Positive Trust Anchors:
+[  738.438638] odin systemd-resolved[897]: . IN DS 20326 8 2 e06d44b80b8f1d39a95c0b0d7c65d08458e880409bbc683457104237c7f8ec8d
+[  738.479031] odin systemd-resolved[897]: . IN DS 38696 8 2 683d2d0acb8c9b712a1948b27f741219298d0a450d612c483af444a4c0fb2b16
+[  738.485716] odin systemd-resolved[897]: Negative trust anchors: home.arpa 10.in-addr.arpa 16.172.in-addr.arpa 17.172.in-addr.arpa 18.172.in-addr.arpa 19.172.in-addr.arpa 20.172.in-addr.arpa 21.172.in-addr.arpa 22.172.in-addr.arpa 23.172.in-addr.arpa 24.172.in-addr.arpa 25.172.in-addr.arpa 26.172.in-addr.arpa 27.172.in-addr.arpa 28.172.in-addr.arpa 29.172.in-addr.arpa 30.172.in-addr.arpa 31.172.in-addr.arpa 170.0.0.192.in-addr.arpa 171.0.0.192.in-addr.arpa 168.192.in-addr.arpa d.f.ip6.arpa ipv4only.arpa corp home internal intranet lan local private test
+[  753.918752] odin systemd[1]: Reached target usb-gadget.target - Hardware activated USB gadget.
+[  795.194719] odin kernel: qcom-wcnss-pil a204000.remoteproc: fatal error received: dog.c:1569:Watchdog startup timeout
+[  795.218285] odin kernel: remoteproc remoteproc0: crash detected in a204000.remoteproc: type fatal error
+[  795.779913] odin kernel: remoteproc remoteproc0: remote processor a204000.remoteproc is now up
+[  795.825174] odin kernel: remoteproc remoteproc0: handling crash #3 in a204000.remoteproc
+[  795.830352] odin kernel: remoteproc remoteproc0: recovering a204000.remoteproc
+[  797.951039] odin kernel: mc: Linux media interface: v0.10
+[  801.278843] odin kernel: qcom-wcnss-pil a204000.remoteproc: timed out on wait
+[  801.431330] odin kernel: remoteproc remoteproc0: stopped remote processor a204000.remoteproc
+[  808.318899] odin systemd-udevd[858]: 1d00000.venus: Worker [865] processing SEQNUM=1940 is taking a long time
+[  809.026893] odin systemd-udevd[858]: 1a00000.display-subsystem: Worker [866] processing SEQNUM=1938 is taking a long time
+[  810.050630] odin kernel: rtc-pm8xxx 200f000.spmi:pmic@0:rtc@6000: registered as rtc0
+[  811.184092] odin kernel: input: pm8941_pwrkey as /devices/platform/soc@0/200f000.spmi/spmi-0/0-00/200f000.spmi:pmic@0:pon@800/200f000.spmi:pmic@0:pon@800:pwrkey/input/input1
+[  811.374261] odin (udev-worker)[884]: mmc0::: Spawned process 'bright-helper input g+w /sys/class/leds/mmc0::/brightness' [901] is taking longer than 15s to complete
+[  813.347991] odin systemd-udevd[858]: mmc0::: Worker [884] processing SEQNUM=2014 is taking a long time
+[  814.774860] odin systemd[1]: systemd-resolved.service: start operation timed out. Terminating.
+[  815.771545] odin systemd-udevd[858]: 200f000.spmi:pmic@0:pon@800: Worker [868] processing SEQNUM=1947 is taking a long time
+[  816.202214] odin systemd-udevd[858]: 200f000.spmi:pmic@0:adc@3100: Worker [889] processing SEQNUM=1944 is taking a long time
+[  817.761407] odin kernel: input: pm8941_resin as /devices/platform/soc@0/200f000.spmi/spmi-0/0-00/200f000.spmi:pmic@0:pon@800/200f000.spmi:pmic@0:pon@800:resin/input/input2
+[  819.542098] odin kernel: videodev: Linux video capture interface: v2.00
+[  828.177401] odin systemd[1]: Created slice system-systemd\x2dbacklight.slice - Slice /system/systemd-backlight.
+[  829.539520] odin systemd[1]: Starting systemd-backlight@backlight:backlight.service - Load/Save Screen Backlight Brightness of backlight:backlight...
+[  834.545305] odin systemd-resolved[897]: Using system hostname 'odin'.
+[  835.688253] odin kernel: edt_ft5x06 0-0038: supply vcc not found, using dummy regulator
+[  836.321254] odin kernel: edt_ft5x06 0-0038: touchscreen probe failed
+[  836.947252] odin kernel: edt_ft5x06 0-0038: probe with driver edt_ft5x06 failed with error -5
+[  838.893672] odin systemd[1]: Finished systemd-backlight@backlight:backlight.service - Load/Save Screen Backlight Brightness of backlight:backlight.
+[  839.830265] odin kernel: remoteproc remoteproc1: adsp is available
+[  840.110007] odin kernel: remoteproc remoteproc1: powering up adsp
+[  840.150986] odin kernel: remoteproc remoteproc1: Booting fw image adsp.mdt, size 7452
+[  841.468671] odin systemd[1]: systemd-resolved.service: Failed with result 'timeout'.
+[  841.901838] odin kernel: qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: DT property missing, MBHC btn detection disabled
+[  841.961349] odin kernel: qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: supply vdd-cdc-io not found, using dummy regulator
+[  842.022988] odin kernel: qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: supply vdd-cdc-tx-rx-cx not found, using dummy regulator
+[  843.079750] odin systemd[1]: Failed to start systemd-resolved.service - Network Name Resolution.
+[  843.407929] odin systemd[1]: systemd-resolved.service: Consumed 57.072s CPU time.
+[  843.580895] odin systemd[1]: systemd-resolved.service: Scheduled restart job, restart counter is at 2.
+[  843.779364] odin systemd[1]: Stopped systemd-resolved.service - Network Name Resolution.
+[  843.910528] odin systemd[1]: systemd-resolved.service: Consumed 57.072s CPU time.
+[  844.842084] odin systemd[1]: Starting systemd-resolved.service - Network Name Resolution...
+[  857.047646] odin systemd-resolved[923]: Positive Trust Anchors:
+[  897.192874] odin kernel: remoteproc remoteproc0: remote processor a204000.remoteproc is now up
+[  898.041778] odin systemd-resolved[923]: . IN DS 20326 8 2 e06d44b80b8f1d39a95c0b0d7c65d08458e880409bbc683457104237c7f8ec8d
+[  898.397511] odin kernel:  remoteproc0:smd-edge: remote side did not enter opening state
+[  898.407927] odin kernel: qcom_wcnss_ctrl remoteproc0:smd-edge.WCNSS_CTRL.-1.-1: failed to create endpoint
+[  898.427442] odin kernel: qcom_wcnss_ctrl remoteproc0:smd-edge.WCNSS_CTRL.-1.-1: probe with driver qcom_wcnss_ctrl failed with error -12
+[  898.488427] odin kernel: qcom-wcnss-pil a204000.remoteproc: fatal error received: dog.c:1569:Watchdog startup timeout
+[  898.511543] odin kernel: remoteproc remoteproc0: crash detected in a204000.remoteproc: type fatal error
+[  898.516182] odin kernel: remoteproc remoteproc0: handling crash #4 in a204000.remoteproc
+[  898.518577] odin kernel: remoteproc remoteproc0: recovering a204000.remoteproc
+[  901.212437] odin kernel:  remoteproc0:smd-edge: remote side did not enter opening state
+[  901.253568] odin kernel: qcom_sysmon remoteproc0:smd-edge.sys_mon.-1.-1: failed to create endpoint
+[  901.259978] odin kernel: qcom_sysmon remoteproc0:smd-edge.sys_mon.-1.-1: probe with driver qcom_sysmon failed with error -12
+[  901.902139] odin systemd-resolved[923]: . IN DS 38696 8 2 683d2d0acb8c9b712a1948b27f741219298d0a450d612c483af444a4c0fb2b16
+[  902.123945] odin systemd-resolved[923]: Negative trust anchors: home.arpa 10.in-addr.arpa 16.172.in-addr.arpa 17.172.in-addr.arpa 18.172.in-addr.arpa 19.172.in-addr.arpa 20.172.in-addr.arpa 21.172.in-addr.arpa 22.172.in-addr.arpa 23.172.in-addr.arpa 24.172.in-addr.arpa 25.172.in-addr.arpa 26.172.in-addr.arpa 27.172.in-addr.arpa 28.172.in-addr.arpa 29.172.in-addr.arpa 30.172.in-addr.arpa 31.172.in-addr.arpa 170.0.0.192.in-addr.arpa 171.0.0.192.in-addr.arpa 168.192.in-addr.arpa d.f.ip6.arpa ipv4only.arpa corp home internal intranet lan local private test
+[  906.762429] odin kernel: qcom-wcnss-pil a204000.remoteproc: timed out on wait
+[  906.975118] odin kernel: remoteproc remoteproc0: stopped remote processor a204000.remoteproc
+[  922.938849] odin kernel: qcom-venus 1d00000.venus: Unsupported property: 0
+[  922.955152] odin kernel: qcom-venus 1d00000.venus: truncated property 0x1007: need 20 bytes, 12 left
+[  925.642925] odin systemd-udevd[858]: 1a00000.display-subsystem: Worker [866] processing SEQNUM=1938 killed
+[  926.302549] odin systemd-udevd[858]: 1d00000.venus: Worker [865] processing SEQNUM=1940 killed
+[  927.575174] odin systemd-udevd[858]: 1d00000.venus: Worker [865] terminated by signal 9 (KILL).
+[  928.512924] odin kernel: platform 1a01000.display-controller: Adding to iommu group 3
+[  928.513244] odin kernel: /soc@0/display-subsystem@1a00000/display-controller@1a01000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[  928.527790] odin kernel: /soc@0/display-subsystem@1a00000/display-controller@1a01000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[  928.532539] odin kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0
+[  928.545411] odin kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/display-controller@1a01000
+[  928.558318] odin kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[  928.569030] odin systemd-resolved[923]: Using system hostname 'odin'.
+[  928.573324] odin systemd[1]: Started systemd-resolved.service - Network Name Resolution.
+[  928.573923] odin systemd[1]: Reached target nss-lookup.target - Host and Network Name Lookups.
+[  928.574043] odin systemd[1]: Reached target sysinit.target - System Initialization.
+[  928.574635] odin systemd[1]: Started apt-daily.timer - Daily apt download activities.
+[  928.574819] odin systemd[1]: Started apt-daily-upgrade.timer - Daily apt upgrade and clean activities.
+[  928.575118] odin systemd[1]: Started dpkg-db-backup.timer - Daily dpkg database backup timer.
+[  928.575399] odin systemd[1]: Started e2scrub_all.timer - Periodic ext4 Online Metadata Check for All Filesystems.
+[  928.575593] odin systemd[1]: Started exim4-base.timer - Daily exim4-base housekeeping.
+[  928.575901] odin systemd[1]: Started fstrim.timer - Discard unused blocks once a week.
+[  928.576329] odin systemd[1]: Started odin-usb-gadget.timer - ODIN USB role watchdog (self-healing every 30s).
+[  928.576465] odin systemd[1]: Started systemd-tmpfiles-clean.timer - Daily Cleanup of Temporary Directories.
+[  928.576568] odin systemd[1]: Reached target timers.target - Timer Units.
+[  928.578654] odin systemd-udevd[858]: 1a00000.display-subsystem: Worker [866] terminated by signal 9 (KILL).
+[  928.578978] odin systemd[1]: Listening on dbus.socket - D-Bus System Message Bus Socket.
+[  928.579106] odin systemd[1]: Reached target sockets.target - Socket Units.
+[  928.579199] odin systemd[1]: systemd-pcrphase-sysinit.service - TPM2 PCR Barrier (Initialization) was skipped because of an unmet condition check (ConditionPathExists=/sys/firmware/efi/efivars/StubPcrKernelImage-4a67b082-0a4c-41cf-b6c7-440b29bb8c4f).
+[  928.579316] odin systemd[1]: Reached target basic.target - Basic System.
+[  928.600447] odin kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0
+[  928.600730] odin kernel: /soc@0/display-subsystem@1a00000/dsi@1a94000/panel@0: Fixed dependency cycle(s) with /soc@0/display-subsystem@1a00000/dsi@1a94000
+[  928.614998] odin kernel: msm_dpu 1a01000.display-controller: bound 1a94000.dsi (ops dsi_ops [msm])
+[  928.626610] odin kernel: adreno 1c00000.gpu: supply vdd not found, using dummy regulator
+[  928.613819] odin systemd[1]: Started cron.service - Regular background program processing daemon.
+[  928.633452] odin kernel: adreno 1c00000.gpu: supply vddcx not found, using dummy regulator
+[  928.622271] odin cron[939]: (CRON) INFO (pidfile fd = 3)
+[  928.627058] odin systemd[1]: Starting dbus.service - D-Bus System Message Bus...
+[  928.631522] odin systemd[1]: Starting e2scrub_reap.service - Remove Stale Online ext4 Metadata Check Snapshots...
+[  928.631861] odin systemd[1]: getty-static.service - getty on tty2-tty6 if dbus and logind are not available was skipped because of an unmet condition check (ConditionPathExists=!/usr/bin/dbus-daemon).
+[  928.633039] odin cron[939]: (CRON) INFO (Running @reboot jobs)
+[  928.635582] odin systemd[1]: Starting odin-adsp-fw.service - Provision ADSP (audio DSP) firmware and start the remoteproc...
+[  928.639745] odin systemd[1]: Starting odin-backlight.service - ODIN 默认背光亮度（省电）...
+[  928.645014] odin systemd[1]: Starting odin-firstboot-resize.service - Grow root filesystem to fill userdata (one-shot)...
+[  928.649755] odin systemd[1]: Starting odin-ssh-hostkeys.service - Generate SSH host keys on first boot (image ships none)...
+[  928.651539] odin brightnessctl[945]: Updated device 'backlight':
+[  928.651539] odin brightnessctl[945]: Device 'backlight' of class 'backlight':
+[  928.651539] odin brightnessctl[945]:         Current brightness: 500 (12%)
+[  928.651539] odin brightnessctl[945]:         Max brightness: 4095
+[  928.653701] odin systemd[1]: Starting odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG)...
+[  928.679638] odin kernel: msm_dpu 1a01000.display-controller: bound 1c00000.gpu (ops a3xx_ops [msm])
+[  928.670881] odin systemd[1]: Starting systemd-logind.service - User Login Management...
+[  928.671889] odin systemd[1]: systemd-pcrphase.service - TPM2 PCR Barrier (User) was skipped because of an unmet condition check (ConditionPathExists=/sys/firmware/efi/efivars/StubPcrKernelImage-4a67b082-0a4c-41cf-b6c7-440b29bb8c4f).
+[  928.676354] odin systemd[1]: Finished odin-backlight.service - ODIN 默认背光亮度（省电）.
+[  928.693357] odin kernel: [drm:dpu_kms_hw_init:1173] dpu hardware revision:0x10100000
+[  928.683140] odin odin-adsp-fw.sh[944]: [odin-adsp-fw] 找到 adsp remoteproc: /sys/class/remoteproc/remoteproc1（等了 0s）
+[  928.685175] odin systemd[1]: Starting systemd-tmpfiles-clean.service - Cleanup of Temporary Directories...
+[  928.716750] odin kernel: remoteproc remoteproc1: remote processor adsp is now up
+[  928.706188] odin odin-adsp-fw.sh[944]: [odin-adsp-fw] 固件就位
+[  928.709552] odin systemd[1]: Started dbus.service - D-Bus System Message Bus.
+[  928.728542] odin kernel: [drm] Initialized msm 1.13.0 for 1a01000.display-controller on minor 0
+[  928.728892] odin kernel: msm_dpu 1a01000.display-controller: Direct firmware load for qcom/a530_pm4.fw failed with error -2
+[  928.735181] odin kernel: msm_dpu 1a01000.display-controller: [drm:adreno_request_fw [msm]] *ERROR* failed to load a530_pm4.fw
+[  928.730988] odin systemd[1]: Starting NetworkManager.service - Network Manager...
+[  928.733597] odin odin-adsp-fw.sh[944]: [odin-adsp-fw] ADSP 已 running
+[  928.736546] odin systemd[1]: Starting wpa_supplicant.service - WPA supplicant...
+[  928.739676] odin systemd[1]: e2scrub_reap.service: Deactivated successfully.
+[  928.739969] odin systemd[1]: Finished e2scrub_reap.service - Remove Stale Online ext4 Metadata Check Snapshots.
+[  928.779310] odin kernel: EXT4-fs (mmcblk0p57): resizing filesystem from 225280 to 29338619 blocks
+[  928.814128] odin kernel: qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:3
+[  928.814281] odin kernel: qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:4
+[  928.814342] odin kernel: qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:7
+[  928.814407] odin kernel: qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:8
+[  928.814454] odin kernel: qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:9
+[  928.814501] odin kernel: qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:a
+[  928.814543] odin kernel: qcom,apr remoteproc1:smd-edge.apr_audio_svc.-1.-1: Adding APR/GPR dev: aprsvc:service:4:b
+[  928.808432] odin wpa_supplicant[1007]: Successfully initialized wpa_supplicant
+[  928.827596] odin systemd-logind[963]: New seat seat0.
+[  928.887806] odin kernel: msm8916-wcd-digital-codec c0f0000.codec: using zero-initialized flat cache, this may cause unexpected behavior
+[  928.889407] odin kernel: qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: supply vdd-micbias not found, using dummy regulator
+[  928.889609] odin kernel: qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: PMIC REV: 0         CODEC Version: 4
+[  928.890153] odin kernel: qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: sink widget PDM_RX1 overwritten
+[  928.890338] odin kernel: qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: source widget PDM_RX1 overwritten
+[  928.890383] odin kernel: qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: source widget PDM_RX1 overwritten
+[  928.890401] odin kernel: qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: sink widget PDM_RX1 overwritten
+[  928.890422] odin kernel: qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: sink widget PDM_RX1 overwritten
+[  928.890442] odin kernel: qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: sink widget ADC1 overwritten
+[  928.890468] odin kernel: qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: sink widget ADC1 overwritten
+[  928.890492] odin kernel: qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: sink widget PDM_RX1 overwritten
+[  928.890793] odin kernel: qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: source widget PDM_RX3 overwritten
+[  928.890900] odin kernel: qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: source widget PDM_RX3 overwritten
+[  928.935020] odin kernel: input: smartisan-odin Headset Jack as /devices/platform/soc@0/c051000.sound-card/sound/card0/input4
+[  928.948869] odin kernel: Console: switching to colour frame buffer device 135x120
+[  928.948899] odin kernel: fb0: sys_imageblit: framebuffer is not in virtual address space.
+[  928.976828] odin (udev-worker)[862]: controlC0: Process '/usr/sbin/alsactl -E HOME=/run/alsa -E XDG_RUNTIME_DIR=/run/alsa/runtime restore 0' failed with exit code 99.
+[  928.985306] odin NetworkManager[1005]: <info>  [1788577356.8194] NetworkManager (version 1.42.4) is starting... (boot:65fd7973-cab1-4dee-815d-6de850f50bbc)
+[  928.986245] odin NetworkManager[1005]: <info>  [1788577356.8203] Read config: /etc/NetworkManager/NetworkManager.conf (lib: no-mac-addr-change.conf) (etc: 99-odin-usb0.conf)
+[  928.991313] odin NetworkManager[1005]: <info>  [1788577356.8262] bus-manager: acquired D-Bus service "org.freedesktop.NetworkManager"
+[  929.006781] odin NetworkManager[1005]: <info>  [1788577356.8417] manager[0xaaaaee304000]: monitoring kernel firmware directory '/lib/firmware'.
+[  929.007069] odin NetworkManager[1005]: <info>  [1788577356.8418] monitoring ifupdown state file '/run/network/ifstate'.
+[  929.011179] odin dbus-daemon[942]: [system] Activating via systemd: service name='org.freedesktop.hostname1' unit='dbus-org.freedesktop.hostname1.service' requested by ':1.4' (uid=0 pid=1005 comm="/usr/sbin/NetworkManager --no-daemon")
+[  929.099421] odin kernel: remoteproc remoteproc0: remote processor a204000.remoteproc is now up
+[  929.109623] odin kernel: msm_dpu 1a01000.display-controller: [drm] fb0: msmdrmfb frame buffer device
+[  929.210666] odin systemd[1]: Finished odin-adsp-fw.service - Provision ADSP (audio DSP) firmware and start the remoteproc.
+[  929.219026] odin systemd[1]: systemd-tmpfiles-clean.service: Deactivated successfully.
+[  929.219522] odin systemd[1]: Finished systemd-tmpfiles-clean.service - Cleanup of Temporary Directories.
+[  929.220238] odin systemd-logind[963]: Watching system buttons on /dev/input/event1 (pm8941_pwrkey)
+[  929.222502] odin systemd[1]: run-credentials-systemd\x2dtmpfiles\x2dclean.service.mount: Deactivated successfully.
+[  929.252518] odin kernel: qcom_wcnss_ctrl remoteproc0:smd-edge.WCNSS_CTRL.-1.-1: WCNSS Version 1.5 1.2
+[  929.252525] odin systemd[1]: Started wpa_supplicant.service - WPA supplicant.
+[  929.253231] odin systemd[1]: Started NetworkManager.service - Network Manager.
+[  929.259160] odin systemd[1]: Started systemd-logind.service - User Login Management.
+[  929.261058] odin systemd[1]: alsa-state.service - Manage Sound Card State (restore and store) was skipped because of an unmet condition check (ConditionPathExists=/etc/alsa/state-daemon.conf).
+[  929.282246] odin systemd[1]: Starting alsa-restore.service - Save/Restore Sound Card State...
+[  929.286212] odin alsactl[1047]: /usr/sbin/alsactl: load_state:1689: Cannot open /var/lib/alsa/asound.state for reading: No such file or directory
+[  929.291942] odin alsactl[1047]: Found hardware: "smartisan-odin" "" "qdsp6" "" ""
+[  929.291942] odin alsactl[1047]: Hardware is initialized using a generic method
+[  929.305755] odin kernel: EXT4-fs (mmcblk0p57): resized filesystem to 29338619
+[  929.293316] odin systemd[1]: Starting systemd-hostnamed.service - Hostname Service...
+[  929.309332] odin systemd[1]: Finished alsa-restore.service - Save/Restore Sound Card State.
+[  929.311268] odin systemd[1]: Reached target sound.target - Sound Card.
+[  929.362683] odin systemd[1]: Created slice system-odin\x2ddnsmasq.slice - Slice /system/odin-dnsmasq.
+[  929.386157] odin systemd[1]: Started odin-dnsmasq@usb0.service - ODIN USB gadget DHCP server on usb0.
+[  929.403796] odin systemctl[1055]: Removed "/etc/systemd/system/multi-user.target.wants/odin-firstboot-resize.service".
+[  929.404686] odin systemd[1]: odin-usb-gadget.service: Deactivated successfully.
+[  929.405166] odin systemd[1]: Finished odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG).
+[  929.410335] odin dnsmasq[1056]: dnsmasq: started, version 2.90 DNS disabled
+[  929.410335] odin dnsmasq[1056]: dnsmasq: compile time options: IPv6 GNU-getopt DBus no-UBus i18n IDN2 DHCP DHCPv6 no-Lua TFTP conntrack ipset nftset auth cryptohash DNSSEC loop-detect inotify dumpfile
+[  929.410335] odin dnsmasq[1056]: dnsmasq-dhcp: DHCP, IP range 172.16.42.2 -- 172.16.42.2, lease time 1h
+[  929.410335] odin dnsmasq[1056]: dnsmasq-dhcp: DHCP, sockets bound exclusively to interface usb0
+[  929.411269] odin systemd[1]: Reloading.
+[  929.431808] odin dbus-daemon[942]: [system] Successfully activated service 'org.freedesktop.hostname1'
+[  929.448783] odin NetworkManager[1005]: <info>  [1788577357.2837] hostname: hostname: using hostnamed
+[  929.449059] odin NetworkManager[1005]: <info>  [1788577357.2838] hostname: static hostname changed from (none) to "odin"
+[  929.452717] odin NetworkManager[1005]: <info>  [1788577357.2876] dns-mgr: init: dns=systemd-resolved rc-manager=unmanaged (auto), plugin=systemd-resolved
+[  929.454200] odin NetworkManager[1005]: <info>  [1788577357.2891] manager[0xaaaaee304000]: rfkill: Wi-Fi hardware radio set enabled
+[  929.454429] odin NetworkManager[1005]: <info>  [1788577357.2892] manager[0xaaaaee304000]: rfkill: WWAN hardware radio set enabled
+[  929.476820] odin NetworkManager[1005]: <info>  [1788577357.3117] Loaded device plugin: NMWwanFactory (/usr/lib/aarch64-linux-gnu/NetworkManager/1.42.4/libnm-device-plugin-wwan.so)
+[  929.479021] odin NetworkManager[1005]: <info>  [1788577357.3140] Loaded device plugin: NMAtmManager (/usr/lib/aarch64-linux-gnu/NetworkManager/1.42.4/libnm-device-plugin-adsl.so)
+[  929.481793] odin NetworkManager[1005]: <info>  [1788577357.3167] Loaded device plugin: NMWifiFactory (/usr/lib/aarch64-linux-gnu/NetworkManager/1.42.4/libnm-device-plugin-wifi.so)
+[  929.486427] odin NetworkManager[1005]: <info>  [1788577357.3213] Loaded device plugin: NMBluezManager (/usr/lib/aarch64-linux-gnu/NetworkManager/1.42.4/libnm-device-plugin-bluetooth.so)
+[  929.491092] odin NetworkManager[1005]: <info>  [1788577357.3260] Loaded device plugin: NMTeamFactory (/usr/lib/aarch64-linux-gnu/NetworkManager/1.42.4/libnm-device-plugin-team.so)
+[  929.491776] odin NetworkManager[1005]: <info>  [1788577357.3267] manager: rfkill: Wi-Fi enabled by radio killswitch; enabled by state file
+[  929.492107] odin NetworkManager[1005]: <info>  [1788577357.3269] manager: rfkill: WWAN enabled by radio killswitch; enabled by state file
+[  929.492341] odin NetworkManager[1005]: <info>  [1788577357.3271] manager: Networking is enabled by state file
+[  929.494344] odin NetworkManager[1005]: <info>  [1788577357.3293] settings: Loaded settings plugin: ifupdown ("/usr/lib/aarch64-linux-gnu/NetworkManager/1.42.4/libnm-settings-plugin-ifupdown.so")
+[  929.494631] odin NetworkManager[1005]: <info>  [1788577357.3293] settings: Loaded settings plugin: keyfile (internal)
+[  929.494954] odin NetworkManager[1005]: <info>  [1788577357.3294] ifupdown: management mode: unmanaged
+[  929.495245] odin NetworkManager[1005]: <info>  [1788577357.3297] ifupdown: interfaces file /etc/network/interfaces doesn't exist
+[  929.498018] odin dbus-daemon[942]: [system] Activating via systemd: service name='org.freedesktop.nm_dispatcher' unit='dbus-org.freedesktop.nm-dispatcher.service' requested by ':1.4' (uid=0 pid=1005 comm="/usr/sbin/NetworkManager --no-daemon")
+[  929.499404] odin NetworkManager[1005]: <info>  [1788577357.3343] dhcp: init: Using DHCP client 'internal'
+[  929.500156] odin NetworkManager[1005]: <info>  [1788577357.3351] manager: (lo): new Loopback device (/org/freedesktop/NetworkManager/Devices/1)
+[  929.506310] odin NetworkManager[1005]: <info>  [1788577357.3412] device (lo): state change: unmanaged -> unavailable (reason 'connection-assumed', sys-iface-state: 'external')
+[  929.507384] odin NetworkManager[1005]: <info>  [1788577357.3423] device (lo): state change: unavailable -> disconnected (reason 'connection-assumed', sys-iface-state: 'external')
+[  929.509105] odin NetworkManager[1005]: <info>  [1788577357.3440] device (lo): Activation: starting connection 'lo' (ceef0922-e925-4fbb-b5d1-a21c4a2aca30)
+[  929.511413] odin NetworkManager[1005]: <info>  [1788577357.3461] manager: (ipa_lan0): new Generic device (/org/freedesktop/NetworkManager/Devices/2)
+[  929.513700] odin NetworkManager[1005]: <info>  [1788577357.3485] device (usb0): carrier: link connected
+[  929.515056] odin NetworkManager[1005]: <info>  [1788577357.3499] manager: (usb0): new Ethernet device (/org/freedesktop/NetworkManager/Devices/3)
+[  929.517655] odin NetworkManager[1005]: <info>  [1788577357.3525] failed to open /run/network/ifstate
+[  929.528831] odin NetworkManager[1005]: <info>  [1788577357.3637] device (lo): state change: disconnected -> prepare (reason 'none', sys-iface-state: 'external')
+[  929.529560] odin NetworkManager[1005]: <info>  [1788577357.3645] device (lo): state change: prepare -> config (reason 'none', sys-iface-state: 'external')
+[  929.530378] odin NetworkManager[1005]: <info>  [1788577357.3653] device (lo): state change: config -> ip-config (reason 'none', sys-iface-state: 'external')
+[  929.530895] odin NetworkManager[1005]: <info>  [1788577357.3658] device (lo): state change: ip-config -> ip-check (reason 'none', sys-iface-state: 'external')
+[  930.572972] odin systemd[1]: Finished odin-firstboot-resize.service - Grow root filesystem to fill userdata (one-shot).
+[  930.575542] odin systemd[1]: Started systemd-hostnamed.service - Hostname Service.
+[  930.577626] odin systemd[1]: Reached target network.target - Network.
+[  930.578412] odin systemd[1]: Reached target network-online.target - Network is Online.
+[  930.613967] odin systemd[1]: Starting NetworkManager-dispatcher.service - Network Manager Script Dispatcher Service...
+[  930.619183] odin systemd[1]: Starting exim4.service - LSB: exim Mail Transport Agent...
+[  930.624141] odin systemd[1]: Starting odin-swap.service - Set up swap (file-based as primary, zram as first tier)...
+[  930.629661] odin systemd[1]: Starting systemd-user-sessions.service - Permit User Sessions...
+[  930.635704] odin odin-swap.sh[1078]: [odin-swap] === 开始（swapfile=4G 主力 / zram=512M 打底）
+[  930.646272] odin dbus-daemon[942]: [system] Successfully activated service 'org.freedesktop.nm_dispatcher'
+[  930.651741] odin systemd[1]: Finished systemd-user-sessions.service - Permit User Sessions.
+[  930.653511] odin systemd[1]: Started NetworkManager-dispatcher.service - Network Manager Script Dispatcher Service.
+[  930.656361] odin NetworkManager[1005]: <info>  [1788577358.4911] device (lo): state change: ip-check -> secondaries (reason 'none', sys-iface-state: 'external')
+[  930.657261] odin NetworkManager[1005]: <info>  [1788577358.4917] device (lo): state change: secondaries -> activated (reason 'none', sys-iface-state: 'external')
+[  930.659040] odin NetworkManager[1005]: <info>  [1788577358.4938] device (lo): Activation: successful, device activated.
+[  930.662307] odin systemd[1]: Started getty@tty1.service - Getty on tty1.
+[  930.663661] odin systemd[1]: Reached target getty.target - Login Prompts.
+[  930.665040] odin NetworkManager[1005]: <info>  [1788577358.4997] manager: startup complete
+[  930.685865] odin kernel: zram: Added device: zram0
+[  930.696891] odin kernel: zram0: detected capacity change from 0 to 1048576
+[  930.724716] odin kernel: Adding 524284k swap on /dev/zram0.  Priority:100 extents:1 across:524284k SS
+[  930.713441] odin odin-swap.sh[1078]: [odin-swap] zram 512M 已启用（优先级 100）
+[  930.723728] odin odin-swap.sh[1078]: [odin-swap] 创建 /swapfile（4G）
+[  930.748598] odin odin-swap.sh[1078]: [odin-swap]   fallocate 成功
+[  930.786269] odin kernel: Adding 4194300k swap on /swapfile.  Priority:10 extents:7 across:4489212k SS
+[  930.775328] odin odin-swap.sh[1078]: [odin-swap] swapfile /swapfile 已启用（优先级 10）
+[  930.779047] odin odin-swap.sh[1078]: [odin-swap] === 结束，当前 swap：
+[  930.790161] odin odin-swap.sh[1207]:   NAME       TYPE      SIZE USED PRIO
+[  930.790161] odin odin-swap.sh[1207]:   /dev/zram0 partition 512M   0B  100
+[  930.790161] odin odin-swap.sh[1207]:   /swapfile  file        4G   0B   10
+[  930.792335] odin systemd[1]: Finished odin-swap.service - Set up swap (file-based as primary, zram as first tier).
+[  931.060984] odin exim4[1077]: Starting MTA: exim4.
+[  931.061791] odin systemd[1]: Started exim4.service - LSB: exim Mail Transport Agent.
+[  934.384613] odin kernel: qcom_wcnss_ctrl remoteproc0:smd-edge.WCNSS_CTRL.-1.-1: expected cold boot completion
+[  934.385991] odin kernel: wcn36xx: mac address: 02:00:67:db:fe:b9
+[  934.380925] odin NetworkManager[1005]: <info>  [1788577362.2157] device (wlan0): driver supports Access Point (AP) mode
+[  934.383808] odin NetworkManager[1005]: <info>  [1788577362.2179] manager: (wlan0): new 802.11 Wi-Fi device (/org/freedesktop/NetworkManager/Devices/4)
+[  934.386470] odin NetworkManager[1005]: <info>  [1788577362.2212] rfkill0: found Wi-Fi radio killswitch (at /sys/devices/platform/soc@0/a204000.remoteproc/remoteproc/remoteproc0/remoteproc0:smd-edge/remoteproc0:smd-edge.WCNSS_CTRL.-1.-1/a204000.remoteproc:smd-edge:wcnss:wifi/ieee80211/phy0/rfkill0) (driver wcn36xx)
+[  934.406483] odin systemd[1]: Starting systemd-rfkill.service - Load/Save RF Kill Switch Status...
+[  934.410935] odin NetworkManager[1005]: <info>  [1788577362.2452] device (wlan0): state change: unmanaged -> unavailable (reason 'managed', sys-iface-state: 'external')
+[  934.432739] odin systemd[1]: Started systemd-rfkill.service - Load/Save RF Kill Switch Status.
+[  934.448314] odin kernel: Bluetooth: Core ver 2.22
+[  934.448576] odin kernel: NET: Registered PF_BLUETOOTH protocol family
+[  934.451035] odin kernel: Bluetooth: HCI device and connection manager initialized
+[  934.451060] odin kernel: Bluetooth: HCI socket layer initialized
+[  934.451068] odin kernel: Bluetooth: L2CAP socket layer initialized
+[  934.451094] odin kernel: Bluetooth: SCO socket layer initialized
+[  934.493646] odin (uetoothd)[1373]: ConfigurationDirectory 'bluetooth' already exists but the mode is different. (File system: 755 ConfigurationDirectoryMode: 555)
+[  934.494579] odin systemd[1]: Starting bluetooth.service - Bluetooth service...
+[  934.601953] odin bluetoothd[1373]: Bluetooth daemon 5.66
+[  934.606286] odin systemd[1]: Started bluetooth.service - Bluetooth service.
+[  934.608099] odin systemd[1]: Reached target bluetooth.target - Bluetooth Support.
+[  934.610445] odin bluetoothd[1373]: Starting SDP server
+[  934.614013] odin bluetoothd[1373]: profiles/audio/vcp.c:vcp_init() D-Bus experimental not enabled
+[  934.614257] odin bluetoothd[1373]: src/plugin.c:plugin_init() Failed to init vcp plugin
+[  934.614371] odin bluetoothd[1373]: profiles/audio/mcp.c:mcp_init() D-Bus experimental not enabled
+[  934.614447] odin bluetoothd[1373]: src/plugin.c:plugin_init() Failed to init mcp plugin
+[  934.614535] odin bluetoothd[1373]: profiles/audio/bap.c:bap_init() D-Bus experimental not enabled
+[  934.614603] odin bluetoothd[1373]: src/plugin.c:plugin_init() Failed to init bap plugin
+[  934.622375] odin bluetoothd[1373]: profiles/network/bnep.c:bnep_init() kernel lacks bnep-protocol support
+[  934.622631] odin bluetoothd[1373]: src/plugin.c:plugin_init() System does not support network plugin
+[  934.627470] odin bluetoothd[1373]: Bluetooth management interface 1.23 initialized
+[  934.644017] odin kernel: Bluetooth: MGMT ver 1.23
+[  934.630403] odin bluetoothd[1373]: profiles/sap/server.c:sap_server_register() Sap driver initialization failed.
+[  934.630612] odin bluetoothd[1373]: sap-server: Operation not permitted (1)
+[  937.256141] odin systemd[1]: Finished odin-ssh-hostkeys.service - Generate SSH host keys on first boot (image ships none).
+[  937.298471] odin systemd[1]: Starting ssh.service - OpenBSD Secure Shell server...
+[  938.957565] odin kernel: wcn36xx: firmware WLAN version 'WCN v2.0 RadioPhy vIris_TSMC_4.0 with 48MHz XO' and CRM version 'CNSS-PR-4-0-00412'
+[  938.957815] odin kernel: wcn36xx: firmware API 1.5.1.2, 41 stations, 2 bssids
+[  939.082990] odin NetworkManager[1005]: <info>  [1788577366.9178] device (wlan0): set-hw-addr: set MAC address to BE:0D:C3:09:7B:FE (scanning)
+[  939.246140] odin sshd[1377]: Server listening on 0.0.0.0 port 22.
+[  939.247574] odin sshd[1377]: Server listening on :: port 22.
+[  939.248355] odin systemd[1]: Started ssh.service - OpenBSD Secure Shell server.
+[  939.249946] odin systemd[1]: Reached target multi-user.target - Multi-User System.
+[  939.251170] odin systemd[1]: Reached target graphical.target - Graphical Interface.
+[  939.286809] odin systemd[1]: Starting systemd-update-utmp-runlevel.service - Record Runlevel Change in UTMP...
+[  939.314240] odin wpa_supplicant[1007]: dbus: fill_dict_with_properties dbus_interface=fi.w1.wpa_supplicant1.Interface.P2PDevice dbus_property=P2PDeviceConfig getter failed
+[  939.319210] odin systemd[1]: systemd-update-utmp-runlevel.service: Deactivated successfully.
+[  939.319829] odin systemd[1]: Finished systemd-update-utmp-runlevel.service - Record Runlevel Change in UTMP.
+[  939.321092] odin NetworkManager[1005]: <info>  [1788577367.1554] device (wlan0): supplicant interface state: internal-starting -> disconnected
+[  939.321404] odin NetworkManager[1005]: <info>  [1788577367.1558] device (wlan0): state change: unavailable -> disconnected (reason 'supplicant-available', sys-iface-state: 'managed')
+[  939.324589] odin systemd[1]: Startup finished in 5min 27.136s (kernel) + 10min 12.186s (userspace) = 15min 39.323s.
+[  939.476551] odin systemd[1]: systemd-rfkill.service: Deactivated successfully.
+[  940.257499] odin wpa_supplicant[1007]: wlan0: CTRL-EVENT-REGDOM-CHANGE init=BEACON_HINT type=UNKNOWN
+[  940.335832] odin wpa_supplicant[1007]: wlan0: CTRL-EVENT-REGDOM-CHANGE init=BEACON_HINT type=UNKNOWN
+[  940.408982] odin wpa_supplicant[1007]: wlan0: CTRL-EVENT-REGDOM-CHANGE init=BEACON_HINT type=UNKNOWN
+[  940.509038] odin wpa_supplicant[1007]: wlan0: CTRL-EVENT-REGDOM-CHANGE init=BEACON_HINT type=UNKNOWN
+[  944.834032] odin wpa_supplicant[1007]: wlan0: CTRL-EVENT-REGDOM-CHANGE init=BEACON_HINT type=UNKNOWN
+[  949.257114] odin systemd[1]: NetworkManager-dispatcher.service: Deactivated successfully.
+[  952.506463] odin systemd[1]: Starting odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG)...
+[  952.650251] odin systemd[1]: odin-usb-gadget.service: Deactivated successfully.
+[  952.650848] odin systemd[1]: Finished odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG).
+[  964.680072] odin systemd[1]: systemd-hostnamed.service: Deactivated successfully.
+[  983.342420] odin systemd[1]: Starting odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG)...
+[  983.486500] odin systemd[1]: odin-usb-gadget.service: Deactivated successfully.
+[  983.486994] odin systemd[1]: Finished odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG).
+[ 1012.517829] odin systemd[1]: Starting odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG)...
+[ 1012.539464] odin sshd[1436]: error: kex_exchange_identification: Connection closed by remote host
+[ 1012.540623] odin sshd[1436]: Connection closed by 172.16.42.2 port 59455
+[ 1012.666549] odin systemd[1]: odin-usb-gadget.service: Deactivated successfully.
+[ 1012.667809] odin systemd[1]: Finished odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG).
+[ 1025.721815] odin sshd[1462]: Accepted password for user from 172.16.42.2 port 59517 ssh2
+[ 1025.736102] odin sshd[1462]: pam_unix(sshd:session): session opened for user user(uid=1000) by (uid=0)
+[ 1025.824605] odin systemd[1]: Created slice user-1000.slice - User Slice of UID 1000.
+[ 1025.833997] odin systemd[1]: Starting user-runtime-dir@1000.service - User Runtime Directory /run/user/1000...
+[ 1025.847530] odin systemd-logind[963]: New session 1 of user user.
+[ 1025.867915] odin systemd[1]: Finished user-runtime-dir@1000.service - User Runtime Directory /run/user/1000.
+[ 1025.886590] odin systemd[1]: Starting user@1000.service - User Manager for UID 1000...
+[ 1025.900069] odin (systemd)[1467]: pam_unix(systemd-user:session): session opened for user user(uid=1000) by (uid=0)
+[ 1026.913337] odin systemd[1467]: Queued start job for default target default.target.
+[ 1026.938953] odin systemd[1467]: Created slice app.slice - User Application Slice.
+[ 1026.939227] odin systemd[1467]: Reached target paths.target - Paths.
+[ 1026.939339] odin systemd[1467]: Reached target timers.target - Timers.
+[ 1026.941662] odin systemd[1467]: Starting dbus.socket - D-Bus User Message Bus Socket...
+[ 1026.963722] odin systemd[1467]: Listening on dbus.socket - D-Bus User Message Bus Socket.
+[ 1026.964014] odin systemd[1467]: Reached target sockets.target - Sockets.
+[ 1026.964125] odin systemd[1467]: Reached target basic.target - Basic System.
+[ 1026.964231] odin systemd[1467]: Reached target default.target - Main User Target.
+[ 1026.964423] odin systemd[1467]: Startup finished in 1.034s.
+[ 1026.964571] odin systemd[1]: Started user@1000.service - User Manager for UID 1000.
+[ 1026.968988] odin systemd[1]: Started session-1.scope - Session 1 of User user.
+[ 1027.029899] odin sshd[1462]: pam_env(sshd:session): deprecated reading of user environment enabled
+[ 1027.031343] odin sshd[1462]: pam_env(sshd:session): Unable to open env file: /etc/default/locale: No such file or directory
+[ 1027.224542] odin sudo[1479]:     user : PWD=/home/user ; USER=root ; COMMAND=/usr/bin/sh -s
+[ 1027.225217] odin sudo[1479]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+[ 1027.249169] odin sudo[1479]: pam_unix(sudo:session): session closed for user root
+[ 1027.252971] odin sshd[1478]: Received disconnect from 172.16.42.2 port 59517:11: disconnected by user
+[ 1027.253930] odin sshd[1478]: Disconnected from user user 172.16.42.2 port 59517
+[ 1027.255949] odin sshd[1462]: pam_unix(sshd:session): session closed for user user
+[ 1027.276913] odin systemd[1]: session-1.scope: Deactivated successfully.
+[ 1027.282766] odin systemd-logind[963]: Session 1 logged out. Waiting for processes to exit.
+[ 1027.288804] odin systemd-logind[963]: Removed session 1.
+[ 1030.079260] odin sshd[1464]: Accepted password for user from 172.16.42.2 port 59519 ssh2
+[ 1030.088711] odin sshd[1464]: pam_unix(sshd:session): session opened for user user(uid=1000) by (uid=0)
+[ 1030.109944] odin systemd-logind[963]: New session 3 of user user.
+[ 1030.130476] odin systemd[1]: Started session-3.scope - Session 3 of User user.
+[ 1030.195211] odin sshd[1464]: pam_env(sshd:session): deprecated reading of user environment enabled
+[ 1030.195538] odin sshd[1464]: pam_env(sshd:session): Unable to open env file: /etc/default/locale: No such file or directory
+[ 1043.352248] odin systemd[1]: Starting odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG)...
+[ 1043.523596] odin systemd[1]: odin-usb-gadget.service: Deactivated successfully.
+[ 1043.524874] odin systemd[1]: Finished odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG).
+[ 1069.811272] odin sshd[1521]: Accepted password for user from 172.16.42.2 port 59719 ssh2
+[ 1069.824321] odin sshd[1521]: pam_unix(sshd:session): session opened for user user(uid=1000) by (uid=0)
+[ 1069.853968] odin systemd-logind[963]: New session 4 of user user.
+[ 1069.874456] odin systemd[1]: Started session-4.scope - Session 4 of User user.
+[ 1069.944036] odin sshd[1521]: pam_env(sshd:session): deprecated reading of user environment enabled
+[ 1069.944491] odin sshd[1521]: pam_env(sshd:session): Unable to open env file: /etc/default/locale: No such file or directory
+[ 1070.113810] odin sudo[1528]:     user : PWD=/home/user ; USER=root ; COMMAND=/usr/bin/sh -s
+[ 1070.114686] odin sudo[1528]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+[ 1070.342113] odin sudo[1528]: pam_unix(sudo:session): session closed for user root
+[ 1070.346741] odin sshd[1527]: Received disconnect from 172.16.42.2 port 59719:11: disconnected by user
+[ 1070.348132] odin sshd[1527]: Disconnected from user user 172.16.42.2 port 59719
+[ 1070.350194] odin sshd[1521]: pam_unix(sshd:session): session closed for user user
+[ 1070.367988] odin systemd[1]: session-4.scope: Deactivated successfully.
+[ 1070.374336] odin systemd-logind[963]: Session 4 logged out. Waiting for processes to exit.
+[ 1070.381862] odin systemd-logind[963]: Removed session 4.
+[ 1072.507436] odin systemd[1]: Starting odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG)...
+[ 1072.653284] odin systemd[1]: odin-usb-gadget.service: Deactivated successfully.
+[ 1072.654297] odin systemd[1]: Finished odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG).
+[ 1072.790276] odin wpa_supplicant[1007]: wlan0: CTRL-EVENT-REGDOM-CHANGE init=BEACON_HINT type=UNKNOWN
+[ 1080.786008] odin sshd[1558]: Accepted password for user from 172.16.42.2 port 59771 ssh2
+[ 1080.795897] odin sshd[1558]: pam_unix(sshd:session): session opened for user user(uid=1000) by (uid=0)
+[ 1080.824542] odin systemd-logind[963]: New session 5 of user user.
+[ 1080.846514] odin systemd[1]: Started session-5.scope - Session 5 of User user.
+[ 1080.912653] odin sshd[1558]: pam_env(sshd:session): deprecated reading of user environment enabled
+[ 1080.913328] odin sshd[1558]: pam_env(sshd:session): Unable to open env file: /etc/default/locale: No such file or directory
+[ 1081.074359] odin sudo[1565]:     user : PWD=/home/user ; USER=root ; COMMAND=/usr/bin/sh -s
+[ 1081.075095] odin sudo[1565]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+[ 1083.268960] odin sudo[1565]: pam_unix(sudo:session): session closed for user root
+[ 1083.272452] odin sshd[1564]: Received disconnect from 172.16.42.2 port 59771:11: disconnected by user
+[ 1083.273148] odin sshd[1564]: Disconnected from user user 172.16.42.2 port 59771
+[ 1083.274716] odin sshd[1558]: pam_unix(sshd:session): session closed for user user
+[ 1083.284184] odin systemd[1]: session-5.scope: Deactivated successfully.
+[ 1083.287183] odin systemd-logind[963]: Session 5 logged out. Waiting for processes to exit.
+[ 1083.291100] odin systemd-logind[963]: Removed session 5.
+[ 1103.339690] odin systemd[1]: Starting odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG)...
+[ 1103.506185] odin systemd[1]: odin-usb-gadget.service: Deactivated successfully.
+[ 1103.507359] odin systemd[1]: Finished odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG).
+[ 1106.468536] odin sshd[1598]: Accepted password for user from 172.16.42.2 port 59884 ssh2
+[ 1106.480391] odin sshd[1598]: pam_unix(sshd:session): session opened for user user(uid=1000) by (uid=0)
+[ 1106.507244] odin systemd-logind[963]: New session 6 of user user.
+[ 1106.526053] odin systemd[1]: Started session-6.scope - Session 6 of User user.
+[ 1106.594227] odin sshd[1598]: pam_env(sshd:session): deprecated reading of user environment enabled
+[ 1106.594575] odin sshd[1598]: pam_env(sshd:session): Unable to open env file: /etc/default/locale: No such file or directory
+[ 1106.755662] odin sudo[1605]:     user : PWD=/home/user ; USER=root ; COMMAND=/usr/bin/sh -s
+[ 1106.771396] odin sudo[1605]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+[ 1106.793754] odin sudo[1605]: pam_unix(sudo:session): session closed for user root
+[ 1106.797634] odin sshd[1604]: Received disconnect from 172.16.42.2 port 59884:11: disconnected by user
+[ 1106.798613] odin sshd[1604]: Disconnected from user user 172.16.42.2 port 59884
+[ 1106.801677] odin sshd[1598]: pam_unix(sshd:session): session closed for user user
+[ 1106.820407] odin systemd[1]: session-6.scope: Deactivated successfully.
+[ 1106.826393] odin systemd-logind[963]: Session 6 logged out. Waiting for processes to exit.
+[ 1106.832533] odin systemd-logind[963]: Removed session 6.
+[ 1132.515717] odin systemd[1]: Starting odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG)...
+[ 1132.666659] odin systemd[1]: odin-usb-gadget.service: Deactivated successfully.
+[ 1132.667926] odin systemd[1]: Finished odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG).
+[ 1137.016201] odin wpa_supplicant[1007]: wlan0: CTRL-EVENT-REGDOM-CHANGE init=BEACON_HINT type=UNKNOWN
+[ 1140.159465] odin sshd[1637]: Accepted password for user from 172.16.42.2 port 60055 ssh2
+[ 1140.172930] odin sshd[1637]: pam_unix(sshd:session): session opened for user user(uid=1000) by (uid=0)
+[ 1140.199388] odin systemd-logind[963]: New session 7 of user user.
+[ 1140.222158] odin systemd[1]: Started session-7.scope - Session 7 of User user.
+[ 1140.279180] odin sshd[1637]: pam_env(sshd:session): deprecated reading of user environment enabled
+[ 1140.279795] odin sshd[1637]: pam_env(sshd:session): Unable to open env file: /etc/default/locale: No such file or directory
+[ 1140.440643] odin sudo[1644]:     user : PWD=/home/user ; USER=root ; COMMAND=/usr/bin/sh -s
+[ 1140.441365] odin sudo[1644]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+[ 1140.500652] odin sudo[1644]: pam_unix(sudo:session): session closed for user root
+[ 1140.504097] odin sshd[1643]: Received disconnect from 172.16.42.2 port 60055:11: disconnected by user
+[ 1140.506213] odin sshd[1643]: Disconnected from user user 172.16.42.2 port 60055
+[ 1140.510422] odin sshd[1637]: pam_unix(sshd:session): session closed for user user
+[ 1140.530602] odin systemd[1]: session-7.scope: Deactivated successfully.
+[ 1140.537582] odin systemd-logind[963]: Session 7 logged out. Waiting for processes to exit.
+[ 1140.546351] odin systemd-logind[963]: Removed session 7.
+[ 1163.351183] odin systemd[1]: Starting odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG)...
+[ 1163.527822] odin systemd[1]: odin-usb-gadget.service: Deactivated successfully.
+[ 1163.529405] odin systemd[1]: Finished odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG).
+[ 1183.994423] odin sshd[1686]: Accepted password for user from 172.16.42.2 port 60263 ssh2
+[ 1184.007103] odin sshd[1686]: pam_unix(sshd:session): session opened for user user(uid=1000) by (uid=0)
+[ 1184.037379] odin systemd-logind[963]: New session 8 of user user.
+[ 1184.058221] odin systemd[1]: Started session-8.scope - Session 8 of User user.
+[ 1184.129102] odin sshd[1686]: pam_env(sshd:session): deprecated reading of user environment enabled
+[ 1184.129786] odin sshd[1686]: pam_env(sshd:session): Unable to open env file: /etc/default/locale: No such file or directory
+[ 1184.293788] odin sudo[1693]:     user : PWD=/home/user ; USER=root ; COMMAND=/usr/bin/sh -s
+[ 1184.294641] odin sudo[1693]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+[ 1184.332074] odin sudo[1693]: pam_unix(sudo:session): session closed for user root
+[ 1184.335511] odin sshd[1692]: Received disconnect from 172.16.42.2 port 60263:11: disconnected by user
+[ 1184.336702] odin sshd[1692]: Disconnected from user user 172.16.42.2 port 60263
+[ 1184.338699] odin sshd[1686]: pam_unix(sshd:session): session closed for user user
+[ 1184.357410] odin systemd[1]: session-8.scope: Deactivated successfully.
+[ 1184.363128] odin systemd-logind[963]: Session 8 logged out. Waiting for processes to exit.
+[ 1184.370120] odin systemd-logind[963]: Removed session 8.
+[ 1192.519227] odin systemd[1]: Starting odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG)...
+[ 1192.689858] odin systemd[1]: odin-usb-gadget.service: Deactivated successfully.
+[ 1192.690395] odin systemd[1]: Finished odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG).
+[ 1223.351187] odin systemd[1]: Starting odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG)...
+[ 1223.523125] odin systemd[1]: odin-usb-gadget.service: Deactivated successfully.
+[ 1223.524658] odin systemd[1]: Finished odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG).
+[ 1226.888602] odin sshd[1751]: Accepted password for user from 172.16.42.2 port 60450 ssh2
+[ 1226.901495] odin sshd[1751]: pam_unix(sshd:session): session opened for user user(uid=1000) by (uid=0)
+[ 1226.929187] odin systemd-logind[963]: New session 9 of user user.
+[ 1226.957881] odin systemd[1]: Started session-9.scope - Session 9 of User user.
+[ 1227.030512] odin sshd[1751]: pam_env(sshd:session): deprecated reading of user environment enabled
+[ 1227.031201] odin sshd[1751]: pam_env(sshd:session): Unable to open env file: /etc/default/locale: No such file or directory
+[ 1227.199549] odin sudo[1758]:     user : PWD=/home/user ; USER=root ; COMMAND=/usr/bin/sh -s
+[ 1227.200478] odin sudo[1758]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+[ 1227.256819] odin sudo[1758]: pam_unix(sudo:session): session closed for user root
+[ 1227.260772] odin sshd[1757]: Received disconnect from 172.16.42.2 port 60450:11: disconnected by user
+[ 1227.262355] odin sshd[1757]: Disconnected from user user 172.16.42.2 port 60450
+[ 1227.265288] odin sshd[1751]: pam_unix(sshd:session): session closed for user user
+[ 1227.286467] odin systemd[1]: session-9.scope: Deactivated successfully.
+[ 1227.293163] odin systemd-logind[963]: Session 9 logged out. Waiting for processes to exit.
+[ 1227.302042] odin systemd-logind[963]: Removed session 9.
+[ 1252.515522] odin systemd[1]: Starting odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG)...
+[ 1252.667082] odin systemd[1]: odin-usb-gadget.service: Deactivated successfully.
+[ 1252.668910] odin systemd[1]: Finished odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG).
+[ 1262.753516] odin sshd[1797]: Accepted password for user from 172.16.42.2 port 60617 ssh2
+[ 1262.764558] odin sshd[1797]: pam_unix(sshd:session): session opened for user user(uid=1000) by (uid=0)
+[ 1262.792914] odin systemd-logind[963]: New session 10 of user user.
+[ 1262.814457] odin systemd[1]: Started session-10.scope - Session 10 of User user.
+[ 1262.885559] odin sshd[1797]: pam_env(sshd:session): deprecated reading of user environment enabled
+[ 1262.886256] odin sshd[1797]: pam_env(sshd:session): Unable to open env file: /etc/default/locale: No such file or directory
+[ 1263.049688] odin sudo[1804]:     user : PWD=/home/user ; USER=root ; COMMAND=/usr/bin/sh -s
+[ 1263.050586] odin sudo[1804]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+[ 1266.509054] odin sudo[1804]: pam_unix(sudo:session): session closed for user root
+[ 1266.513455] odin sshd[1803]: Received disconnect from 172.16.42.2 port 60617:11: disconnected by user
+[ 1266.514674] odin sshd[1803]: Disconnected from user user 172.16.42.2 port 60617
+[ 1266.516594] odin sshd[1797]: pam_unix(sshd:session): session closed for user user
+[ 1266.534651] odin systemd[1]: session-10.scope: Deactivated successfully.
+[ 1266.536404] odin systemd[1]: session-10.scope: Consumed 1.305s CPU time.
+[ 1266.541120] odin systemd-logind[963]: Session 10 logged out. Waiting for processes to exit.
+[ 1266.547016] odin systemd-logind[963]: Removed session 10.
+[ 1283.342908] odin systemd[1]: Starting odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG)...
+[ 1283.500062] odin systemd[1]: odin-usb-gadget.service: Deactivated successfully.
+[ 1283.501645] odin systemd[1]: Finished odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG).
+[ 1285.700182] odin sshd[1837]: Accepted password for user from 172.16.42.2 port 60721 ssh2
+[ 1285.713150] odin sshd[1837]: pam_unix(sshd:session): session opened for user user(uid=1000) by (uid=0)
+[ 1285.742220] odin systemd-logind[963]: New session 11 of user user.
+[ 1285.766297] odin systemd[1]: Started session-11.scope - Session 11 of User user.
+[ 1285.834808] odin sshd[1837]: pam_env(sshd:session): deprecated reading of user environment enabled
+[ 1285.835468] odin sshd[1837]: pam_env(sshd:session): Unable to open env file: /etc/default/locale: No such file or directory
+[ 1286.003231] odin sudo[1844]:     user : PWD=/home/user ; USER=root ; COMMAND=/usr/bin/sh -s
+[ 1286.004125] odin sudo[1844]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+[ 1289.554751] odin sudo[1844]: pam_unix(sudo:session): session closed for user root
+[ 1289.559033] odin sshd[1843]: Received disconnect from 172.16.42.2 port 60721:11: disconnected by user
+[ 1289.560532] odin sshd[1843]: Disconnected from user user 172.16.42.2 port 60721
+[ 1289.562793] odin sshd[1837]: pam_unix(sshd:session): session closed for user user
+[ 1289.581714] odin systemd[1]: session-11.scope: Deactivated successfully.
+[ 1289.583278] odin systemd[1]: session-11.scope: Consumed 1.295s CPU time.
+[ 1289.587807] odin systemd-logind[963]: Session 11 logged out. Waiting for processes to exit.
+[ 1289.595834] odin systemd-logind[963]: Removed session 11.
+[ 1312.506955] odin systemd[1]: Starting odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG)...
+[ 1312.651877] odin systemd[1]: odin-usb-gadget.service: Deactivated successfully.
+[ 1312.652359] odin systemd[1]: Finished odin-usb-gadget.service - ODIN USB role switch (device=usb0+dnsmasq / host=OTG).
+[ 1322.998578] odin sshd[1873]: Accepted password for user from 172.16.42.2 port 60895 ssh2
+[ 1323.011807] odin sshd[1873]: pam_unix(sshd:session): session opened for user user(uid=1000) by (uid=0)
+[ 1323.039937] odin systemd-logind[963]: New session 12 of user user.
+[ 1323.058318] odin systemd[1]: Started session-12.scope - Session 12 of User user.
+[ 1323.131395] odin sshd[1873]: pam_env(sshd:session): deprecated reading of user environment enabled
+[ 1323.132236] odin sshd[1873]: pam_env(sshd:session): Unable to open env file: /etc/default/locale: No such file or directory
+[ 1323.296212] odin sudo[1880]:     user : PWD=/home/user ; USER=root ; COMMAND=/usr/bin/sh -s
+[ 1323.297066] odin sudo[1880]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
+[ 1323.318915] odin sudo[1880]: pam_unix(sudo:session): session closed for user root
+[ 1323.327756] odin sshd[1879]: Received disconnect from 172.16.42.2 port 60895:11: disconnected by user
+[ 1323.328911] odin sshd[1879]: Disconnected from user user 172.16.42.2 port 60895
+[ 1323.330696] odin sshd[1873]: pam_unix(sshd:session): session closed for user user
+[ 1323.349111] odin systemd[1]: session-12.scope: Deactivated successfully.
+[ 1323.355217] odin systemd-logind[963]: Session 12 logged out. Waiting for processes to exit.
+[ 1323.361705] odin systemd-logind[963]: Removed session 12.
+[ 1335.800191] odin sshd[1886]: Accepted password for user from 172.16.42.2 port 60952 ssh2
+[ 1335.812900] odin sshd[1886]: pam_unix(sshd:session): session opened for user user(uid=1000) by (uid=0)
+[ 1335.841218] odin systemd-logind[963]: New session 13 of user user.
+[ 1335.866217] odin systemd[1]: Started session-13.scope - Session 13 of User user.
+[ 1335.935751] odin sshd[1886]: pam_env(sshd:session): deprecated reading of user environment enabled
+[ 1335.936198] odin sshd[1886]: pam_env(sshd:session): Unable to open env file: /etc/default/locale: No such file or directory
+[ 1336.100114] odin sudo[1893]:     user : PWD=/home/user ; USER=root ; COMMAND=/usr/bin/sh -s
+[ 1336.100960] odin sudo[1893]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1000)
