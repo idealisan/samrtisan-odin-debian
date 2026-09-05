@@ -14,7 +14,7 @@
 #   · Debian      发行版套件 bookworm（debootstrap 现装，不依赖任何预置镜像）
 #
 # 产物（全部挂到该 Release 上）：
-#   lk2nd.img / lk2nd-nomarkw.img   刷 boot 分区的二级引导（精简版强制命中 odin）
+#   lk2nd.img / lk2nd-odin.img   刷 boot 分区的二级引导（精简版强制命中 odin）
 #   msm8953-smartisan-odin*.dtb ×4  设备树
 #   odin-debian.img                 刷 userdata 的系统（core 变体，无 GUI）
 #   odin-debian-sparse.img          同上 sparse 版，fastboot 分块传输用
@@ -174,8 +174,8 @@ jobs:
       - name: 校验缓存的 lk2nd 产物
         run: |
           test -s out/lk2nd/lk2nd.img
-          test -s out/lk2nd/lk2nd-nomarkw.img
-          strings out/lk2nd/lk2nd-nomarkw.img > /tmp/lk2nd-strings.txt
+          test -s out/lk2nd/lk2nd-odin.img
+          strings out/lk2nd/lk2nd-odin.img > /tmp/lk2nd-strings.txt
           ! grep -q "xiaomi-markw" /tmp/lk2nd-strings.txt
           grep -q "smartisan-odin" /tmp/lk2nd-strings.txt
       - uses: actions/upload-artifact@v4

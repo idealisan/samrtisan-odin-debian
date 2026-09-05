@@ -337,10 +337,10 @@ $(STAMPS)/lk2nd: | $(STAMPS)
 		LK2ND_VERSION="$(LK2ND_VER)-odin" PROJECT=lk2nd-msm8953 2>&1 \
 		| tee /tmp/lk2nd-build-trimmed.log
 	@command -v ccache >/dev/null 2>&1 && ccache -s || true
-	cp -f "$(LK2ND_SRC)/build-lk2nd-msm8953/lk2nd.img" "$(LK2ND_OUT)/lk2nd-nomarkw.img"
-	@echo "[lk2nd]   lk2nd-nomarkw.img $$($(call SIZE,$(LK2ND_OUT)/lk2nd-nomarkw.img)) 字节"
+	cp -f "$(LK2ND_SRC)/build-lk2nd-msm8953/lk2nd.img" "$(LK2ND_OUT)/lk2nd-odin.img"
+	@echo "[lk2nd]   lk2nd-odin.img $$($(call SIZE,$(LK2ND_OUT)/lk2nd-odin.img)) 字节"
 	@echo "[lk2nd] 自检"
-	@strings "$(LK2ND_OUT)/lk2nd-nomarkw.img" > "$(LK2ND_OUT)/.odin-strings.txt" \
+	@strings "$(LK2ND_OUT)/lk2nd-odin.img" > "$(LK2ND_OUT)/.odin-strings.txt" \
 		|| { echo "[lk2nd]   ❌ strings 失败" >&2; exit 1; }
 	@if grep -q "xiaomi-markw" "$(LK2ND_OUT)/.odin-strings.txt"; then \
 		echo "[lk2nd]   ❌ 仍能搜到 xiaomi-markw" >&2; exit 1; \

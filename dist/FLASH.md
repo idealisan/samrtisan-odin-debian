@@ -17,7 +17,7 @@
 fastboot devices                                   # 确认能看到设备
 
 # 2) 二级引导 → boot 分区
-fastboot flash boot lk2nd-nomarkw.img
+fastboot flash boot lk2nd-odin.img
 
 # 3) 整个 Debian 系统 → userdata 分区
 fastboot flash userdata odin-debian-sparse.img     # 报 too large 就改用 odin-debian.img
@@ -31,7 +31,7 @@ fastboot reboot
 > **顺序不能反**：先 lk2nd 后 userdata —— lk2nd 负责挂载 userdata 去找
 > `/extlinux/extlinux.conf`。
 >
-> **刷的是 `lk2nd-nomarkw.img`（精简版）**，不是 `lk2nd.img`：精简版去掉了
+> **刷的是 `lk2nd-odin.img`（精简版）**，不是 `lk2nd.img`：精简版去掉了
 > `msm8953-xiaomi-markw`，强制 lk2nd 命中 odin 条目，屏幕才会亮。
 
 ---
@@ -40,7 +40,7 @@ fastboot reboot
 
 | 产物 | 大小 | 用途 |
 |---|---|---|
-| `lk2nd-nomarkw.img` | 约 356 KB | 二级引导（**刷这个**），刷入 boot 分区 |
+| `lk2nd-odin.img` | 约 356 KB | 二级引导（**刷这个**），刷入 boot 分区 |
 | `lk2nd.img` | 约 358 KB | 完整版二级引导，保留全部 29 个设备条目；一般不用 |
 | `odin-debian-sparse.img` | 数百 MB | 完整系统的 sparse 版，**推荐**（fastboot 分块传输） |
 | `odin-debian.img` | 2 GiB raw | 同上 raw 版，sparse 失败时的回退 |

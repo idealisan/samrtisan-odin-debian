@@ -90,11 +90,11 @@ make -j"$JOBS" -C "$SRC" TOOLCHAIN_PREFIX=arm-none-eabi- \
 	> "$HERE/build-trimmed-$STAMP.log" 2>&1 || {
 		echo "精简版编译失败，看 $HERE/build-trimmed-$STAMP.log" >&2
 		tail -25 "$HERE/build-trimmed-$STAMP.log"; exit 1; }
-cp -f "$SRC/build-lk2nd-msm8953/lk2nd.img" "$OUT/lk2nd-nomarkw.img"
-echo "  lk2nd-nomarkw.img $(stat -f%z "$OUT/lk2nd-nomarkw.img") 字节"
+cp -f "$SRC/build-lk2nd-msm8953/lk2nd.img" "$OUT/lk2nd-odin.img"
+echo "  lk2nd-odin.img $(stat -f%z "$OUT/lk2nd-odin.img") 字节"
 
 date '+[%F %T] 自检'
-strings "$OUT/lk2nd-nomarkw.img" > "$OUT/.strings.txt"
+strings "$OUT/lk2nd-odin.img" > "$OUT/.strings.txt"
 grep -q "xiaomi-markw" "$OUT/.strings.txt" \
 	&& { echo "  ❌ 仍能搜到 xiaomi-markw" >&2; exit 1; } \
 	|| echo "  ✅ xiaomi-markw: 0 处"

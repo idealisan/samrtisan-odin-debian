@@ -258,7 +258,7 @@ flash/flash-all.sh --dry-run       # 只打印将执行的动作，不真刷
 | `00 precheck` | 本机依赖、镜像是否齐全、按 Release 清单校验 SHA256、判断设备当前状态 |
 | `10 backup` | 经 SSH 全量备份真机根文件系统（手机本地打包 + HTTP 拉回，可断点续传） |
 | `20 fastboot` | 进入原生 fastboot |
-| `30 boot` | `fastboot flash boot lk2nd-nomarkw.img` |
+| `30 boot` | `fastboot flash boot lk2nd-odin.img` |
 | `40 data` | `fastboot flash userdata odin-debian-sparse.img`（失败自动回退 raw 版） |
 | `50 reboot` | `fastboot reboot`，等 PC 上出现 USB NCM 网卡 |
 | `60 usbnet` | 等 PC 拿到 172.16.42.2（DHCP 优先，超时用静态地址兜底） |

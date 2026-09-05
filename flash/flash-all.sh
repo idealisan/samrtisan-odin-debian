@@ -34,7 +34,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/lib/common.sh"
 
 FROM=00
 DRY=0
-BOOT_IMG=${BOOT_IMG:-$DIST_DIR/lk2nd-nomarkw.img}
+BOOT_IMG=${BOOT_IMG:-$DIST_DIR/lk2nd-odin.img}
 DATA_IMG=${DATA_IMG:-$DIST_DIR/odin-debian-sparse.img}
 DATA_IMG_RAW=${DATA_IMG_RAW:-$DIST_DIR/odin-debian.img}
 STATE=$EVIDENCE_DIR/flash-state.env
