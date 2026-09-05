@@ -3769,3 +3769,39 @@ device: usb0 10s 内未 up（exists=no），仍尝试启动 dnsmasq（看门狗�
 - **风险待 CI 回答**：补丁落得上去 ≠ 编得过。DRM panel / DSI 的 API 若在 7.1 有变化，
   0004/0005/0006/0008 可能编译失败；0007 的 binding 若改名，dtb job 会失败
 - **不假设**：不认为"升了基线 OTG 掉电就好了" —— 040 已量过那是电池内阻 0.54Ω，硬件问题
+
+## 2026-09-05/06 升级 7.1.3 的第一轮 CI：dtb 挂了，真因是上游改了标签名
+
+- **00:00 完成** — 本地复现 + 修好 + 提交推送，等 kernel job（冷缓存约 35 分钟）再发新版
+- 本地装了 homebrew 的 dtc 1.7.2，**可以直接跑 `KDIR=ext/linux-msm8953 dts/build-dtb.sh`**
+  复现 CI 的 dtb job —— 不用等 35 分钟才知道结果。这条以后都用。
+- **dtb 失败真因**：不是接线错，是 7.1.3 把 `msm8953.dtsi` 里 `&tlmm` 下 6 个 PDM 状态
+  **改了名**（`_act`→`_default`、`_sus`→`_sleep`），按 pinctrl-names 统一命名。
+  引脚定义（gpio67~74 / cdc_pdm0 / 8mA、2mA+bias-disable）**一字未改**，跟着改名即可。
+  改完本地四个 DTB 全过（63475 / 63323 / 63475 / 63323 字节），Makefile dtb 自检也全过。
+- **顺手查到的一个真实行为变化**（不是编译问题）：上游给 PMI8950 补了正经支持
+  - 6.19.5：`pmi8950.dtsi` 写 `compatible = "qcom,pmi8996-smbchg"`（借的）+ DT 属性 `smbchg-lite`
+  - 7.1.3：改成 `qcom,pmi8950-smbchg`，驱动新增 `smbchg_pmi8950_data`，属性删掉
+  - 差异只有 iterm/ilim 两张表（改用电 pmi8994 的）；`reset_otg_on_oc` 与 `smbchg_lite`
+    **都没变**（前者两版都是 true，后者 6.19.5 靠属性、7.1.3 靠 data，都等效 true）
+  - ⇒ 是修好不是回归；OTG 相关开关位完全一致，真机留意充电电流档位
+- **预先排除了编译风险**（不用等 CI 猜）：`include/drm/drm_panel.h`、`drm_mipi_dsi.h`
+  两版只多了一个 `MIPI_DSI_FMT_RGB101010`；`hfi_parser.c` **完全没动**；
+  三块面板驱动用到的 mipi_dsi_*/drm_panel_*/devm_* 签名全不变
+
+## 2026-09-06 FAT32 中文文件名：用 utf8=1 就够了，不重编内核
+
+- **00:05 完成** — 已提交推送，待真机（SSH 现在要密码，进不去）
+- 之前 README 第八节决策 1 写的是"放弃 FAT32 中文、不做 nls_utf8"，**这条撤销**
+- 卡住的不是内核缺模块，是**选项写错了**
+  - `iocharset=utf8` 错：vfat 仍要走 `load_nls(iocharset)`
+    （`fs/fat/inode.c:1797`，注释就写着 "FIXME: utf8 is using iocharset for upper/lower conversion"），
+    缺 `nls_utf8` 直接挂载失败
+  - `utf8=1` 对：`opts->utf8=1`，名字转换改走 `utf16s_to_utf8s()` / `utf8s_to_utf16s()`，
+    这两个在 **fs/nls/nls_base.c**，`obj-$(CONFIG_NLS)` 就编进去，**与 CONFIG_NLS_UTF8 无关**
+- 本镜像 `CONFIG_NLS=y` + `CONFIG_NLS_ISO8859_1=y` + `CONFIG_NLS_CODEPAGE_437=y`
+  + `CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"` ⇒ 两个 load_nls 都拿得到，**零改动可用**
+- 唯一副作用可接受：大小写比较仍走 iso8859-1 的 `nls_strnicmp`，
+  ASCII 仍不区分大小写、非 ASCII 不折叠，对中文名无影响
+- 顺手改正一个事实错误：exfat **支持** iocharset（`super.c:254`），
+  只是默认值已经是 utf8，不需要给
