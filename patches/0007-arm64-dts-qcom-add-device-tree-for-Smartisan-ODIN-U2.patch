@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,816 @@
+@@ -0,0 +1,830 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -90,11 +90,25 @@ index 000000000..3dc8f434d
 +			no-map;
 +		};
 +
++		/*
++		 * ramoops —— 崩溃转储的落点，空间必须够。
++		 *
++		 * 原来这里是 0x100000（1 MB），其中 console-size 就吃掉 0x80000（512 KB），
++		 * 留给 dmesg 记录的不到 480 KB。而 ramoops **重启不清空**（内存不断电），
++		 * 累积几次崩溃就写满了 ⇒ pstore: backend (ramoops) writing error (-28)，
++		 * 转储丢失，只能靠人眼从屏幕上拍。reports/038 那次 Oops 就是这样丢的。
++		 *
++		 * 改成 2 MB，并把 console 压到 128 KB：
++		 *   2 MB - 128 KB(console) - 32 KB(pmsg) - 4 KB(ftrace) ≈ 1.85 MB 给记录
++		 *   按 record-size 4 KB 算 ≈ 470 条，足够连续抓好几次崩溃。
++		 * 地址 0x9ff00000 是 reserved-memory 里最高的，往后扩不与任何区域重叠
++		 * （设备 4 GB 内存，0x9ff00000 之后还有约 1.5 GB）。
++		 */
 +		ramoops@9ff00000 {
 +			compatible = "ramoops";
-+			reg = <0x0 0x9ff00000 0x0 0x100000>;
++			reg = <0x0 0x9ff00000 0x0 0x200000>;
 +			record-size = <0x1000>;
-+			console-size = <0x80000>;
++			console-size = <0x20000>;
 +			ftrace-size = <0x1000>;
 +			pmsg-size = <0x8000>;
 +		};

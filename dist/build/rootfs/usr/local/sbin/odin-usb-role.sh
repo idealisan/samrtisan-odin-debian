@@ -50,6 +50,32 @@ GADGET_DEV_MAC="${ODIN_GADGET_DEV_MAC:-02:00:0d:1d:00:02}"     # 手机侧 usb0 
 
 log() { echo "$(date -Is) $*" >> "$LOG" 2>/dev/null; }
 
+# --------------------------------- 链路状态：只读 sysfs，尽量不碰 netlink
+#
+# 为什么不用 ip 命令查状态：见 reports/038 —— 内核 Oops 就是 `ip` 触发的，
+# 崩在 if_nlmsg_size() ← rtnl_getlink()，也就是 netlink 的 RTM_GETLINK
+# （遍历网卡列表）。时机恰好是 OTG 插拔导致 usb0（NCM gadget 网卡）正在
+# 创建/销毁的瞬间，撞上内核竞态。
+#
+# 这个 Oops 的后果是连锁的：
+#   · 本脚本当场中断 ⇒ gadget 建不完 ⇒ USB 网卡不恢复
+#   · 内核状态受损 ⇒ sshd 不再响应新连接
+#   · 反复发生会搞坏文件系统 ⇒ 无法启动，必须重刷（已发生两次）
+#
+# 内核那个竞态修好之前，脚本一律用 sysfs 判断状态，把 netlink 调用降到最少
+# （只保留真正需要改变状态的 ip link/addr，且调用前先确认设备还在）。
+
+usb0_exists() { [ -d /sys/class/net/usb0 ]; }
+
+# IFF_UP = 0x1；/sys/class/net/usb0/flags 是十六进制，形如 0x1003
+usb0_is_up() {
+	local f
+	usb0_exists || return 1
+	[ -r /sys/class/net/usb0/flags ] || return 1
+	f=$(cat /sys/class/net/usb0/flags 2>/dev/null) || return 1
+	[ $(( f & 0x1 )) -ne 0 ]
+}
+
 # ---------------------------------------------------------------- 并发保护
 # udev 事件与 timer 可能同时触发；拿不到锁就直接退出（另一次会做完该做的事）
 mkdir -p /run/lock 2>/dev/null
@@ -148,8 +174,13 @@ apply_device() {
 	#     （旧代码正是这样 ⇒ 一直用随机 MAC，每次重启换一个，把 dnsmasq 地址池耗光）。
 	#  2) 改成 usb0 出现后用 ip link set 设置，这个在绑定后仍然有效。
 
-	ip link set usb0 up 2>/dev/null
-	ip addr add ${HOST_IP}/24 dev usb0 2>/dev/null   # 已存在时报错无妨
+	# 先确认 usb0 还在，再调 ip —— 设备正在消失时调 ip 会撞内核竞态（reports/038）
+	if usb0_exists; then
+		ip link set usb0 up 2>/dev/null
+		ip addr add ${HOST_IP}/24 dev usb0 2>/dev/null   # 已存在时报错无妨
+	else
+		log "device: usb0 not present yet, skip ip calls"
+	fi
 
 	# 固定手机侧 MAC（PC 侧看到的 host MAC 由内核/对端决定，这里固定本端即可）
 	#
@@ -160,7 +191,7 @@ apply_device() {
 	# 169.254。加重设守卫后，看门狗空跑时不再打断网络。
 	local cur_mac=""
 	[ -r /sys/class/net/usb0/address ] && cur_mac=$(cat /sys/class/net/usb0/address 2>/dev/null)
-	if [ "$cur_mac" != "$GADGET_DEV_MAC" ]; then
+	if usb0_exists && [ "$cur_mac" != "$GADGET_DEV_MAC" ]; then
 		ip link set usb0 down 2>/dev/null
 		ip link set usb0 address "$GADGET_DEV_MAC" 2>/dev/null
 		ip link set usb0 up 2>/dev/null
@@ -183,18 +214,25 @@ apply_device() {
 		log "device: bound UDC=$udc"
 	fi
 
-	ip link set usb0 up 2>/dev/null
-	ip addr add ${HOST_IP}/24 dev usb0 2>/dev/null   # 已存在时报错无妨
+	if usb0_exists; then
+		ip link set usb0 up 2>/dev/null
+		ip addr add ${HOST_IP}/24 dev usb0 2>/dev/null   # 已存在时报错无妨
+	fi
 
-	# 等 usb0 真正拿到地址再启 dnsmasq：刚 add 完地址还处于 tentative，过早绑定
+	# 等 usb0 真正起来再启 dnsmasq：刚 add 完地址还处于 tentative，过早绑定
 	# 会让 dnsmasq 起来后又退出（开机时"started (pid N)"但 pgrep 查不到就是这个原因）
+	#
+	# 原来这里是 `ip -4 -o addr show usb0 | grep HOST_IP` 轮询 10 次 —— 每轮一次
+	# netlink RTM_GETADDR/GETLINK，正好踩在 reports/038 的崩溃点上，而且是在
+	# usb0 刚被创建、最不稳定的那几秒里连踩 10 次。改成读 sysfs 的链路标志，
+	# 一次 netlink 都不发。
 	local w=0
 	while [ "$w" -lt 10 ]; do
-		ip -4 -o addr show usb0 2>/dev/null | grep -q "${HOST_IP}" && break
+		usb0_is_up && break
 		sleep 1; w=$((w+1))
 	done
-	if [ "$w" -ge 10 ]; then
-		log "device: usb0 未拿到 ${HOST_IP}，仍尝试启动 dnsmasq（看门狗会重试）"
+	if ! usb0_is_up; then
+		log "device: usb0 10s 内未 up（exists=$(usb0_exists && echo yes || echo no)），仍尝试启动 dnsmasq（看门狗会重试）"
 	fi
 
 	if dnsmasq_running; then
@@ -251,7 +289,8 @@ apply_host() {
 	if dnsmasq_running; then
 		systemctl stop "$DNSMASQ_UNIT" 2>/dev/null && log "host: dnsmasq stopped"
 	fi
-	ip addr flush dev usb0 2>/dev/null
+	# 同上：usb0 已经在消失的过程中就不要再调 ip 了（reports/038）
+	usb0_exists && ip addr flush dev usb0 2>/dev/null
 	return 0
 }
 
