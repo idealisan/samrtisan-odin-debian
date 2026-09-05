@@ -1,0 +1,39 @@
+diff --git a/drivers/usb/gadget/function/f_ncm.c b/drivers/usb/gadget/function/f_ncm.c
+index 0e38330271d5..eeb593eb5e5a 100644
+--- a/drivers/usb/gadget/function/f_ncm.c
++++ b/drivers/usb/gadget/function/f_ncm.c
+@@ -1718,9 +1718,34 @@ static void ncm_free(struct usb_function *f)
+ static void ncm_unbind(struct usb_configuration *c, struct usb_function *f)
+ {
+ 	struct f_ncm *ncm = func_to_ncm(f);
++	struct f_ncm_opts *ncm_opts;
+ 
+ 	DBG(c->cdev, "ncm unbind\n");
+ 
++	/*
++	 * 清掉 netdev 的 parent 指针（它指向本 gadget 的 struct device）。
++	 *
++	 * 原因：UDC 驱动在断开时会调用 usb_del_gadget_udc() 清理并删除 gadget，
++	 * 但**此刻 usb0 这个 net_device 还没被删除**。于是 TCP/IP 栈仍可能通过
++	 * netlink 的 GETLINK 消息访问这个 netdev，进而顺着 dev->dev.parent 摸到
++	 * 已经被释放的 gadget 对象 → 内核 panic。
++	 *
++	 * 崩溃路径（真机抓到的与上游报告完全一致）：
++	 *     if_nlmsg_size()
++	 *      └─ rtnl_vfinfo_size()
++	 *          └─ dev_num_vf(dev->dev.parent)     ← 访问已释放的 parent->bus
++	 *
++	 * 见上游补丁 "usb: gadget: f_ncm: Fix Kernel Panic due to access of
++	 * invalid gadget ptr"（Hardik Gajjar，LKML 2024-03-07）。pmOS 的 msm8953
++	 * 分支（6.19.5）不含该补丁，故在此补上。
++	 *
++	 * 这也解释了本仓库此前"插拔 OTG 会把系统搞坏、需要重刷"的现象 —— 不是
++	 * 我们的脚本或配置问题，是 f_ncm 的这个竞态。
++	 */
++	ncm_opts = container_of(f->fi, struct f_ncm_opts, func_inst);
++	if (ncm_opts->net)
++		ncm_opts->net->dev.parent = NULL;
++
+ 	hrtimer_cancel(&ncm->task_timer);
+ 
+ 	kfree(f->os_desc_table);
