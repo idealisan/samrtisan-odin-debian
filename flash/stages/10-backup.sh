@@ -1,6 +1,13 @@
 #!/bin/bash
 # 10-backup —— 全量备份真机根文件系统（userdata 已用部分）
 #
+# ⚠️ 已停用（2026-09-05，用户拍板）：flash-all.sh 不再调用本脚本。
+#    停用理由：这是纯测试机，没有要保的数据；而备份本身有害——tar 整个根会把
+#    3.5 GiB 内存的页缓存吃满（实测 free 掉到 52 MiB），SSH 直接失联，
+#    紧接着的 reboot 命令发不出去，刷机流程卡死在"等 fastboot 超时"。
+#    需要备份分区时改用 fastboot 侧的手段，别走正在运行的系统。
+#    文件留着是为了保留"为什么不能这么干"的记录，不要照抄它去写新脚本。
+#
 #   flash/stages/10-backup.sh              在手机上生成备份包（后台跑，只轮询大小）
 #   flash/stages/10-backup.sh --status     只看进度，不启动新任务
 #   flash/stages/10-backup.sh --fetch      把已生成的备份包拉回主机

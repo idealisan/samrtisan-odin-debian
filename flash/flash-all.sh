@@ -7,7 +7,10 @@
 #
 # 阶段：
 #   00 precheck    本机依赖、镜像存在性与校验和、设备当前状态
-#   10 backup      经 SSH 全量备份真机根文件系统（手机本地打包 + HTTP 拉回）
+#   10 (已移除)     原「经 SSH 全量备份真机根文件系统」。2026-09-05 用户拍板去掉：
+#                  这是纯测试机，没有要保的数据；而备份本身有害——tar 整个根会把
+#                  3.5 GiB 内存的页缓存吃满（实测 free 掉到 52 MiB），SSH 直接失联，
+#                  后续 reboot 命令发不出去，刷机流程卡死。详见 WORKLOG。
 #   20 fastboot    进入原生 fastboot（远程：改名 extlinux.conf 让 lk2nd 停在 fastboot）
 #   30 boot        刷 lk2nd → boot 分区
 #   40 data        刷 Debian 镜像 → userdata 分区
@@ -91,15 +94,11 @@ if run 0; then
   else warn "  设备状态：既不在 SSH 也不在 fastboot（可能需要按键）"; fi
 fi
 
-# ---------------------------------------------------------------- 10 backup
+# ---------------------------------------------------------------- 10 backup（已停用，见文件头）
+# 不要再启用：全量 tar 会把内存吃满导致 SSH 失联，详见上面注释。
+# 万一真需要备份某个分区，用 fastboot fetch 或从 fastboot 里 dd，别走运行的系统。
 if run 10; then
-  step "10 backup"
-  if device_alive; then
-    act bash "$FLASH_DIR/stages/10-backup.sh"
-    act bash "$FLASH_DIR/stages/10-backup.sh" --fetch
-  else
-    warn "设备不可达，跳过备份。若已备份过，用 --from 20 继续"
-  fi
+  : # 阶段号保留，避免 --from 的语义和已有的状态文件对不上
 fi
 
 # ---------------------------------------------------------------- 20 fastboot
