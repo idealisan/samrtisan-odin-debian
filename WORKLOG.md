@@ -3462,3 +3462,29 @@ fastboot/qcom/android 设备，`ifconfig` 里连 usb0 都没了 —— 屏幕上
 顺带一条：区分两种 fastboot 不能看 `version` / `kernel` / `product`（lk2nd 复用
 aboot 的 fastboot 代码，这几个值两边一样）。要看 `partition-size:lk2nd` ——
 lk2nd 自己的会导出 0x80000，原厂的不导出这个分区名。
+
+### 做诊断版这件事本身的坑（2026-09-05 15:2x~15:37）
+
+为了让 lk2nd 把日志留在屏幕上，做了个诊断版。过程中踩了五个坑，都值得记：
+
+1. **`cp -a` 到已存在的目录不会覆盖，会变成 `目标/源目录名/`。**
+   上一版诊断镜像因此带了 `xiaomi-markw`（刷成了完整版），用户看到"变成小米那款、
+   按键又坏了"。**刷之前必须用 `strings` 核 `markw/rosy` 计数，不能只看文件名。**
+
+2. **`.mk` 里赋值行后面不能跟 `/* */` 注释** —— 会被原样塞进 `config.h`，
+   报 `macro names must be identifiers`。注释要单独一行。
+
+3. **`--disassemble='_dputc' | grep "bl.*fbcon_putc"` 查不到 ≠ 没生效。**
+   编译器生成的是**尾跳转 `b <fbcon_putc>`**，不是 `bl`。模式用错会得出反的结论。
+
+4. **日志级别：`SPEW` 的值就是 2，不是 3**（`debug.h`：`CRITICAL 0 / INFO 1 / SPEW 2`）。
+   而 `DEBUGLEVEL` 取的是 `DEBUG` 宏的值 —— `lk2nd/project/base.mk:12` 里 `DEBUG := 1`，
+   所以 SPEW 日志一直被裁掉。**改 `include/debug.h` 的默认值没用**（被 `DEBUG` 覆盖），
+   而且改了也不会触发重编（LK 构建缺头文件依赖跟踪），得 `touch` 所有 `.c`。
+
+5. **屏幕输出不能配 SPEW。** `fbcon_putc` 是逐字符画、还可能滚屏重绘，
+   SPEW 全开之后日志量大到"像 tree 一直在滚、几分钟停不下来"，根本没法看。
+   诊断版要 **DEBUG=1（INFO）+ 强制 fbcon 输出**，十几行就够定位。
+
+收获（虽然被上面这些耽误了）：SPEW 那版**持续打印、没有重启** ——
+说明 lk2nd 在扫描阶段**没有崩溃**。上轮列为最可能的"扫描时崩"被排除。
