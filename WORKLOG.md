@@ -3295,3 +3295,44 @@ probe 也不阻止 OTG 尝试。要真禁掉得改驱动侧。
   走脚本自己的 `odin_sudo` 通道就稳。
 - 发版：`v0.9.4`（干净三段式，非 Pre-release），CI run 33943856041 排队中。
   之前一共走过 27 个后缀版，收敛路径写在 Release 说明里。
+
+## 2026-09-05 lk2nd 专题：按键真机验证通过，引导失败自动停 fastboot 仍未解决
+
+### 已确认修好：按键（补丁 0008）
+
+用户在真机菜单上实测：音量上 / 音量下 / Home 都能用了，方向也对。
+根因与修法见提交 55623e6。要点：三个键全是 TLMM GPIO（85/86/87，低电平有效），
+原厂还把 PMIC 的 RESIN 显式 disable 了，所以 lk2nd 默认的
+`target_volume_down() -> pm8x41_resin_status()` 恒为 0，音量下必然没反应。
+
+### 仍未解决：找不到可启动 fs 时不会自动停在 fastboot（补丁 0007）
+
+现象照旧：改名 extlinux.conf 之后设备反复重启，必须人工按键才能停在菜单。
+
+已排除的：
+- 不是 watchdog。`project/msm8952.mk:118 ENABLE_WDOG_SUPPORT := 0`，
+  且 lk2nd 在 `target/msm8953/init.c:496` 就 `pm8x41_clear_pmic_watchdog()`。
+- 补丁确实编进去了。产物里能搜到 "Reverting to fastboot" 与 gpio-keys 节点，
+  DTB 里 lk2nd,code = 0x115/0x116/0x122、gpios pin 85/86/87 flags 0x11 逐字节核对过。
+
+实测到的 boot 分区决定性事实：/dev/mmcblk0p21 里有 **4 个原厂 ANDROID! 镜像**，
+偏移 0 / 271236 / 524288 / 787184。这正是 `boot_linux_from_mmc()` 会去引导的东西。
+
+### 这轮踩到的环境与流程坑（记下来，下次别再踩）
+
+1. **本机有两种 fastboot，别混**：
+   - 原厂 aboot 的：`kernel:lk`、`version:0.5`、只有 cache/userdata/system 三个分区，
+     **没有 lk2nd 分区名**。`fastboot flash lk2nd` 在这里会报
+     "partition table doesn't exist"。这里要刷 lk2nd 用 `fastboot flash boot`
+     （原厂视角的 boot 就是物理偏移 0，正是 lk2nd 所在）。
+   - lk2nd 自己的：会导出 `lk2nd` 分区（= boot+0..512KB）并把 `boot` 指向 512KB。
+     `dist/FLASH.md` 里写的手动刷法 `fastboot flash boot lk2nd-odin.img` 是**原厂那个**。
+2. `fastboot reboot` 之后立刻 `fastboot devices` 会看到设备还在（假阳性）。
+   要先等它消失，再等它出现，否则结论是错的。
+3. macOS 的 `nc -z` 也会假阳性（报端口通，实际 python connect 是 refused）。
+   判端口通不通用 python socket。
+4. 验一串补丁能不能应用**不能用 --dry-run 串起来**：前一条没真落盘，
+   后一条要改的文件还不存在，`patch` 会挂住等我从 stdin 输入文件名 —— 白等 3 分钟。
+5. 复制子模块源码要排除 .git（它是个 gitlink 文件，指向父仓的 .git/modules），
+   否则在副本里跑 git 会报
+   "not a git repository: .../gen/../../.git/modules/ext/lk2nd"。
