@@ -39,6 +39,14 @@ LOG=/home/user/audio-test.log
 
 db() { printf '%+d dB' $(( $1 - 84 )); }   # 数字音量 → dB，显示用
 
+# ——— 百分比 ↔ 原始值 ———
+# 原始值 0~124，84 = 0 dB。百分比**线性映射到整个 0~124**：
+#     0% → 0（−84 dB，等于静音）   68% → 84（0 dB）   100% → 124（+40 dB）
+# 日常听音大致在 55%~75%（−30 dB ~ +9 dB）；超过 68% 就是正增益，可能失真。
+MAXRAW=124
+pct2raw() { printf '%d' $(( $1 * MAXRAW / 100 )); }
+raw2pct() { printf '%d' $(( $1 * 100 / MAXRAW )); }
+
 # ---------------------------------------------------------------- root 检查
 if [ "$(id -u)" -ne 0 ]; then
 	exec sudo VOL="$VOL" bash "$0" "$@"
@@ -100,28 +108,28 @@ playwav() {
 
 # ---------------------------------------------------------------- 各项测试
 t_speaker() {
-	hdr "扬声器：3 秒 1 kHz 提示音（数字音量 $VOL = $(db "$VOL")）"
+	hdr "扬声器：3 秒 1 kHz 提示音（音量 $(raw2pct "$VOL")% = 原始 $VOL，$(db "$VOL")）"
 	spk_on
 	say "  放音中……"
 	tone
 	ask "扬声器听到蜂鸣了吗？"
 }
 t_music() {
-	hdr "扬声器：播放《暖暖》前 30 秒（数字音量 $VOL = $(db "$VOL")）"
+	hdr "扬声器：播放《暖暖》前 30 秒（音量 $(raw2pct "$VOL")% = 原始 $VOL，$(db "$VOL")）"
 	spk_on
 	say "  播放中（30 秒，Ctrl-C 可中断）……"
 	playwav
 	ask "扬声器播出音乐了吗？"
 }
 t_earpiece() {
-	hdr "听筒：3 秒 1 kHz 提示音（数字音量 $EVOL = $(db "$EVOL")，请把耳朵贴到听筒上）"
+	hdr "听筒：3 秒 1 kHz 提示音（音量 $(raw2pct "$EVOL")% = 原始 $EVOL，$(db "$EVOL")，请贴耳朵）"
 	ear_on
 	say "  放音中……"
 	tone
 	ask "听筒听到蜂鸣了吗？"
 }
 t_emusic() {
-	hdr "听筒：播放《暖暖》前 30 秒（数字音量 $EVOL = $(db "$EVOL")，请贴耳朵）"
+	hdr "听筒：播放《暖暖》前 30 秒（音量 $(raw2pct "$EVOL")% = 原始 $EVOL，$(db "$EVOL")，请贴耳朵）"
 	ear_on
 	say "  播放中（30 秒，Ctrl-C 可中断）……"
 	playwav
@@ -155,11 +163,15 @@ t_mic() {
 	ask "听到自己的录音了吗？"
 }
 t_vol() {
-	hdr "调数字音量（84 = 0 dB，1 dB/档，0~124）"
-	say "  注意：这不是百分比。低于 84 就是负增益，"
-	say "  听筒会比扬声器先听不见（听筒本来响度就低得多）。"
-	printf '\n  1) 扬声器  当前 %s（%s）\n' "$VOL" "$(db "$VOL")"
-	printf '  2) 听筒    当前 %s（%s）\n' "$EVOL" "$(db "$EVOL")"
+	hdr "调音量（按百分比）"
+	say "  0%   = 静音（−84 dB）     68% = 0 dB      100% = +40 dB"
+	say "  日常听音大约 55%~75%；超过 68% 是正增益，可能失真。"
+	say "  想直接填原始值（0~124）就在前面加个 r，例如 r90。"
+	say "  （听筒比扬声器需要更大的值 —— 听筒响度本来就低得多，两者分开存。）"
+	printf '\n  1) 扬声器   %s%%（原始 %s，%s）\n' \
+		"$(raw2pct "$VOL")" "$VOL" "$(db "$VOL")"
+	printf '  2) 听筒     %s%%（原始 %s，%s）\n' \
+		"$(raw2pct "$EVOL")" "$EVOL" "$(db "$EVOL")"
 	printf '  选 1/2（直接回车返回）：'
 	read -r which || which=
 	case "$which" in
@@ -167,19 +179,30 @@ t_vol() {
 		2) prompt='听筒';   cur=$EVOL ;;
 		*) return ;;
 	esac
-	printf '  %s 新音量（当前 %s = %s，直接回车不改）：' "$prompt" "$cur" "$(db "$cur")"
+	printf '  %s 新音量（当前 %s%%；可填 0~100，或 r0~r124）：' \
+		"$prompt" "$(raw2pct "$cur")"
 	read -r v || v=
-	if [ -n "${v:-}" ]; then
-		case "$v" in
-			*[!0-9]*) warn "不是数字，忽略" ;;
-			*)
-				if [ "$v" -gt 124 ]; then v=124; fi
-				if [ "$which" = 1 ]; then VOL=$v; else EVOL=$v; fi
-				ok "$prompt 已设为 $v（$(db "$v")）"
-				log "调音量：$prompt = $v（$(db "$v")）"
-				;;
-		esac
-	fi
+	[ -n "${v:-}" ] || return
+	case "$v" in
+		r*)
+			n=${v#r}
+			case "$n" in
+				*[!0-9]*) warn "不是数字，忽略"; return ;;
+			esac
+			[ "$n" -gt $MAXRAW ] && n=$MAXRAW
+			raw=$n
+			;;
+		*)
+			case "$v" in
+				*[!0-9]*) warn "不是数字，忽略"; return ;;
+			esac
+			[ "$v" -gt 100 ] && v=100
+			raw=$(pct2raw "$v")
+			;;
+	esac
+	if [ "$which" = 1 ]; then VOL=$raw; else EVOL=$raw; fi
+	ok "$prompt 设为 $raw（约 $(raw2pct "$raw")%，$(db "$raw")）"
+	log "调音量：$prompt = $raw（约 $(raw2pct "$raw")%，$(db "$raw")）"
 }
 
 t_status() {
@@ -241,8 +264,8 @@ t_status
 
 while true; do
 	printf '\n\033[1m选择\033[0m  1)扬声器提示音  2)扬声器放音乐  3)听筒提示音  4)听筒放音乐\n'
-	printf '      5)麦克风录放  6)调音量(扬声器 %s / 听筒 %s)  7)看状态  0)退出\n' \
-		"$VOL" "$EVOL"
+	printf '      5)麦克风录放  6)调音量(扬声器 %s%% / 听筒 %s%%)  7)看状态  0)退出\n' \
+		"$(raw2pct "$VOL")" "$(raw2pct "$EVOL")"
 	printf '> '
 	read -r sel || sel=0
 	log "选择：$sel"

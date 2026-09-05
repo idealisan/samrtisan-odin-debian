@@ -590,3 +590,99 @@ DEC1=DMIC2 CIC1=DMIC                 RMS = 0.0
 | UCM 设备切换 `alsaucm set _dev` | ❌ 恒定 -EINVAL，**不影响 amixer 直接控音**，但桌面声音服务依赖它，未解决（§6.6） |
 | 音量百分比映射 | ⚠️ 0~124 且 84 = 0 dB，桌面音量条会表现异常，未做映射 |
 | 耳机通路 | — 本机无 3.5mm 口，不需要 |
+
+---
+
+## 10. 更正 §6.6：`alsaucm set _dev` 不是 bug，是我命令用错了
+
+§6.6 记的"遗留：alsaucm set _dev 恒定 -EINVAL，暂未定位"——**结论是错的**。
+UCM 配置一直是对的，坏的是我的命令。
+
+翻 alsa-lib 1.2.8 的 `src/ucm/main.c`（第 2724 行起）：
+
+```c
+int snd_use_case_set(snd_use_case_mgr_t *uc_mgr,
+		     const char *identifier, const char *value)
+{
+	...
+	else if (strcmp(identifier, "_verb") == 0)
+		err = set_verb_user(uc_mgr, value);
+	else if (strcmp(identifier, "_enadev") == 0)
+		err = set_device_user(uc_mgr, value, 1);
+	else if (strcmp(identifier, "_disdev") == 0)
+		err = set_device_user(uc_mgr, value, 0);
+	...
+	else {
+		str1 = strchr(identifier, '/');
+		if (str1) { ... }
+		else {
+			err = -EINVAL;          /* ← `set _dev` 就掉进这里 */
+			goto __end;
+		}
+		if (check_identifier(identifier, "_swdev"))
+			err = switch_device(uc_mgr, str, value);
+		else if (check_identifier(identifier, "_swmod"))
+			err = switch_modifier(uc_mgr, str, value);
+		else
+			err = -EINVAL;
+	}
+	...
+}
+```
+
+**1.2.8 支持的 identifier 只有**：`_fboot` / `_boot` / `_defaults` / `_verb` /
+`_enadev` / `_disdev` / `_enamod` / `_dismod` / `_swdev/<名>` / `_swmod/<名>`。
+**根本没有 `_dev`** —— 所以它必然返回 -EINVAL，对任何配置、任何机器都一样。
+这也解释了 §6.6 里那两条当时想不通的对照：
+"上游 apq8016-sbc 的配置也一样失败"（不是配置问题）、
+"`set _dev NoSuchDevice` 和 `set _dev Speaker` 报一样的错"（根本没走到查找那步）。
+
+### 10.1 实测：用对 identifier 后一切正常
+
+同一进程里 `set _verb HiFi` → `set _enadev Speaker`：
+
+```
+PRI_MI2S_RX Audio Mixer MultiMedia1   values=on
+RX3 MIX1 INP1                         values=3     ← RX1
+RX3 Digital Volume                    values=84    ← 0 dB
+LINEOUT                               values=1     ← Switch
+Ext Spk Switch                        values=on
+```
+EnableSequence 被完整执行。
+
+再 `set _disdev Speaker`：
+
+```
+RX3 MIX1 INP1                         values=0     ← ZERO
+LINEOUT                               values=0     ← ZERO
+Ext Spk Switch                        values=off
+```
+DisableSequence 也正确执行。
+
+听筒同理（`_enadev Earpiece` → `RX1 MIX1 INP1=RX1`、`EAR_S=Switch`、
+`Earpiece Switch=on`、`RX1 Digital Volume=90`）。
+
+### 10.2 两个容易误解的细节
+
+1. **跨进程时 `_disdev` 会报 ENOENT**。`set_device_user` 里
+   `find_device(uc_mgr, uc_mgr->active_verb, name, 1)` 要求设备在当前
+   active 列表里；alsaucm 每次调用都是新进程，active 列表是空的。
+   这不是配置问题，用 `-b -`（batch）把一串命令喂进**同一个进程**即可。
+2. **`set_device` 开头有幂等短路**：
+   ```c
+   if (device_status(uc_mgr, device->name) == enable)
+           return 0;          /* 已经是目标状态 ⇒ 不执行序列 */
+   ```
+   所以重复 `_enadev` 不会重跑序列，重复 `_disdev` 也不会。
+   我之前测出"disdev 好像没生效"，是因为同一串命令里又 `set _verb HiFi`
+   把 active 设备列表清了 —— 不是配置错。
+
+### 10.3 顺带：音量百分比映射（已做进测试脚本）
+
+`RXn Digital Volume` 原始值 0~124、84 = 0 dB。测试脚本原来让用户直接填原始值，
+很容易被当成百分比（填 30 实际是 −54 dB，听筒直接静音）。现在脚本按**百分比**
+输入，内部换算，并同时显示原始值与 dB：
+
+    0% → 原始 0（−84 dB，静音）  68% → 原始 84（0 dB）  100% → 原始 124（+40 dB）
+
+保留原始值直通：前面加 `r`，例如 `r90`。

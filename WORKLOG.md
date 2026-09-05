@@ -3145,3 +3145,32 @@ probe 也不阻止 OTG 尝试。要真禁掉得改驱动侧。
   - 测试脚本改成扬声器/听筒各存各的音量（VOL / EVOL），所有显示处换算成 dB。
 - 刷机：这回 stage 20（远程改 extlinux.conf 再重启落 fastboot）**自动成功**了，
   上一回超时 420s 需要手按【音量减+电源键】。同样的流程，结果不同 —— 待观察。
+
+## 2026-09-05（续）更正：UCM 从来没坏过，是我命令用错了；麦克风客观确认
+
+- **麦克风客观确认**（扬声器/听筒通了之后这个测试才做得出来）
+  - 让扬声器播 1 kHz 同时录：1000 Hz 谱线 **关 7.8 → 开 7342.4**（约 940 倍），
+    整体 RMS **81.3 → 5635.5**（约 69 倍）。扬声器确实在发声、麦克风确实收到了。
+  - 这个测试在 v0.9.4-audio-model 时做过一次，开/关都是 8~9 —— 当时是扬声器
+    不响（功放脉冲模式没对），不是麦克风的问题。
+- **更正 §6.6：`alsaucm set _dev` 不是 bug，是我用错了 identifier**
+  - alsa-lib 1.2.8 `src/ucm/main.c` 的 `snd_use_case_set()` 只认
+    `_fboot/_boot/_defaults/_verb/_enadev/_disdev/_enamod/_dismod/_swdev/<x>/_swmod/<x>`
+    —— **没有 `_dev`**，所以必然 -EINVAL，对任何配置任何机器都一样。
+  - 改用 `_enadev` / `_disdev` 后一切正常：Enable/DisableSequence 都能执行
+    （实测 Speaker 的 RX3 MIX1 INP1 / LINEOUT / Ext Spk 三条都被正确开关；
+    听筒的 RX1 MIX1 INP1 / EAR_S / Earpiece 同样）。
+  - 两个当时误导我的细节：
+    1. 跨进程时 `_disdev` 报 ENOENT —— alsaucm 每次调用都是新进程，active 列表
+       是空的。用 `-b -` 把一串命令喂进同一进程。
+    2. `set_device()` 开头有幂等短路（`device_status()==enable` 就直接 return 0，
+       不跑序列）。我测出"disdev 没生效"是因为同一串里又 `set _verb HiFi`
+       把 active 列表清了。
+  - 教训：日志里"Invalid argument"且**换任何配置都一样**时，先怀疑**自己用的
+    API/命令**，而不是怀疑配置。读源码比继续做黑盒对照实验快得多。
+- 音量百分比映射（已做进测试脚本）
+  - 原来让用户直接填原始值 0~124（84 = 0 dB），容易被当百分比：填 30 实为
+    −54 dB，扬声器勉强有声、听筒直接静音，用户实测撞到过。
+  - 现在按**百分比**输入、内部换算，同时显示原始值和 dB：
+    0%→0（−84 dB） / 68%→84（0 dB） / 100%→124（+40 dB）。
+    保留 `r<数字>` 直通原始值。
