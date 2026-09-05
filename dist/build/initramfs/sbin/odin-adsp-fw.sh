@@ -94,7 +94,10 @@ for cand in "$mnt"/image/adsp.* "$mnt"/image/ADSP.* "$mnt"/adsp.* "$mnt"/ADSP.*;
 		copied=$((copied + 1))
 	fi
 done
-sync
+# 这里**不** sync：sync 是全局的，会把根分区所有脏页一起刷掉，而调用方
+# （init）在几段固件都取完之后会统一 sync 一次。中途这几次纯属重复劳动 ——
+# 2026-09-05 首启实测每段各卡 42~70s。拷出来的脏页在页缓存里不会丢，
+# umount 的也只是只读挂载的源分区。
 umount "$mnt" 2>/dev/null
 rmdir "$mnt" 2>/dev/null
 

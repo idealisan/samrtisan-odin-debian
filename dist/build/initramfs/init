@@ -26,28 +26,75 @@ usb_up() {
     ip addr add 172.16.42.1/24 dev usb0 2>/dev/null
 }
 
-try_mount_root() {
-    # NOTE: 判定用真实文件而非 /mnt/sbin/init——后者是指向
-    # /lib/systemd/systemd 的绝对路径符号链接，在 initramfs 环境下
-    # 解析到 initramfs 自身根目录而必然失效。
-    ROOT=$(findfs LABEL=pmOS_root 2>/dev/null)
-    if [ -n "$ROOT" ] && mount -t ext4 -o ro "$ROOT" /mnt 2>/dev/null; then
-        [ -x /mnt/usr/lib/systemd/systemd ] && return 0
-        umount /mnt
-    fi
-    # fallback: brute scan mmc partitions for our marker
-    for dev in /dev/mmcblk0p* /dev/mmcblk1p* /dev/mmcblk0 /dev/mmcblk1 /dev/vd[a-z]; do
-        [ -b "$dev" ] || continue
-        mount -t ext4 -o ro "$dev" /mnt 2>/dev/null || continue
-        if [ -x /mnt/usr/lib/systemd/systemd ] && [ -f /mnt/.odin-debian ]; then
-            ROOT="$dev"; return 0
-        fi
-        umount /mnt
-    done
-    return 1
+part_dev() {
+	# 按 GPT 分区名找设备节点。
+	# initramfs 里没有 udev，/dev/disk/by-partlabel/ 那套符号链接不存在，
+	# 但 sysfs 每个块设备的 uevent 里就有 DEVNAME 与 PARTNAME —— 既够用，
+	# 也比 udev 更早可用，而且**不用去读目标分区的超级块**。
+	# （与 sbin/odin-*-fw.sh 里那个 part_dev 是同一份逻辑。）
+	name=$1
+	for d in /sys/class/block/*; do
+		[ -f "$d/uevent" ] || continue
+		if grep -q "^PARTNAME=$name$" "$d/uevent" 2>/dev/null; then
+			sed -n 's/^DEVNAME=//p' "$d/uevent" 2>/dev/null | head -1 | sed 's|^|/dev/|'
+			return 0
+		fi
+	done
+	return 1
 }
 
-echo "[initramfs] waiting for pmOS_root ..."
+# 判定用真实文件而非 /mnt/sbin/init——后者是指向
+# /lib/systemd/systemd 的绝对路径符号链接，在 initramfs 环境下
+# 解析到 initramfs 自身根目录而必然失效。
+root_ok() { [ -x /mnt/usr/lib/systemd/systemd ]; }
+
+# ---- 快路径：只做"不贵"的探测，可以在重试循环里反复跑 ----------------------
+#
+# 顺序是刻意的：
+#   1. GPT 分区名 userdata —— 刷机刷的就是这个分区（fastboot flash userdata），
+#      名字写死在 GPT 里、与文件系统无关、与块设备编号（mmcblk0/1）无关。
+#      2026-09-05 实测：首启那次 findfs 与 devtmpfs 建节点撞车，一次 miss 就
+#      掉进暴力扫分区，57 个分区逐个 mount 试、每次约 2s，光这一步 2 分钟。
+#      走 PARTNAME 既不吃这个竞争，也完全不用碰超级块。
+#   2. 文件系统卷标 pmOS_root —— 分区名万一变了（换机的分区表不同）还能兜住。
+try_mount_root() {
+	dev=$(part_dev userdata 2>/dev/null)
+	if [ -n "$dev" ] && [ -b "$dev" ] \
+	   && mount -t ext4 -o ro "$dev" /mnt 2>/dev/null; then
+		if root_ok; then ROOT="$dev"; return 0; fi
+		umount /mnt 2>/dev/null
+	fi
+	ROOT=$(findfs LABEL=pmOS_root 2>/dev/null)
+	if [ -n "$ROOT" ] && mount -t ext4 -o ro "$ROOT" /mnt 2>/dev/null; then
+		if root_ok; then return 0; fi
+		umount /mnt 2>/dev/null
+	fi
+	ROOT=""
+	return 1
+}
+
+# ---- 兜底：扫全部分区 ------------------------------------------------------
+#
+# 只在快路径彻底失败后才做，而且**绝不能放进重试循环**：它是分钟级的，
+# 放进去就是把整个循环钉死（首启那 2 分钟就是这么来的）。
+scan_all() {
+	for dev in /dev/mmcblk0p* /dev/mmcblk1p* /dev/mmcblk0 /dev/mmcblk1 /dev/vd[a-z]; do
+		[ -b "$dev" ] || continue
+		# 先用 blkid 把非 ext4 的筛掉：读一次超级块远比 mount 一次便宜。
+		# 57 个分区里绝大多数是原厂的 raw/固件分区，mount 它们纯属浪费。
+		blkid -s TYPE "$dev" 2>/dev/null | grep -q 'TYPE="ext4"' || continue
+		mount -t ext4 -o ro "$dev" /mnt 2>/dev/null || continue
+		if root_ok && [ -f /mnt/.odin-debian ]; then
+			ROOT="$dev"; return 0
+		fi
+		umount /mnt 2>/dev/null
+	done
+	return 1
+}
+
+# 30s 窗口里只跑快路径。跑不到就说明快路径真的救不了（分区表不是这套、
+# 或者卷标被改了），这时才轮到分钟级的兜底 —— 见 scan_all 上面的说明。
+echo "[initramfs] 找根：先试 GPT 分区名 userdata，再试卷标 pmOS_root ..."
 i=0; ROOT=""
 while [ $i -lt 150 ]; do          # ~30s
     if try_mount_root; then
@@ -59,13 +106,35 @@ while [ $i -lt 150 ]; do          # ~30s
 done
 
 if [ -z "$ROOT" ]; then
-    echo "[initramfs] BOOT FAILED - rescue: telnet 172.16.42.2->23 / UART ttyMSM0"
-    usb_up; telnetd -l /bin/sh -p 23 2>/dev/null
-    while ! try_mount_root; do sleep 5; done
-    echo "[initramfs] root appeared, booting"
+    echo "[initramfs] 快路径没找到根，转兜底扫描全部分区"
+    if scan_all; then
+        echo "[initramfs] root found on $ROOT（兜底扫描）"
+    else
+        echo "[initramfs] BOOT FAILED - rescue: telnet 172.16.42.2->23 / UART ttyMSM0"
+        usb_up; telnetd -l /bin/sh -p 23 2>/dev/null
+        while ! scan_all; do sleep 5; done
+        echo "[initramfs] root appeared, booting"
+    fi
 fi
 
 [ "$RESCUE" = "1" ] && { echo "staying in rescue shell"; exec sh; }
+
+# 三段固件的**挂载/同步**合并成一轮：挂 rw → 抽全部 → sync 一次 → 挂回 ro。
+# 原来每段各自 remount rw + sync + remount ro，等于 6 次 remount + 3 次全局
+# sync。2026-09-05 首启实测：三段各卡 42~70s（"task sync:... waiting for
+# writeback completion"），合起来 3 分钟。合一轮省掉 2/3 的 remount 与 sync。
+# 注意 sync 是全局的（会顺带刷根分区的所有脏页），不是只刷刚拷的那几个文件。
+NEED_RW=0
+prep_fw() {   # prep_fw <脚本> <人话描述>
+	[ -x "$1" ] || return 0
+	if "$1" /mnt --check; then
+		echo "[initramfs] $2 已在位"
+		return 0
+	fi
+	[ "$NEED_RW" = 1 ] || { mount -o remount,rw /mnt 2>/dev/null; NEED_RW=1; }
+	echo "[initramfs] 取出 $2"
+	"$1" /mnt
+}
 
 # WCNSS（WiFi）固件与板级射频校准数据要从原厂 modem / persist 分区现取：
 # 它们不在任何 Debian 包里，也不能进版本库（二进制 + 机器相关的校准数据）。
@@ -73,33 +142,12 @@ fi
 # request_firmware("wcnss.mdt")，那时 systemd 刚起来，任何 late service 都还
 # 没跑（实测 persist 分区要到 25.9s 才被挂载）。差这十几秒，remoteproc 就停在
 # offline，补上文件也不会自己重试。
-# 只有确实缺文件时才把根临时挂为 rw，取完立刻 sync 并挂回 ro。
-if [ -x /sbin/odin-wlan-fw.sh ]; then
-    if /sbin/odin-wlan-fw.sh /mnt --check; then
-        echo "[initramfs] WCNSS 固件已在位"
-    else
-        echo "[initramfs] 取出 WCNSS 固件与校准数据"
-        mount -o remount,rw /mnt 2>/dev/null
-        /sbin/odin-wlan-fw.sh /mnt
-        sync
-        mount -o remount,ro /mnt 2>/dev/null
-    fi
-fi
+prep_fw /sbin/odin-wlan-fw.sh "WCNSS 固件与校准数据"
 
 # venus（视频硬编解码）固件同样是 modem:/image/ 里的 PIL 映像，同样的时序要求：
 # qcom-venus 是 platform 驱动，开机早期就会被 udev 加载并立刻 request_firmware
 # ("venus.mdt")。必须在这里备好，让驱动的第一次请求就成功。
-if [ -x /sbin/odin-venus-fw.sh ]; then
-    if /sbin/odin-venus-fw.sh /mnt --check; then
-        echo "[initramfs] venus 固件已在位"
-    else
-        echo "[initramfs] 取出 venus 固件"
-        mount -o remount,rw /mnt 2>/dev/null
-        /sbin/odin-venus-fw.sh /mnt
-        sync
-        mount -o remount,ro /mnt 2>/dev/null
-    fi
-fi
+prep_fw /sbin/odin-venus-fw.sh "venus 固件"
 
 # ADSP（音频 DSP）固件 —— 主线的整条 msm8953 音频链路都跑在它上面
 #   （q6afe / q6adm / q6asm / q6routing，声卡是 qcom,msm8953-qdsp6-sndcard）。
@@ -107,17 +155,11 @@ fi
 #   qcom,msm8953-adsp-pil 的匹配数据 msm8996_adsp_resource 带 **auto_boot = true**，
 #   驱动一 probe 就立刻 request_firmware("adsp.mdt")，**失败不会自己重试**。
 #   固件不到位 = 整台机器没有声音。必须在 switch_root 之前备好。
-if [ -x /sbin/odin-adsp-fw.sh ]; then
-    if /sbin/odin-adsp-fw.sh /mnt --check; then
-        echo "[initramfs] ADSP 固件已在位"
-    else
-        echo "[initramfs] 取出 ADSP 固件"
-        mount -o remount,rw /mnt 2>/dev/null
-        /sbin/odin-adsp-fw.sh /mnt
-        sync
-        mount -o remount,ro /mnt 2>/dev/null
-    fi
-fi
+prep_fw /sbin/odin-adsp-fw.sh "ADSP 固件"
+
+# 只有确实写过东西才需要落盘 + 挂回 ro。取固件失败不致命（最坏没 WiFi / 没声音），
+# 绝不能因为取不到把启动搞挂。
+[ "$NEED_RW" = 1 ] && { sync; mount -o remount,ro /mnt 2>/dev/null; }
 
 # 注意：此处不得 umount /mnt —— 根必须保持挂载态供 switch_root 使用；
 # 只读挂载由 systemd 依 fstab 重挂为 rw。
