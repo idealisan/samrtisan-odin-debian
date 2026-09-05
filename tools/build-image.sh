@@ -103,7 +103,24 @@ rm -rf "$STAGE"/var/cache/apt/* "$STAGE"/var/lib/apt/lists/*
 say "cleanup done (machine-id/random-seed/journal/wtmp/lastlog/apt-cache)"
 
 # ---------------------------------------------------------------- 3. 建文件系统
-# 保守特性集 + 显式保留 resize_inode（=> mke2fs 会分配 reserved GDT blocks）
+#
+# 特性集怎么定的（2026-09-05 改：extents 从"关"改成"开"）：
+#
+#   extents          **开**。之前关掉它是为了迁就 lk2nd —— 它要读根分区里的
+#                    /extlinux/extlinux.conf，而它的 ext2 驱动不认识 extents。
+#                    代价是根文件系统残缺：swapfile 走 iomap，**需要 extents**，
+#                    于是基于文件的 swap 根本建不起来（实测 swapon: EINVAL）。
+#                    现在 lk2nd 由补丁 lk2nd/0005 补上只读 extents 支持，
+#                    这个枷锁可以摘掉了。详见 reports/035、reports/036。
+#
+#   64bit            关。开了会改变 group descriptor 的大小（32 → 64 字节），
+#                    lk2nd 的驱动按 32 字节读，会读错。
+#   metadata_csum    关。lk2nd 只读，不做校验；开着徒增不兼容面。
+#   extra_isize      关。会让 inode 变大，没必要。
+#   huge_file        关。Dir_nlink 同理。
+#   dir_nlink        关。
+#
+# 保留 resize_inode（=> mke2fs 会分配 reserved GDT blocks），为后续 resize 留余地。
 #
 # -N 显式指定 inode 数量：默认 mke2fs 按"文件系统总大小 / inode_ratio"来分配，
 #   而文件系统大小是调用方给的保守估值（通常远大于实际内容），于是白白多出一大张
@@ -117,7 +134,7 @@ ninodes=$(( nfiles * 12 / 10 + 2000 ))
 say "inode 数按实际条目算: ${nfiles} 条目 → -N ${ninodes}"
 rm -f "$OUT"
 mke2fs -q -F -t ext4 -L "$LABEL" \
-  -O resize_inode,^extents,^64bit,^metadata_csum,^huge_file,^dir_nlink,^extra_isize \
+  -O resize_inode,extents,^64bit,^metadata_csum,^huge_file,^dir_nlink,^extra_isize \
   -I 256 -b 4096 -N "$ninodes" -d "$STAGE" "$OUT" "$BLOCKS"
 say "mke2fs done ($BLOCKS blocks)"
 
@@ -192,7 +209,11 @@ note "label" "$LBL"
 case "$FEAT" in *resize_inode*) note "resize_inode" "OK" ;;
   *) note "resize_inode" "MISSING"; rc=1 ;; esac
 [ "${RDT:-0}" -gt 0 ] && note "reserved GDT > 0" "OK" || { note "reserved GDT > 0" "ZERO"; rc=1; }
-for bad in extent 64bit metadata_csum huge_file dir_nlink extra_isize; do
+# extent 现在是**必需**项（swapfile 需要它；lk2nd 靠补丁 0005 提供只读支持），
+# 不再列进"禁止特性"。其余仍是 lk2nd 的 ext2 驱动读不了的，必须关着。
+case "$FEAT" in *extent*) note "extents" "OK" ;;
+  *) note "extents" "MISSING"; rc=1 ;; esac
+for bad in 64bit metadata_csum huge_file dir_nlink extra_isize; do
   case "$FEAT" in *$bad*) note "forbidden feature: $bad" "PRESENT"; rc=1 ;; esac
 done
 # lk2nd ext2 驱动的挂载门槛：ro_compat 只允许 sparse_super|large_file

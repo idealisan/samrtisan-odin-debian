@@ -1,41 +1,45 @@
 [Unit]
-Description=Set up compressed RAM swap (zram)
+Description=Set up swap (file-based as primary, zram as first tier)
 Documentation=file:/usr/local/sbin/odin-swap.sh
 
 # ─────────────────────────────────────────────────────────────────────────
-# ⚠️ 之前这个 unit **一次都没跑起来过**，原因是 systemd 依赖环：
+# ⚠️ 这个 unit 曾经**一次都没跑起来过**，原因是 systemd 依赖环：
 #
 #   systemd[1]: sysinit.target: Found ordering cycle on odin-swap.service/start
 #   systemd[1]: sysinit.target: Job odin-swap.service/start deleted to break
 #                               ordering cycle starting with sysinit.target/start
 #
-# 环是这样形成的（当时的写法）：
+# 当时的写法是：
+#     DefaultDependencies=no
 #     After=local-fs.target odin-firstboot-resize.service
-#     Before=sysinit.target
-#     WantedBy=sysinit.target
-#   而 odin-firstboot-resize.service 是 WantedBy=multi-user.target。
-#   于是：sysinit.target → odin-swap → firstboot-resize → multi-user.target
-#         → sysinit.target   闭成一个环。systemd 的破环手段是**把本 unit 整个丢掉**，
-#   于是 swap 从来没建过，journal 里 0 条记录 —— 表面上只是"swap 没起来"，
-#   实际是 unit 被 systemd 静默丢弃了。
+#     Before=sysinit.target          ← 关键
+#     WantedBy=sysinit.target        ← 关键
+#   而 odin-firstboot-resize.service 是 WantedBy=multi-user.target。于是
+#     sysinit.target → odin-swap → firstboot-resize → multi-user.target
+#                    → sysinit.target
+#   闭成环。systemd 的破环手段是**把本 unit 整个丢掉** —— 于是脚本一次没跑过，
+#   journal -u odin-swap 里 0 条记录、日志文件根本不存在。表面上是"swap 没起来"，
+#   实际是 unit 被静默丢弃了。
 #
-# 现在改用 zram，它不碰磁盘，**不需要等 resize2fs**，所以不再依赖
-# odin-firstboot-resize.service —— 环从根上消失。
+# 现在挂在 multi-user.target 上（不再 Before sysinit.target），
+# 那个环自然消失。
 #
-# 教训：`WantedBy=sysinit.target` + `Before=sysinit.target` 的单元，
-# 千万别 After 一个属于 multi-user.target 的单元。改完用
-#   journalctl -u <unit>   确认**有**记录才算真的跑过。
+# 教训：`WantedBy=sysinit.target` + `Before=sysinit.target` 的单元，千万别
+# `After` 一个属于 multi-user.target 的单元。改完用 `journalctl -u <unit>`
+# 确认**有**记录才算真的跑过（status 是 active (exited) 而不是 inactive (dead)）。
 # ─────────────────────────────────────────────────────────────────────────
 
-# zram 只需要内核模块和 sysfs，不依赖文件系统，可以很早起来。
-DefaultDependencies=no
-Before=swap.target
+# 建 swapfile 必须在文件系统扩容之后：resize2fs 之前根分区还是镜像里那个
+# 小尺寸，dd 写出几百 MB 就 ENOSPC，留下半截文件（历史上踩过）。
+After=local-fs.target odin-firstboot-resize.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+# 4 GiB 的 swapfile 创建可能要一会儿（fallocate 通常很快，dd 会慢）
+TimeoutStartSec=600
 ExecStart=/usr/local/sbin/odin-swap.sh start
 ExecStop=/usr/local/sbin/odin-swap.sh stop
 
 [Install]
-WantedBy=swap.target
+WantedBy=multi-user.target

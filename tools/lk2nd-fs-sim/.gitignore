@@ -1,0 +1,9 @@
+# 编译产物与测试镜像（一次几百 MiB，不要进版本库）
+ext2sim
+ext2sim-*
+src/
+*.img
+stage/
+stage-sparse/
+.dump.tmp
+*.dSYM/

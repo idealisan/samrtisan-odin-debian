@@ -1,0 +1,289 @@
+From: Smartisan ODIN mainline porting effort
+Subject: [PATCH 5/5] lib/fs/ext2: add read-only ext4 extent support
+
+lk2nd 用文件系统只是为了读（extlinux.conf、kernel、initramfs、dtb），但因为它的
+ext2 驱动不认识 extents，根分区的 ext4 只能关掉 extents 来迁就它
+（tools/build-image.sh 里 mke2fs -O ^extents，为的是 lk2nd 能读 /extlinux/extlinux.conf）。
+代价是根文件系统残缺：基于文件的 swap 用不了（swapfile 走 iomap，需要 extents），
+元数据效率也差。
+
+本补丁补上**只读**的 extents 支持，于是根分区可以开 extents。
+
+三处改动：
+
+1. ext2_fs.h —— 补 ext4 常量与结构体（数值与 Linux 的 fs/ext4/ext4.h、
+   fs/ext4/ext4_extents.h 逐条核对）：
+     incompat 特性位（EXTENTS / 64BIT / MMP / FLEX_BG / INLINE_DATA / ENCRYPT / CASEFOLD）
+     inode 标志（EXT4_EXTENTS_FL / EXT4_INLINE_DATA_FL / EXT4_HUGE_FILE_FL）
+     struct ext4_extent_header / ext4_extent / ext4_extent_idx
+   以及白名单 EXT2_FEATURE_INCOMPAT_SUPP_RO_EXT4：放行 FLEX_BG 与 EXTENTS，
+   其余（64BIT / INLINE_DATA / ENCRYPT / CASEFOLD / MMP）一律拒绝。
+
+2. ext2.c —— 挂载时补 incompat 门禁。
+   原来驱动**完全不检查** s_feature_incompat：遇到不支持的特性不会拒绝，而是等到
+   读文件时拿间接块的方式去解析 extent 树，于是读出**错误的块号**而不是报错 ——
+   比直接拒绝难查得多。现在显式检查，不支持就返回 -5。
+
+3. io.c —— 新增 ext2_extent_lookup()，并在 file_block_to_fs_block() 里对
+   带 EXT4_EXTENTS_FL 的 inode 分流走 extent 树。
+   实现是只读的：按 eh_depth 逐层下钻（第一层在 inode->i_block 里，更深层各占一个
+   物理块），最多 EXT4_MAX_EXTENT_DEPTH 层；叶子命中返回
+   phys + (fileblock - ee_block)；未覆盖或"未初始化"(ee_len > 32768) 都返回 0，
+   由调用方按"读到全 0"处理。
+
+   顺带修一个 UB：file_block_to_fs_block() 里 `uint32_t pos[4];` 未初始化就传给
+   ext2_calculate_block_pointer_pos()，而 level==0 时只填了 pos[0]，紧接着 LTRACEF
+   会读 pos[1..3]。读未初始化栈是未定义行为 —— 实测 clang -O1 下会把 level 一起
+   弄成垃圾值（本该是 0，实际打印出 3），导致原本能读的文件读不出来。改成
+   `uint32_t pos[4] = { 0, 0, 0, 0 };`，并补上 ext2_calculate_block_pointer_pos()
+   返回值的检查（原来返回值被直接丢弃）。
+
+   i_block 区域没有经过 endian_swap_inode 处理（那里刻意跳过块指针），所以 extent
+   结构的每个字段都自己套了 LE16/LE32；i_flags 则已经过 LE32SWAP，是主机序，直接比较。
+
+验证方式（详见 reports/036）：
+在宿主机上把 lib/fs/ext2 拉下来编译成 ext2sim（只依赖 bio_read + 5 个 bcache_* 函数），
+跑矩阵：
+    配置 A 无 extents（当前 tools/build-image.sh 的 -O 参数）  改前改后都必须全过（回归）
+    配置 B 开 extents                                         改前失败，改后全过
+    小文件(167B) / 大文件(30 MiB 连续) / 稀疏文件(64 MiB 含洞)
+结果：三种文件在 A、B 两种配置下读出的内容**逐字节一致**（fnv1a 校验和相同），
+其中稀疏文件的 extent 树 depth=1，索引层下钻路径被走到 16392 次。
+
+diff --git a/lib/fs/ext2/ext2.c b/lib/fs/ext2/ext2.c
+index 14f1355c..878e637f 100644
+--- a/lib/fs/ext2/ext2.c
++++ b/lib/fs/ext2/ext2.c
+@@ -155,6 +155,21 @@ status_t ext2_mount(bdev_t *dev, fscookie **cookie)
+         return err;
+     }
+ 
++    /*
++     * make sure it doesn't have any incompat features we don't support
++     *
++     * 原来这里**完全不检查** incompat —— 遇到不支持的特性（比如 extents）时
++     * 不会在挂载阶段拒绝，而是等到读文件时用间接块的方式去解析 extent 树，
++     * 于是读出**错误的块号**而不是报错，比直接拒绝难查得多。
++     * 现在显式放行 extents（下面 io.c 会走 extent 树），其余一律拒绝。
++     */
++    if (ext2->sb.s_feature_incompat & ~EXT2_FEATURE_INCOMPAT_SUPP_RO_EXT4) {
++        LTRACEF("unsupported incompat features 0x%x (allowed 0x%x)\n",
++                ext2->sb.s_feature_incompat, EXT2_FEATURE_INCOMPAT_SUPP_RO_EXT4);
++        err = -5;
++        return err;
++    }
++
+     /* read in all the group descriptors */
+     ext2->gd = malloc(sizeof(struct ext2_group_desc) * ext2->s_group_count);
+     err = bio_read(ext2->dev, (void *)ext2->gd,
+diff --git a/lib/fs/ext2/ext2_fs.h b/lib/fs/ext2/ext2_fs.h
+index c06f4565..64ea8013 100644
+--- a/lib/fs/ext2/ext2_fs.h
++++ b/lib/fs/ext2/ext2_fs.h
+@@ -360,6 +360,67 @@ struct ext2_super_block {
+ #define EXT2_FEATURE_RO_COMPAT_UNSUPPORTED  ~EXT2_FEATURE_RO_COMPAT_SUPP
+ #define EXT2_FEATURE_INCOMPAT_UNSUPPORTED   ~EXT2_FEATURE_INCOMPAT_SUPP
+ 
++/*
++ * ext4 特性与结构 —— 只取**只读**所需的部分
++ *
++ * lk2nd 用文件系统只是为了读（extlinux.conf、kernel、initramfs、dtb），
++ * 所以这里不实现任何写路径、块分配、日志回放。目的只有一个：
++ * 让根分区能开 `extents`，从而支持基于文件的 swap 等需要 ext4 完整语义的功能。
++ *
++ * 数值与 Linux 的 fs/ext4/ext4.h、fs/ext4/ext4_extents.h 逐条核对过。
++ */
++
++/* incompat 特性位 */
++#define EXT4_FEATURE_INCOMPAT_EXTENTS       0x0040  /* extents support */
++#define EXT4_FEATURE_INCOMPAT_64BIT         0x0080  /* 64bit 会改变组描述符大小，不支持 */
++#define EXT4_FEATURE_INCOMPAT_MMP           0x0100
++#define EXT4_FEATURE_INCOMPAT_FLEX_BG       0x0200  /* 只影响块组布局，只读无碍 */
++#define EXT4_FEATURE_INCOMPAT_INLINE_DATA   0x8000  /* 数据内联在 inode 里，不支持 */
++#define EXT4_FEATURE_INCOMPAT_ENCRYPT       0x10000
++#define EXT4_FEATURE_INCOMPAT_CASEFOLD      0x20000
++
++/* 我们只读，能接受的 incompat 特性：把 extents 加进原有白名单，
++   并放宽 FLEX_BG（只读路径用不到块组布局信息）。
++   64BIT / INLINE_DATA / ENCRYPT / CASEFOLD / MMP 一律拒绝 —— 不检查的话
++   驱动会拿间接块的方式去解析 extents，读出的是垃圾而不是报错，比拒绝更糟。 */
++#define EXT2_FEATURE_INCOMPAT_SUPP_RO_EXT4  (EXT2_FEATURE_INCOMPAT_FILETYPE| \
++                     EXT2_FEATURE_INCOMPAT_META_BG| \
++                     EXT4_FEATURE_INCOMPAT_FLEX_BG| \
++                     EXT4_FEATURE_INCOMPAT_EXTENTS)
++
++/* inode 标志 */
++#define EXT4_HUGE_FILE_FL           0x00040000
++#define EXT4_EXTENTS_FL             0x00080000  /* Inode uses extents */
++#define EXT4_INLINE_DATA_FL         0x10000000  /* Inode has inline data */
++
++#define EXT4_EXT_MAGIC              0xf30a
++#define EXT4_MAX_EXTENT_DEPTH       5
++
++/* extent 树的头部，位于 inode->i_block 起始处，或某个索引块起始处 */
++struct ext4_extent_header {
++	uint16_t	eh_magic;
++	uint16_t	eh_entries;	/* 有效项数 */
++	uint16_t	eh_max;		/* 容量 */
++	uint16_t	eh_depth;	/* 0 = 叶子，>0 = 索引 */
++	uint32_t	eh_generation;
++};
++
++/* 叶子节点项（depth == 0） */
++struct ext4_extent {
++	uint32_t	ee_block;	/* 覆盖的第一个逻辑块 */
++	uint16_t	ee_len;		/* 覆盖的块数；>32768 表示未初始化 */
++	uint16_t	ee_start_hi;	/* 物理块高 16 位 */
++	uint32_t	ee_start_lo;	/* 物理块低 32 位 */
++};
++
++/* 索引节点项（depth > 0） */
++struct ext4_extent_idx {
++	uint32_t	ei_block;	/* 该索引覆盖的逻辑块起点 */
++	uint32_t	ei_leaf_lo;	/* 下一层所在物理块（低 32 位） */
++	uint16_t	ei_leaf_hi;	/* 高 16 位 */
++	uint16_t	ei_unused;
++};
++
+ /*
+  * Default values for user and/or group using reserved blocks
+  */
+diff --git a/lib/fs/ext2/io.c b/lib/fs/ext2/io.c
+index d5110319..c8d7375f 100644
+--- a/lib/fs/ext2/io.c
++++ b/lib/fs/ext2/io.c
+@@ -141,6 +141,103 @@ error:
+     return err;
+ }
+ 
++/*
++ * ext4 extents: 文件的逻辑块号 → 物理块号（只读）
++ *
++ * 命中 extent 则返回对应物理块；落到空洞（未覆盖 / 未初始化）返回 0，
++ * 由调用方按"读到全 0"处理。真正的错误返回负值。
++ *
++ * extent 树的第一层就嵌在 inode->i_block 里（60 字节），更深的层各占一个物理块。
++ * 所以只需要按 eh_depth 逐层往下读，最多 EXT4_MAX_EXTENT_DEPTH 层。
++ *
++ * 注意：i_block 区域**没有**经过 endian_swap_inode 处理（那里刻意跳过块指针），
++ * 所以下面的每个字段都要自己套 LE16/LE32。
++ */
++static int ext2_extent_lookup(ext2_t *ext2, struct ext2_inode *inode,
++			      uint fileblock, blocknum_t *out_block)
++{
++	const uint32_t block_size = EXT2_BLOCK_SIZE(ext2->sb);
++	const void *cur = inode->i_block;   /* 第一层在 inode 里 */
++	void *tmp = NULL;                   /* 更深层读出来的块 */
++	int err = -1;
++	uint32_t level;
++
++	*out_block = 0;
++
++	/* level 只是防呆上限，真正的层数由 eh_depth 决定 */
++	for (level = 0; level <= EXT4_MAX_EXTENT_DEPTH; level++) {
++		const struct ext4_extent_header *eh = cur;
++		uint32_t entries, i;
++
++		if (LE16(eh->eh_magic) != EXT4_EXT_MAGIC)
++			goto done;
++		entries = LE16(eh->eh_entries);
++		if (entries == 0 || entries > LE16(eh->eh_max))
++			goto done;
++
++		if (LE16(eh->eh_depth) == 0) {
++			const struct ext4_extent *ee = (const struct ext4_extent *)
++				((const uint8_t *)cur + sizeof(*eh));
++
++			for (i = 0; i < entries; i++) {
++				uint32_t start = LE32(ee[i].ee_block);
++				uint16_t len = LE16(ee[i].ee_len);
++				uint64_t phys;
++
++				/* len > 32768 是"未初始化" extent；只读时当空洞 */
++				if (len > 32768)
++					continue;
++				if (fileblock < start || fileblock >= start + len)
++					continue;
++
++				phys = ((uint64_t)LE16(ee[i].ee_start_hi) << 32) |
++				       LE32(ee[i].ee_start_lo);
++				*out_block = (blocknum_t)(phys + (fileblock - start));
++				err = 0;
++				goto done;
++			}
++			/* 没有任何 extent 覆盖它 => 空洞，读到 0 */
++			err = 0;
++			goto done;
++		}
++
++		/* 索引层：取最后一个 ei_block <= fileblock 的项下钻 */
++		{
++			const struct ext4_extent_idx *ei = (const struct ext4_extent_idx *)
++				((const uint8_t *)cur + sizeof(*eh));
++			uint32_t next = 0;
++			uint64_t phys;
++
++			for (i = 0; i < entries; i++) {
++				if (LE32(ei[i].ei_block) <= fileblock)
++					next = i;
++				else
++					break;
++			}
++			phys = ((uint64_t)LE16(ei[next].ei_leaf_hi) << 32) |
++			       LE32(ei[next].ei_leaf_lo);
++			if (phys == 0) {
++				/* 索引指向 0 => 整段都是空洞 */
++				err = 0;
++				goto done;
++			}
++
++			if (!tmp) {
++				tmp = malloc(block_size);
++				if (!tmp)
++					goto done;
++			}
++			if (ext2_read_block(ext2, tmp, (blocknum_t)phys) < 0)
++				goto done;
++			cur = tmp;
++		}
++	}
++
++done:
++	free(tmp);
++	return err;
++}
++
+ /* translate a file block to a physical block */
+ static blocknum_t file_block_to_fs_block(ext2_t *ext2, struct ext2_inode *inode, uint fileblock)
+ {
+@@ -149,9 +246,28 @@ static blocknum_t file_block_to_fs_block(ext2_t *ext2, struct ext2_inode *inode,
+ 
+     LTRACEF("inode %p, fileblock %u\n", inode, fileblock);
+ 
+-    uint32_t pos[4];
++    /*
++     * ext4 extents：这条路与间接块完全无关，命中就走 extent 树。
++     * （i_flags 已经过 endian_swap_inode 的 LE32SWAP，是主机序，不用再转）
++     */
++    if (inode->i_flags & EXT4_EXTENTS_FL) {
++        blocknum_t eblock;
++
++        if (ext2_extent_lookup(ext2, inode, fileblock, &eblock) < 0) {
++            LTRACEF("extent lookup failed, fileblock %u\n", fileblock);
++            return 0;
++        }
++        LTRACEF("returning %u (extent)\n", eblock);
++        return eblock;
++    }
++
++    /* 必须初始化：level==0 时下面只填 pos[0]，而 LTRACEF 会读 pos[1..3]。
++       读未初始化栈是 UB —— 实测 clang -O1 下会把 level 一起弄成垃圾值。 */
++    uint32_t pos[4] = { 0, 0, 0, 0 };
+     uint32_t level = 0;
+-    ext2_calculate_block_pointer_pos(ext2, fileblock, &level, pos);
++    err = ext2_calculate_block_pointer_pos(ext2, fileblock, &level, pos);
++    if (err < 0)
++        return 0;
+ 
+     LTRACEF("level %d, pos 0x%x 0x%x 0x%x 0x%x\n", level, pos[0], pos[1], pos[2], pos[3]);
+ 
