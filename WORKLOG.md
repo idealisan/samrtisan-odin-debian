@@ -3618,3 +3618,69 @@ reboot rc=0
 - **内核没有 apfs 模块**（`modprobe apfs` not found）⇒ sda2 **不要挂载**，有损坏风险
 - 内核支持的文件系统：ext2/3/4、vfat、ntfs3、f2fs、fuseblk —— **没有 exFAT**
 - core 变体**没装 udisks2** ⇒ 插上不会自动挂载
+
+## 2026-09-05 USB OTG 专题续：重刷 v0.9.5 后**全部正常**
+
+### 背景
+
+上一轮折腾（反复插拔 OTG 设备）之后系统坏掉了 —— 重启卡在 lk2nd 菜单。
+于是用**刚发布的 v0.9.5 正式 CI 制品**重刷了 lk2nd + userdata
+（`gh release download v0.9.5`，SHA256 校验通过）。
+
+> 值得记一笔：系统坏掉时 lk2nd **自动停在菜单**而不是反复重启 ——
+> 这正是这轮修的 0007 + FASTBOOT_REGISTER 在起作用，问题反而变得好处理了。
+
+### 重刷后的实测（设备连着电脑 → 换移动硬盘 → 换回电脑）
+
+记录器（每 2s 采样）完整记录：
+```
+role=device udc=7000000.usb usb0=172.16.42.1/24 dnsmasq=active | extcon=USB-HOST=0
+                                                    ← 连着电脑，USB 网卡正常
+role=host   extcon=USB-HOST=1                       ← 插移动硬盘，角色自动切 host
+role=host   sda=/dev/sda  dev=1-1 id=174c:55aa speed=480 prod=Ugreen Storage Device
+                                                    ← 硬盘识别（USB2.0 高速，走 UAS）
+role=host   usb0=none dnsmasq=inactive               ← 用户态脚本按设计停掉 gadget
+（拔掉硬盘）
+role=host   sda=none  extcon=USB-HOST=0
+role=device udc=7000000.usb                         ← 2 秒后切回 device，UDC 回来
+role=device usb0=172.16.42.1/24 dnsmasq=active      ← 15 秒后 USB 网卡完全恢复
+```
+
+**两个之前报的问题都不复现了**：
+1. ✅ 移动硬盘不再"几秒就掉" —— 长时间插着灯一直亮
+2. ✅ 拔掉 OTG 后 USB 网卡自动恢复（15 秒内）
+
+之前那次"几秒掉 + 网卡不恢复"，很可能**是同一个根因：系统当时已经损坏**，
+不是角色切换机制的 bug。新线 + 干净的 v0.9.5 系统下全通。
+
+### 端到端验证（只读，没动硬盘数据）
+
+```
+sda     894.3G
+├─sda1  200M  vfat  LABEL "EFI"
+└─sda2  894.1G apfs
+mount -o ro /dev/sda1 /tmp/otg-efi   ✅ 成功
+ls /tmp/otg-efi   →  $RECYCLE.BIN  EFI  System Volume Information  it-removed-amfi-80-in-config
+umount            ✅ 已卸载，sda 上无挂载点
+```
+这是一块 Mac 用过的盘（APFS + EFI 分区），**sda2 的 APFS 始终没碰**。
+
+### 内核/用户态现状（这轮的真正缺口）
+
+- 支持的文件系统：ext2/3/4、vfat、ntfs3、f2fs、fuseblk
+- ❌ **没有 exFAT** —— 普通 U 盘最常见的格式，插上大概率读不出来
+- ❌ **没装 udisks2** —— core 变体不会自动挂载
+- ❌ **没有 apfs 模块** —— 苹果盘读不了，也不打算支持
+- 硬件本身没问题：`CONFIG_USB_DWC3_DUAL_ROLE`、`USB_ROLE_SWITCH`、`XHCI_HCD`、
+  `USB_STORAGE`、USB 网卡模块（ax88179/smsc95xx/dm9601/cdc_ether）全在
+
+### 过程中的几个坑（都值得记）
+
+1. **`pkill -f usb-watch.sh` 自杀**：承载这条命令的 `sh -c` 自身命令行里
+   就含 "usb-watch.sh"，pkill 会连它一起杀 ⇒ 后面的 `nohup` 根本没执行。
+   要么把 pkill 和启动拆成两条命令，要么用更精确的匹配。
+2. **zsh 里 SSH 的 `-o` 参数不能放进变量**（`$SSHO` 不分词）⇒
+   `command-line line 0: keyword stricthostkeychecking extra arguments`。
+   内联写死，别省这点字符。（同一天踩了三次。）
+3. 记录器踩样：只把 bMaxPower 放进"变化检测"变量却不打印 ⇒ 日志里看不到。
+   变化检测和日志输出要用同一份字符串。
