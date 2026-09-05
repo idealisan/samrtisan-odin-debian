@@ -7,3 +7,4 @@ stage/
 stage-sparse/
 .dump.tmp
 *.dSYM/
+stage-csum/
