@@ -3384,3 +3384,62 @@ aboot 接着走 `boot_linux_from_mmc()`，去引导 boot 分区里的原厂安�
 
 `odin-fs-verify.sh` **14/14 全过**；`Startup finished in 16.859s (kernel) +
 32.037s (userspace) = 48.896s`；swap 两级 4607 MiB。
+
+## 2026-09-05（再续）新推断：lk2nd 是在"扫描分区"时崩的，不是引导失败路径的问题
+
+### 推翻之前的结论
+
+之前我说"擦掉 userdata 后稳住 120 秒 = 循环打破"，这个结论**站不住**：
+那次观察被三件事污染 —— 坏掉的 userdata、后来才发现的 cmd_continue 里
+`fastboot_stop()` 位置错误、以及我没确认停在哪一种 fastboot。用户当场指出来了。
+
+### 关键实测（14:19 之后）
+
+- `evidence/flash-state.env` 显示 `extlinux_disabled=1` 写于 **14:19** →
+  确认改名成功，设备确实没有可启动配置。
+- 但设备仍然循环，而且**菜单一次都没出现过**；主机连续 6 分钟
+  `fastboot devices` 完全看不到设备。
+- 用户按住所停下的菜单，屏幕上能看到 lk2nd 的版本信息。
+
+### 新推断：崩在扫描阶段
+
+| 场景 | 有没有扫描 | 结果 |
+|---|---|---|
+| 正常启动 | 有 | 画开机画面 → 扫描 → 崩 → 复位（循环，菜单从不出现） |
+| LK2ND_FORCE_FASTBOOT=1 | **跳过** | 菜单正常显示 |
+| 擦掉 userdata | 没有分区可扫 | 不崩 → 0007 → fastboot，稳定 |
+
+三条互相印证：0007 大概是对的，但它前面那次扫描就崩了，根本轮不到它执行。
+
+### 已排除的
+
+- 不是 watchdog（`ENABLE_WDOG_SUPPORT := 0`；lk2nd 早期 `pm8x41_clear_pmic_watchdog()`）
+- 不是 `lk2nd,single-key-navigation`（只在三台 msm8226 上设了）
+- 不是符号问题：`nm build-lk2nd-msm8953/lk` 里 `boot_into_fastboot` 只有一个
+  BSS 全局符号，`extern` 解析正确
+- 不是宏没开：`config.h` 里 `WITH_LK2ND_BOOT 1`
+- 代码位置也对了：构建树的 `normal_boot:` 段确实是
+  `lk2nd_boot(); if (boot_into_fastboot) goto fastboot;`
+
+### 下一步：带屏幕标记的诊断版（已编好）
+
+`tmp/lk2nd/diag2`（干净源码树 + 0001..0009），额外加了 5 个屏幕标记，
+`display_fbcon_message()` 只在 `ENABLE_FBCON_LOGGING` 打开时输出，而项目里
+`project/msm8952.mk:148` 已经是 `=1`，所以会真的画出来：
+
+| 标记 | 位置 |
+|---|---|
+| M1 | `lk2nd/boot/boot.c`，`lk2nd_boot()` 入口 |
+| M2 | 同文件，`lk2nd_scan_devices()` 末尾置位之后 |
+| M3 | `app/aboot/aboot.c`，`fastboot:` 标签之后 |
+| M4 | `lk2nd/device/menu/menu.c`，菜单头部画完之后 |
+| M5 | 同文件，`wait_key()` 返回后（会打印按键码） |
+
+用法：设备进 fastboot 后 `fastboot boot tmp/lk2nd/diag2/build-lk2nd-msm8953/lk2nd.img`
+（**只加载到内存，不写入分区**）。看屏幕上出现哪几个 M 就知道卡在哪：
+- 只有 M1 → 崩在扫描里（支持新推断）
+- M1 M2 但没有 M3 → `goto fastboot` 没生效
+- 有 M3 M4 → 进了 fastboot，问题在菜单之后
+
+注意：`fastboot boot` 在设备不在 fastboot 时会一直 `< waiting for any device >`
+挂住，跑之前先确认 `fastboot devices` 有输出。
