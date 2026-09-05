@@ -3548,3 +3548,73 @@ reboot rc=0
 
 `/proc/device-tree/chosen/lk2nd,version` 是 `23.1-odin\0`，直接 `cat` 会把后面的
 输出吞掉（表现为"命令没输出"）。要用 `tr '\0' '\n' < 文件`。
+
+## 2026-09-05 USB OTG 专题：真机实测（外接 960G SATA SSD + 绿联硬盘盒）
+
+### 结论先行：这个专题的大部分工作早就做过了，而且能用
+
+仓库里已有完整的用户态角色切换机制，我之前的调研完全没查到，是疏忽：
+- `dist/build/rootfs/etc/udev/rules.d/99-odin-usb-role.rules`
+  （UDC add/remove、typec change、extcon change 都触发）
+- `dist/build/rootfs/usr/local/sbin/odin-usb-role.sh`
+  （device=建 NCM gadget+usb0+dnsmasq / host=解绑 UDC+停 dnsmasq）
+- `odin-usb-gadget.timer` 每 30s 自愈看门狗
+
+日志证明它工作：
+```
+16:40:31 host: unbound UDC '7000000.usb'
+16:40:31 host: dnsmasq stopped
+```
+
+**插上移动硬盘 → 角色自动切 host、内核自动开 VBUS、识别为 /dev/sda**，全链路通。
+所以：角色切换 ✅、GPIO 33 通路 ✅、用户态机制 ✅。FUSB301 没驱动也不影响
+（靠 `&pmi8950_smbcharger { usb-role-switch = <&usb3>; }` 就够）。
+
+### 唯一的问题：VBUS 会自己掉，且不恢复
+
+实测两次，间隔**不固定**：
+```
+第一次：1579s 识别 → 1815s 掉   （撑约 4.5 分钟）
+第二次：2538s 识别 → 2578s 掉   （只撑 40 秒）
+报错都是：[...] qcom-smbchg ...: OTG regulator failure → usb 1-1: USB disconnect
+
+用户确认：**拔掉重插能恢复** ⇒ 是可重试的瞬态保护。
+
+### 两条代码事实（源码级）
+
+1. **中断处理不对称**（drivers/power/supply/qcom-smbchg.c）
+   | 中断 | handler | 行为 |
+   |---|---|---|
+   | `otg-oc`（过流） | `smbchg_handle_otg_oc` | ✅ 有重试：关掉→延时重试，最多 NUM_OTG_RESET_RETRIES 次 |
+   | **`otg-fail`** | `smbchg_handle_otg_fail`（1066） | ❌ **只发一次 REGULATOR_EVENT_FAIL 通知就 return，不重试** ← 中招的是这个 |
+
+   设备树 compatible 是 `qcom,pmi8996-smbchg`（PMI8950 声明成 pmi8996 兼容），
+   那份 data 的 `reset_otg_on_oc` 为**真** —— 重试机制本来启用着，
+   只是 `otg-fail` 这条路径没走它。
+
+2. **`detect_work` 会主动关 OTG**（同文件 918 行）
+   ```c
+   if (!otg_present && has_role_sw)
+           smbchg_otg_switch(chip, false);
+   ```
+   ID/OTG 检测一报"不在"就关 VBUS。这条解释了"用户没动设备它自己掉"。
+
+### 另外一个悬挂状态
+
+```
+/sys/class/regulator/regulator.33/  name=smbcharger-otg-vbus  state=enabled  users=0
+```
+`enabled` 但 `users=0` —— VBUS 是驱动绕过 regulator framework 直接写寄存器开的
+（`detect_work` 954 行 `smbchg_otg_switch(chip, !usb_present)`），**没有正式 consumer**，
+所以 fail 通知也没人接，`&usb3` 节点缺 `vbus-supply`。
+
+> 注意：设备树给 `&usb3` 补 `vbus-supply` 有坑 —— `smbchg_otg_enable()` 里有
+> `WARN_ON_ONCE(chip->role_sw)`，主线设计上 role switch 与 regulator 不该混用。
+
+### 硬件/格式备注
+
+- 识别为 `/dev/sda` 894.3G，KIOXIA EXCERIA SATA SSD，绿联硬盘盒（ASMedia 174c:55aa，走 UAS）
+- `sda1` 200M vfat LABEL "EFI"；`sda2` 894.1G **apfs**（这是块 Mac 盘）
+- **内核没有 apfs 模块**（`modprobe apfs` not found）⇒ sda2 **不要挂载**，有损坏风险
+- 内核支持的文件系统：ext2/3/4、vfat、ntfs3、f2fs、fuseblk —— **没有 exFAT**
+- core 变体**没装 udisks2** ⇒ 插上不会自动挂载
