@@ -85,17 +85,37 @@ NCERR=$(dmesg 2>/dev/null | grep -ci "checksum.*invalid\|corrupt.*checksum")
 if [ "${NCERR:-0}" -eq 0 ]; then ok "0 条校验和错误"
 else bad "$NCERR 条校验和错误"; dmesg | grep -i "checksum.*invalid" | tail -5 | sed 's/^/       /'; fi
 
-# ---------------------------------------------------------------- 4. initramfs 找根
+# ---- initramfs 找根的路径（有没有退化到暴力扫分区）----
 sect "4. initramfs 找根的路径（有没有退化到暴力扫分区）"
-# 正常情况 dmesg 里只应该有根分区被挂载过。若出现一串别的分区 mount 又 umount，
-# 说明 try_mount_root 的快路径（GPT 分区名 / 卷标）没命中，掉了兜底。
+# 正常情况 dmesg 里只应该有根分区，外加固件脚本要用的源分区（persist 取 WiFi
+# 校准数据、modem 取 PIL 映像）。若除此之外还有一串分区被 mount 又 umount，
+# 说明 try_mount_root 的快路径（GPT 分区名 / 卷标）没命中，掉了兜底扫描 ——
+# 首启那 2 分钟就是这么来的。
+#
+# 所以按 PARTNAME 把这两个源分区解析出来排除掉，别把正常的取固件误判成扫分区
+# （2026-09-05 第一次跑就误判过：只多挂了 persist，其实是正常业务）。
+FW_SRC=""
+for n in persist modem; do
+	for d in /sys/class/block/*; do
+		[ -f "$d/uevent" ] || continue
+		if grep -q "^PARTNAME=$n$" "$d/uevent" 2>/dev/null; then
+			FW_SRC="$FW_SRC $(sed -n 's/^DEVNAME=//p' "$d/uevent" 2>/dev/null | head -1)"
+		fi
+	done
+done
 MOUNTED=$(dmesg 2>/dev/null | grep "EXT4-fs (" | sed -n 's/.*EXT4-fs (\([a-z0-9]*\)).*/\1/p' | sort -u | tr '\n' ' ')
 info "本次启动挂载过的分区: ${MOUNTED:-（无）}"
-OTHERS=$(echo "$MOUNTED" | tr ' ' '\n' | grep -v "^${ROOT_DEV#/dev/}$" | grep -c . || true)
-if [ "${OTHERS:-0}" -eq 0 ]; then
-	ok "只挂载过根分区，走的是快路径"
+info "排除（固件脚本的源分区）:${FW_SRC:- （无）}"
+OTHERS=""
+for p in $MOUNTED; do
+	[ "$p" = "${ROOT_DEV#/dev/}" ] && continue
+	case " $FW_SRC " in *" $p "*) continue ;; esac
+	OTHERS="$OTHERS $p"
+done
+if [ -z "$OTHERS" ]; then
+	ok "除根与固件源分区外没有别的分区被挂载 —— 走的是快路径"
 else
-	bad "还挂载过 $OTHERS 个别的分区 —— 快路径没命中，退化到暴力扫描了"
+	bad "还挂载过:${OTHERS} —— 快路径没命中，退化到暴力扫描了"
 fi
 
 # ---------------------------------------------------------------- 5. swap
