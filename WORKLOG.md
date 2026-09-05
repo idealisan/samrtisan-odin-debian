@@ -3443,3 +3443,22 @@ aboot 接着走 `boot_linux_from_mmc()`，去引导 boot 分区里的原厂安�
 
 注意：`fastboot boot` 在设备不在 fastboot 时会一直 `< waiting for any device >`
 挂住，跑之前先确认 `fastboot devices` 有输出。
+
+### 又一记：把"屏幕显示"当成了"设备可用"（2026-09-05 14:24~14:43）
+
+**最大的一个误判**：我看到/听说"设备停在 lk2nd 菜单界面"，就默认它在 fastboot 里、
+能用 fastboot 操作。于是后面所有 `fastboot` 命令都超时，我却把失败解释成
+"lk2nd 崩了""菜单默认项触发了 Reboot"，一路往错误的方向推了三轮。
+
+真相：**USB 线松了**。主机侧 `system_profiler SPUSBDataType` 里根本没有任何
+fastboot/qcom/android 设备，`ifconfig` 里连 usb0 都没了 —— 屏幕上那个菜单还在
+（设备自己还在跑），只是和主机没有连接。
+
+**判设备在不在线要查主机侧，不要问屏幕**：
+    system_profiler SPUSBDataType | grep -iE 'fastboot|qcom|android'
+    fastboot devices
+两边都对上才算数。屏幕只说明"设备自己活着"，不说明"链路通"。
+
+顺带一条：区分两种 fastboot 不能看 `version` / `kernel` / `product`（lk2nd 复用
+aboot 的 fastboot 代码，这几个值两边一样）。要看 `partition-size:lk2nd` ——
+lk2nd 自己的会导出 0x80000，原厂的不导出这个分区名。
