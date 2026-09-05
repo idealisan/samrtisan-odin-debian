@@ -1,0 +1,85 @@
+[sudo] password for user: ########## 1. 根分区文件系统特性（关键：extents 开了没）##########
+  根设备 = /dev/mmcblk1p57
+  Filesystem features:      has_journal ext_attr resize_inode dir_index filetype needs_recovery extent flex_bg sparse_super large_file
+  Reserved block count:     1175604
+  Block size:               4096
+  Inode size:	          256
+  >>> extents: ✅ 已开启
+  >>> 64bit: 关（符合预期）
+  >>> metadata_csum: 关（符合预期）
+  >>> huge_file: 关（符合预期）
+  >>> dir_nlink: 关（符合预期）
+  >>> extra_isize: 关（符合预期）
+
+########## 2. 重新看 DSI 状态（刷完时那项是刚启动就查的，可能只是还没使能）##########
+  第 1 次: enabled=[enabled]
+
+########## 3. swap ##########
+--- swapon --show ---
+  NAME       TYPE      SIZE USED PRIO
+  /dev/zram0 partition 512M   0B  100
+  /swapfile  file        4G   0B   10
+--- free -h ---
+                 total        used        free      shared  buff/cache   available
+  Mem:           3.5Gi       236Mi       3.1Gi       9.8Mi       187Mi       3.2Gi
+  Swap:          4.5Gi          0B       4.5Gi
+--- /swapfile ---
+  -rw------- 1 root root 4294967296 Sep  5 09:32 /swapfile
+--- 服务状态 ---
+  ● odin-swap.service - Set up swap (file-based as primary, zram as first tier)
+       Loaded: loaded (/etc/systemd/system/odin-swap.service; enabled; preset: enabled)
+       Active: active (exited) since Sat 2026-09-05 09:32:30 CST; 4min 26s ago
+         Docs: file:/usr/local/sbin/odin-swap.sh
+      Process: 1194 ExecStart=/usr/local/sbin/odin-swap.sh start (code=exited, status=0/SUCCESS)
+     Main PID: 1194 (code=exited, status=0/SUCCESS)
+--- 服务日志 ---
+  2026-09-05T09:32:30+08:00 === 开始（swapfile=4G 主力 / zram=512M 打底）
+  2026-09-05T09:32:30+08:00 zram 512M 已启用（优先级 100）
+  2026-09-05T09:32:30+08:00 创建 /swapfile（4G）
+  2026-09-05T09:32:30+08:00   fallocate 成功
+  2026-09-05T09:32:30+08:00 swapfile /swapfile 已启用（优先级 10）
+  2026-09-05T09:32:30+08:00 === 结束，当前 swap：
+      NAME       TYPE      SIZE USED PRIO
+      /dev/zram0 partition 512M   0B  100
+      /swapfile  file        4G   0B   10
+
+########## 4. swappiness ##########
+  80
+
+########## 5. 声卡还在吗 ##########
+   0 [smartisanodin  ]: smartisan-odin - smartisan-odin
+                        smartisan-odin
+
+########## 6. 内核版本 / uptime ##########
+  Linux odin 6.19.5-postmarketos-qcom-msm8953 #1 SMP PREEMPT Sat Sep  5 01:29:30 UTC 2026 aarch64 GNU/Linux
+   09:36:56 up 5 min,  1 user,  load average: 0.56, 1.03, 0.58
+
+########## 7. dmesg 里 lk2nd 相关（有没有文件系统报错）##########
+  [    0.028403] Mount-cache hash table entries: 8192 (order: 4, 65536 bytes, linear)
+  [    0.028446] Mountpoint-cache hash table entries: 8192 (order: 4, 65536 bytes, linear)
+  [    4.556282] EXT4-fs (mmcblk1p57): mounted filesystem a2ef4cab-f022-4c00-8cf3-87fb4af181c2 ro with ordered data mode. Quota mode: none.
+  [    4.654897] EXT4-fs (mmcblk1p57): re-mounted a2ef4cab-f022-4c00-8cf3-87fb4af181c2 r/w.
+  [    7.216633] EXT4-fs (mmcblk1p24): mounted filesystem 57f8f4bc-abf4-655f-bf67-946fc0f9f25b ro with ordered data mode. Quota mode: none.
+  [    7.423577] EXT4-fs (mmcblk1p24): unmounting filesystem 57f8f4bc-abf4-655f-bf67-946fc0f9f25b.
+  [    7.644928] EXT4-fs (mmcblk1p57): re-mounted a2ef4cab-f022-4c00-8cf3-87fb4af181c2 ro.
+  [    7.739301] EXT4-fs (mmcblk1p57): re-mounted a2ef4cab-f022-4c00-8cf3-87fb4af181c2 r/w.
+
+########## 8. 内核日志里有没有异常 ##########
+  [   49.120141] qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: supply vdd-micbias not found, using dummy regulator
+  [   49.121123] qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: sink widget PDM_RX1 overwritten
+  [   49.121317] qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: source widget PDM_RX1 overwritten
+  [   49.121360] qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: source widget PDM_RX1 overwritten
+  [   49.121378] qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: sink widget PDM_RX1 overwritten
+  [   49.121400] qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: sink widget PDM_RX1 overwritten
+  [   49.121420] qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: sink widget ADC1 overwritten
+  [   49.121446] qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: sink widget ADC1 overwritten
+  [   49.121472] qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: sink widget PDM_RX1 overwritten
+  [   49.121777] qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: source widget PDM_RX3 overwritten
+  [   49.121895] qcom,pm8916-wcd-spmi-codec 200f000.spmi:pmic@1:audio-codec@f000: ASoC: source widget PDM_RX3 overwritten
+  [   49.156789] fb0: sys_imageblit: framebuffer is not in virtual address space.
+
+==================== 人工验证 ====================
+用户听音确认：声音正常发出来了（扬声器 / 听筒均正常）。
+
+==================== 刷机验收（--from 80 重跑）====================
+验收通过 16 项，失败 0 项。

@@ -269,7 +269,18 @@ if run 80 && [ "$DRY" = 0 ]; then
   chk "DSI 已连接"       "connected"    "$(r 'cat /sys/class/drm/card0-DSI-1/status')"
   # status 只是连接器的探测结果，enabled 才表示真的做了一次 modeset。两者都看，
   # 与仓库 docs/04-排障.md 的显示类排障流程保持一致
-  chk "DSI 已使能"       "enabled"      "$(r 'cat /sys/class/drm/card0-DSI-1/enabled')"
+  #
+  # ⚠️ enabled 不是一启动就有：DRM 从 probe 到完成 modeset 要花点时间，而 SSH 一
+  #    通我们就开始验收，于是这一项会随机读到空值（2026-09-05 刷 v0.9.4-extents
+  #    时撞到过一次，手动复查是 enabled，纯属竞态）。这里等一小会儿再判 —— 等的是
+  #    "状态到位"，不是给失败重试机会：超时了仍然照实报错。
+  dsi_enabled=""
+  for _i in 1 2 3 4 5 6 7 8 9 10; do
+	  dsi_enabled=$(r 'cat /sys/class/drm/card0-DSI-1/enabled')
+	  [ "$dsi_enabled" = "enabled" ] && break
+	  sleep 2
+  done
+  chk "DSI 已使能"       "enabled"      "$dsi_enabled"
   has "DRM 设备节点"     "card0"        "$(odin_ssh 'ls /dev/dri/ | tr "\n" " "' 2>/dev/null)"
   chk "面板初始化失败数"  "0"            "$(r 'dmesg | grep -c "Failed to initialize panel"')"
   # 用 actual_brightness（硬件回读）而不是 brightness（只是请求值），后者非零

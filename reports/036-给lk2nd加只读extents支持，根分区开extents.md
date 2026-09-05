@@ -204,3 +204,67 @@ ENOSPC、留下半截文件），所以必须 `After` 一个属于 multi-user.ta
 - `tools/lk2nd-fs-sim/` —— 宿主机仿真台（代码 + 测试 + README）
 - `lk2nd/0005-lib-fs-ext2-add-readonly-ext4-extent-support.patch`
 - `evidence/mem-swap-audit-20260905.txt`、`evidence/swap-why-20260905.txt`
+
+---
+
+## 7. 真机验证（2026-09-05，v0.9.4-extents）
+
+### 7.1 CI 产物确认
+
+lk2nd job 的日志：
+
+```
+[lk2nd] 打补丁 0001 0002 0003 0005
+[lk2nd]   0005-lib-fs-ext2-add-readonly-ext4-extent-support.patch
+patching file lib/fs/ext2/ext2.c
+patching file lib/fs/ext2/ext2_fs.h
+patching file lib/fs/ext2/io.c
+[lk2nd]   lk2nd.img         366608 字节
+[lk2nd] 打补丁 0004 → 构建精简版（增量重编即可）
+[lk2nd]   lk2nd-nomarkw.img 364560 字节
+[lk2nd] 自检
+[lk2nd]   ✅ xiaomi-markw: 0 处
+[lk2nd]   ✅ smartisan-odin: 保留
+```
+
+两个版本（完整版 / 精简版）都带上了补丁。
+
+### 7.2 刷机前：用仿真台读真实镜像
+
+把 CI 产出的 rootfs 镜像直接喂给 `ext2sim`：
+
+| 镜像 | `/extlinux/extlinux.conf` |
+|---|---|
+| 新（带 extents） | 5274 字节，`fnv1a=b6e04a4b3d856128`
+| 旧（无 extents） | 5274 字节，`fnv1a=b6e04a4b3d856128`
+
+**校验和完全相同** —— 打过补丁的驱动能从带 extents 的 ext4 里正确读出引导配置。
+
+### 7.3 刷机后
+
+**引导成功**。lk2nd 读到了带 extents 的根分区里的 extlinux.conf，系统正常起来。
+
+| 项 | 结果 |
+|---|---|
+| 根分区 extents | ✅ 已开启（其余 5 个仍关，符合预期） |
+| swapfile | ✅ `/swapfile` 4 GiB，优先级 10 |
+| zram | ✅ 512 MiB，优先级 100 |
+| 总 swap | ✅ **4.5 GiB** |
+| swapfile 创建方式 | ✅ **fallocate 成功** —— 开 extents 的直接好处：4 GiB 秒级预留，不用 dd 把 4 GiB 写一遍 |
+| swappiness | 80 |
+| 声卡 | `smartisan-odin` 正常；扬声器 / 听筒两条 DAPM 链都通电，用户听音确认**声音正常发出来了** |
+| dmesg | `EXT4-fs` 挂载正常（ordered data mode），无 ext4 报错 |
+| 刷机验收 | 16 项全过 |
+
+### 7.4 顺手修一个 flaky 的验收项
+
+刷机时「DSI 已使能」报了一次失败，手动复查是 `enabled`。原因是 SSH 一通就开始验收，DRM 还没完成 modeset。已在 `flash/flash-all.sh` 里改成等最多 20 秒再判断（等的是"状态到位"，超时仍照实报错）。重跑验收 16/16 通过。
+
+---
+
+## 8. 证据
+
+- `evidence/extents-flash-verify-20260905.txt` —— 刷机后真机验收全量输出
+- `evidence/mem-swap-audit-20260905.txt`、`evidence/swap-why-20260905.txt`
+- `tools/lk2nd-fs-sim/` —— 宿主机仿真台
+- `lk2nd/0005-lib-fs-ext2-add-readonly-ext4-extent-support.patch`
