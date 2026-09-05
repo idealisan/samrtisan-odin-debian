@@ -8,8 +8,10 @@
 #
 # 每一条约束都对应 reports/013 解包复核的一个实测教训：
 #   1. staging 必须是"未挂载的普通目录"——挂载态复制会让超级块 free 计数与位图不一致
-#   2. 特性集保守：lk2nd 的 ext2 驱动只接受 ro_compat ⊆ {sparse_super, large_file}
-#      （lib/fs/ext2/ext2.c:162-166，它完全不检查 compat/incompat）
+#   2. 特性集保守：lk2nd 的 ext2 驱动只接受 ro_compat ⊆ {sparse_super, large_file,
+#      metadata_csum}（lib/fs/ext2/ext2.c，它完全不检查 compat/incompat。
+#      metadata_csum 是补丁 lk2nd/0006 放行的 —— ro_compat 语义就是"只读可忽略"。
+#      详见下面"3. 建文件系统"那节的完整说明，以及 verify 里的 ro_compat 位核对。）
 #   3. 必须保留 resize_inode + reserved GDT：否则在线扩容在第 128 组（16GiB）处
 #      命中 fs/ext4/resize.c 的 "No reserved GDT blocks, can't resize" 而 EPERM
 #   4. 导出后 e2fsck 至干净、img2simg、check_sparse、逐项回读校验，任一失败即非零退出
@@ -223,9 +225,20 @@ done
 for bad in 64bit huge_file dir_nlink extra_isize; do
   case "$FEAT" in *$bad*) note "forbidden feature: $bad" "PRESENT"; rc=1 ;; esac
 done
-# lk2nd ext2 驱动的挂载门槛：ro_compat 只允许 sparse_super|large_file
-MRO=$(( RO & ~3 ))
-note "ro_compat" "0x$(printf '%x' "$RO") (masked 0x$(printf '%x' "$MRO"))"
+#
+# lk2nd 的 ext2 驱动挂载门槛（lib/fs/ext2/ext2.c）。ro_compat 的语义是"只读可忽略"，
+# 它放行的是：
+#     sparse_super   0x001
+#     large_file     0x002
+#     metadata_csum  0x400   ← 补丁 0006 加的（只读不需要验证校验和，实测也不改
+#                               lk2nd 解析所需的布局，见 reports/036 §7）
+#   合计 0x403。多出任何一位 lk2nd 都会拒绝挂载 ⇒ 引导不了，所以这里按位核对，
+# 而不是只看特性名清单（清单是给人看的，位掩码才是真正决定 lk2nd 会不会拒绝的东西。
+# 2026-09-05 就栽在这：开了 metadata_csum 但这里还是老的 ~3 掩码，镜像明明是对的，
+# 自检却报 WILL REFUSE，rootfs job 直接失败。）
+RO_ALLOWED=$(( 0x1 | 0x2 | 0x400 ))
+MRO=$(( RO & ~RO_ALLOWED ))
+note "ro_compat" "0x$(printf '%x' "$RO") (allowed 0x$(printf '%x' "$RO_ALLOWED"), masked 0x$(printf '%x' "$MRO"))"
 [ "$MRO" -eq 0 ] && note "lk2nd mountable" "OK" || { note "lk2nd mountable" "WILL REFUSE"; rc=1; }
 [ "$LBL" = "$LABEL" ] || { note "label" "expected $LABEL"; rc=1; }
 
