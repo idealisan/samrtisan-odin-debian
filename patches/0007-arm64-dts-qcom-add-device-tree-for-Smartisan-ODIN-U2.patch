@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,830 @@
+@@ -0,0 +1,835 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -772,10 +772,15 @@ index 000000000..3dc8f434d
 +	 * &sound_card 上挂这三组状态，定义在 msm8953.dtsi 的 &tlmm 里
 +	 * （gpio67~74，function = "cdc_pdm0"）。不配就没有任何引脚被复用成
 +	 * cdc_pdm0，WCD 的数字音频接口物理上就是断的。
++	 *
++	 * 标签名 7.1.3 改过：_act → _default、_sus → _sleep（上游统一按
++	 * pinctrl-names 的 "default"/"sleep" 命名状态节点）。引脚与电气参数
++	 * **一字未改**（gpio67~74、cdc_pdm0、8mA/2mA），只是换了名字 ——
++	 * 所以这里跟着改名即可，音频行为不变。
 +	 */
 +	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&cdc_pdm_lines_act &cdc_pdm_lines_2_act &cdc_pdm_comp_lines_act>;
-+	pinctrl-1 = <&cdc_pdm_lines_sus &cdc_pdm_lines_2_sus &cdc_pdm_comp_lines_sus>;
++	pinctrl-0 = <&cdc_pdm_lines_default &cdc_pdm_lines_2_default &cdc_pdm_comp_lines_default>;
++	pinctrl-1 = <&cdc_pdm_lines_sleep &cdc_pdm_lines_2_sleep &cdc_pdm_comp_lines_sleep>;
 +
 +	/*
 +	 * widgets 的第一个字符串是**类型**，snd_soc_of_parse_audio_simple_widgets()
