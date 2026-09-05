@@ -13,7 +13,7 @@ STAGE=stage-sparse
 IMG_A=sparse-noext.img
 IMG_B=sparse-ext.img
 FEAT_A="resize_inode,^extents,^64bit,^metadata_csum,^huge_file,^dir_nlink,^extra_isize"
-FEAT_B="resize_inode,extents,^64bit,^metadata_csum,^huge_file,^dir_nlink,^extra_isize"
+FEAT_B="resize_inode,extents,metadata_csum,^64bit,^huge_file,^dir_nlink,^extra_isize"
 
 echo "=== 造稀疏文件 ==="
 rm -rf "$STAGE"; mkdir -p "$STAGE/boot"

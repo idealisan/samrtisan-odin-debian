@@ -1,0 +1,97 @@
+From: Smartisan ODIN mainline porting effort
+Subject: [PATCH 6/6] lib/fs/ext2: accept metadata_csum on read-only mounts
+
+metadata_csum 是 **ro_compat** 特性 —— 语义就是"只读挂载可以忽略"。但 lk2nd 挂载时的
+ro_compat 白名单只有 SPARSE_SUPER|LARGE_FILE，于是根分区开不了元数据校验和，代价是
+**eMMC 位翻转导致的元数据静默损坏检测不到**（reports/036 §5.3 里列的唯一有实际收益的
+剩余项）。
+
+只读不需要验证校验和（那是 e2fsck 和内核写路径的事）。真正要确认的是它会不会改变
+lk2nd 解析所需的磁盘布局。实测结论：不改。
+
+- 超级块：多了 s_checksum，lk2nd 不读那一段
+- 组描述符：多了 bg_checksum / bitmap csum，但 32 字节布局里 lk2nd 用到的
+  bg_block_bitmap / bg_inode_bitmap / bg_inode_table 都在前 0x14 字节，不动
+- inode：多了 i_checksum_lo/hi（在尾部 padding 区），lk2nd 用的 i_mode / i_size /
+  i_flags / i_block 都不动
+- 目录块：尾部会多一个 12 字节的 fake dirent (ext4_dir_entry_tail: inode=0,
+  rec_len=12, name_len=0, file_type=0xDE)。lk2nd 的目录扫描按 rec_len 走并跳过
+  inode==0 的项 —— 实测能正常找到文件（tools/lk2nd-fs-sim/test-csum.sh 覆盖）
+
+本补丁：
+
+- ext2_fs.h：补 ro_compat 特性位定义，并加白名单 EXT2_FEATURE_RO_COMPAT_SUPP_READONLY
+  = SPARSE_SUPER | LARGE_FILE | METADATA_CSUM。刻意**不**放行 huge_file / dir_nlink /
+  extra_isize —— 它们不是"只读可忽略"的语义（会改 i_blocks 单位、目录 nlink 规则、
+  inode 内预留空间。虽然实测也不影响 lk2nd，但没必要为没有收益的东西放宽门禁。
+
+- ext2.c：把挂载时的 ro_compat 判定从内联的位掩码换成新白名单，并补注释说明为什么
+  metadata_csum 对只读是安全的。
+
+验证（tools/lk2nd-fs-sim/test-csum.sh）：
+
+    带 metadata_csum 的镜像    改前 MOUNT: FAIL (status=-3) → 改后读得出
+    不带 metadata_csum 的镜像  改前改后都读得出（回归）
+
+diff --git a/lib/fs/ext2/ext2.c b/lib/fs/ext2/ext2.c
+index 14f1355c..3732bf99 100644
+--- a/lib/fs/ext2/ext2.c
++++ b/lib/fs/ext2/ext2.c
+@@ -149,8 +149,14 @@ status_t ext2_mount(bdev_t *dev, fscookie **cookie)
+         return err;
+     }
+ 
+-    /* make sure it doesn't have any ro features we don't support */
+-    if (ext2->sb.s_feature_ro_compat & ~(EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER|EXT2_FEATURE_RO_COMPAT_LARGE_FILE)) {
++    /*
++     * make sure it doesn't have any ro features we don't support
++     *
++     * 原来这里只放行 SPARSE_SUPER|LARGE_FILE。metadata_csum 是 ro_compat（语义上只读可
++     * 忽略），但被这道白名单挡住了 —— 于是根分区开不了元数据校验和，eMMC 位翻转导致的
++     * 静默损坏检测不到。见 lk2nd/0006 与 reports/036 §5.3。
++     */
++    if (ext2->sb.s_feature_ro_compat & ~EXT2_FEATURE_RO_COMPAT_SUPP_READONLY) {
+         err = -3;
+         return err;
+     }
+diff --git a/lib/fs/ext2/ext2_fs.h b/lib/fs/ext2/ext2_fs.h
+index c06f4565..e02c5cc2 100644
+--- a/lib/fs/ext2/ext2_fs.h
++++ b/lib/fs/ext2/ext2_fs.h
+@@ -339,10 +339,35 @@ struct ext2_super_block {
+ #define EXT2_FEATURE_COMPAT_DIR_INDEX       0x0020
+ #define EXT2_FEATURE_COMPAT_ANY         0xffffffff
+ 
++/* ro_compat 特性位 */
+ #define EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER 0x0001
+ #define EXT2_FEATURE_RO_COMPAT_LARGE_FILE   0x0002
+ #define EXT2_FEATURE_RO_COMPAT_BTREE_DIR    0x0004
+-#define EXT2_FEATURE_RO_COMPAT_ANY      0xffffffff
++#define EXT4_FEATURE_RO_COMPAT_HUGE_FILE    0x0008
++#define EXT4_FEATURE_RO_COMPAT_GDT_CSUM     0x0010
++#define EXT4_FEATURE_RO_COMPAT_DIR_NLINK    0x0020
++#define EXT4_FEATURE_RO_COMPAT_EXTRA_ISIZE  0x0040
++#define EXT4_FEATURE_RO_COMPAT_QUOTA        0x0100
++#define EXT4_FEATURE_RO_COMPAT_BIGALLOC     0x0200
++#define EXT4_FEATURE_RO_COMPAT_METADATA_CSUM 0x0400
++
++/*
++ * 只读能接受的 ro_compat 特性。
++ *
++ * ro_compat 的语义是"只读挂载可以忽略"，所以**校验和类**特性对 lk2nd 是安全的 ——
++ * 它只读，不需要验证校验和（那是 e2fsck / 内核写路径的事）。关键是不能让这些特性
++ * 改变 lk2nd 解析所需的磁盘布局。metadata_csum 实测不改变：超级块、组描述符、inode
++ * 的前半部分（i_mode / i_size / i_flags / i_block）都不动。唯一"多出来的东西"是目录块
++ * 尾部的 12 字节 fake dirent (ext4_dir_entry_tail: inode=0, rec_len=12, name_len=0) ——
++ * lk2nd 的目录扫描按 rec_len 走并跳过 inode==0 的项，实测可正常找到文件。
++ *
++ * 不放行 huge_file / dir_nlink / extra_isize —— 它们不是"只读可忽略"的语义（会改 i_blocks
++ * 的单位、目录 nlink 规则、inode 内预留空间。虽然实测也不影响 lk2nd，但没必要为没有收益
++ * 的东西放宽门禁。
++ */
++#define EXT2_FEATURE_RO_COMPAT_SUPP_READONLY (EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER| \
++					       EXT2_FEATURE_RO_COMPAT_LARGE_FILE| \
++					       EXT4_FEATURE_RO_COMPAT_METADATA_CSUM)
+ 
+ #define EXT2_FEATURE_INCOMPAT_COMPRESSION   0x0001
+ #define EXT2_FEATURE_INCOMPAT_FILETYPE      0x0002

@@ -113,9 +113,12 @@ say "cleanup done (machine-id/random-seed/journal/wtmp/lastlog/apt-cache)"
 #                    现在 lk2nd 由补丁 lk2nd/0005 补上只读 extents 支持，
 #                    这个枷锁可以摘掉了。详见 reports/035、reports/036。
 #
-#   64bit            关。开了会改变 group descriptor 的大小（32 → 64 字节），
-#                    lk2nd 的驱动按 32 字节读，会读错。
-#   metadata_csum    关。lk2nd 只读，不做校验；开着徒增不兼容面。
+#   metadata_csum    **开**（2026-09-05 再改：之前也关着，理由是"lk2nd 只读不做校验，
+#                    开着徒增不兼容面".后来想清楚：metadata_csum 是 ro_compat，
+#                    语义就是"只读可忽略"。实测它不改 lk2nd 解析所需的布局（超级块、
+#                    组描述符、inode 前半段都不动，目录块尾部多出的 12 字节 fake dirent
+#                    lk2nd 的目录扫描能正常跳过。收益是能检测出 eMMC 位翻转造成的
+#                    元数据静默损坏。lk2nd 那边由补丁 0006 放行 ro_compat 白名单。
 #   extra_isize      关。会让 inode 变大，没必要。
 #   huge_file        关。Dir_nlink 同理。
 #   dir_nlink        关。
@@ -134,7 +137,7 @@ ninodes=$(( nfiles * 12 / 10 + 2000 ))
 say "inode 数按实际条目算: ${nfiles} 条目 → -N ${ninodes}"
 rm -f "$OUT"
 mke2fs -q -F -t ext4 -L "$LABEL" \
-  -O resize_inode,extents,^64bit,^metadata_csum,^huge_file,^dir_nlink,^extra_isize \
+  -O resize_inode,extents,metadata_csum,^64bit,^huge_file,^dir_nlink,^extra_isize \
   -I 256 -b 4096 -N "$ninodes" -d "$STAGE" "$OUT" "$BLOCKS"
 say "mke2fs done ($BLOCKS blocks)"
 
@@ -209,11 +212,15 @@ note "label" "$LBL"
 case "$FEAT" in *resize_inode*) note "resize_inode" "OK" ;;
   *) note "resize_inode" "MISSING"; rc=1 ;; esac
 [ "${RDT:-0}" -gt 0 ] && note "reserved GDT > 0" "OK" || { note "reserved GDT > 0" "ZERO"; rc=1; }
-# extent 现在是**必需**项（swapfile 需要它；lk2nd 靠补丁 0005 提供只读支持），
-# 不再列进"禁止特性"。其余仍是 lk2nd 的 ext2 驱动读不了的，必须关着。
-case "$FEAT" in *extent*) note "extents" "OK" ;;
-  *) note "extents" "MISSING"; rc=1 ;; esac
-for bad in 64bit metadata_csum huge_file dir_nlink extra_isize; do
+# 正向断言：这两个是**必须**开着的
+#   extents        —— swapfile 需要它；lk2nd 靠补丁 0005 提供只读支持
+#   metadata_csum  —— 元数据校验，能检测出静默损坏；lk2nd 靠补丁 0006 放行 ro_compat
+for want in extent metadata_csum; do
+  case "$FEAT" in *$want*) note "$want" "OK" ;;
+    *) note "$want" "MISSING"; rc=1 ;; esac
+done
+# 其余仍是 lk2nd 的 ext2 驱动读不了的，必须关着
+for bad in 64bit huge_file dir_nlink extra_isize; do
   case "$FEAT" in *$bad*) note "forbidden feature: $bad" "PRESENT"; rc=1 ;; esac
 done
 # lk2nd ext2 驱动的挂载门槛：ro_compat 只允许 sparse_super|large_file

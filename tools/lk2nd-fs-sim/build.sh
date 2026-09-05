@@ -33,11 +33,12 @@ cp "$LK"/lib/fs/ext2/*.c "$LK"/lib/fs/ext2/*.h src/lib/fs/ext2/
 if [ "${NOPATCH:-0}" = 1 ]; then
 	echo "[build] NOPATCH=1 —— 用子模块原始代码（复现'改前'行为）"
 else
-	p=$(ls "$REPO"/lk2nd/0005-*.patch 2>/dev/null | head -1)
-	if [ -n "$p" ]; then
+	# 打上所有与文件系统相关的补丁（0005 = 只读 extents，0006 = 放行 metadata_csum）
+	for p in $(ls "$REPO"/lk2nd/000[56]-*.patch 2>/dev/null); do
 		echo "[build] 应用 $(basename "$p")"
 		patch -p1 --forward --no-backup-if-mismatch -d src < "$p"
-	else
+	done
+	if ! ls "$REPO"/lk2nd/0005-*.patch >/dev/null 2>&1; then
 		echo "[build] ⚠ 没找到 lk2nd/0005-*.patch，按未打补丁编译" >&2
 	fi
 fi

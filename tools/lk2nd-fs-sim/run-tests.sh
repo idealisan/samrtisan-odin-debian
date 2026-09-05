@@ -18,7 +18,7 @@ IMG_B=ext.img
 
 # 当前 tools/build-image.sh 的特性集；B 只把 ^extents 换成 extents
 FEAT_A="resize_inode,^extents,^64bit,^metadata_csum,^huge_file,^dir_nlink,^extra_isize"
-FEAT_B="resize_inode,extents,^64bit,^metadata_csum,^huge_file,^dir_nlink,^extra_isize"
+FEAT_B="resize_inode,extents,metadata_csum,^64bit,^huge_file,^dir_nlink,^extra_isize"
 
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 
