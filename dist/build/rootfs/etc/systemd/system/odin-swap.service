@@ -1,25 +1,41 @@
 [Unit]
-Description=Prepare swapfile (first boot)
+Description=Set up compressed RAM swap (zram)
 Documentation=file:/usr/local/sbin/odin-swap.sh
-# 要在文件系统就绪**并且扩容完成**之后、内存压力出现之前把 swap 挂上。
+
+# ─────────────────────────────────────────────────────────────────────────
+# ⚠️ 之前这个 unit **一次都没跑起来过**，原因是 systemd 依赖环：
 #
-# ⚠️ After 里那句 odin-firstboot-resize.service 是 2026-09-04 补的，血的教训：
-#    没有它的时候本服务跑在 resize2fs **之前** —— 面对的还是镜像里那个未扩容
-#    的小文件系统，dd 写出 231MB 就 `No space left on device`，5 GiB 的 swapfile
-#    根本建不出来。而服务照样 exit 0，看起来"成功"，实际 swap 一直是 0。
-#    时间线对得很清楚：
-#        08:46:25  odin-swap 开始
-#        08:46:55  dd: No space left on device
-#        dmesg     52.7s 才开始 resize，55.4s 才完成
-#    ⇒ 先 resize，再建 swapfile。
+#   systemd[1]: sysinit.target: Found ordering cycle on odin-swap.service/start
+#   systemd[1]: sysinit.target: Job odin-swap.service/start deleted to break
+#                               ordering cycle starting with sysinit.target/start
+#
+# 环是这样形成的（当时的写法）：
+#     After=local-fs.target odin-firstboot-resize.service
+#     Before=sysinit.target
+#     WantedBy=sysinit.target
+#   而 odin-firstboot-resize.service 是 WantedBy=multi-user.target。
+#   于是：sysinit.target → odin-swap → firstboot-resize → multi-user.target
+#         → sysinit.target   闭成一个环。systemd 的破环手段是**把本 unit 整个丢掉**，
+#   于是 swap 从来没建过，journal 里 0 条记录 —— 表面上只是"swap 没起来"，
+#   实际是 unit 被 systemd 静默丢弃了。
+#
+# 现在改用 zram，它不碰磁盘，**不需要等 resize2fs**，所以不再依赖
+# odin-firstboot-resize.service —— 环从根上消失。
+#
+# 教训：`WantedBy=sysinit.target` + `Before=sysinit.target` 的单元，
+# 千万别 After 一个属于 multi-user.target 的单元。改完用
+#   journalctl -u <unit>   确认**有**记录才算真的跑过。
+# ─────────────────────────────────────────────────────────────────────────
+
+# zram 只需要内核模块和 sysfs，不依赖文件系统，可以很早起来。
 DefaultDependencies=no
-After=local-fs.target odin-firstboot-resize.service
-Before=sysinit.target
+Before=swap.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/local/sbin/odin-swap.sh
+ExecStart=/usr/local/sbin/odin-swap.sh start
+ExecStop=/usr/local/sbin/odin-swap.sh stop
 
 [Install]
-WantedBy=sysinit.target
+WantedBy=swap.target

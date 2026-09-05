@@ -1,83 +1,108 @@
 #!/bin/bash
-# odin-swap.sh —— 准备 5 GiB 的 swapfile（首次开机时执行，幂等）
+# odin-swap.sh —— 用 zram 建压缩内存交换
 #
-# 为什么要有 swap：本机内存 3.5 GiB。作为家用设备（跑 GUI、浏览器、若干后台）
-# 3.5 GiB 偏紧，没有 swap 时一紧张就 OOM kill。5 GiB swap 换来的是"卡一点"
-# 而不是"进程被杀"。
+#   用法： odin-swap.sh start | stop
 #
-# 为什么是 swapfile 而不是分区：分区要动 GPT、且每台机器大小不一；
-# swapfile 放在根文件系统里，随镜像走，尺寸可以按需要改。
+# ─────────────────────────────────────────────────────────────────────────
+# 为什么**不是** swapfile（2026-09-05 实测，这条路在本机是死的）
 #
-# ⚠ fallocate 在这里**不可用**：镜像的 ext4 关掉了 extents
-# （tools/build-image.sh 里 mke2fs -O ^extents，为的是让 lk2nd 的 ext2 驱动
-#  能读它）。所以下面先试 fallocate，失败就用 dd。
+#   根分区的 ext4 为了 lk2nd 能读 /extlinux/extlinux.conf，是用
+#   `mke2fs -O ^extents` 建的（lk2nd 只有 ext2 驱动，读不了 extents）。
+#   而 swapfile 走 iomap，**需要 extents**。对照实验：
+#
+#       loop 上挂一个带 extents 的 ext4，里面建 swapfile  → swapon 成功
+#       根分区（无 extents）里建 swapfile                 → swapon: Invalid argument
+#
+#   而且失败时内核**不打任何日志**（既不走 iomap_swapfile_fail 的 pr_err，
+#   也不走 pr_warn），只剩 util-linux 那句 "Invalid argument"，极难定位。
+#
+# ─────────────────────────────────────────────────────────────────────────
+# 为什么用 zram
+#
+#   内核 CONFIG_ZRAM=m 已在，实测 `swapon /dev/zram0` 成功。
+#   zram 是**压缩的内存**交换：不写 eMMC，比 eMMC swap 快得多，也不磨损闪存 ——
+#   安卓手机用的就是它。而且它不碰磁盘，所以不需要等 resize2fs，
+#   顺便绕开了原来那个 systemd 依赖环（见 odin-swap.service 的注释）。
+#
+#   代价：zram 占的是内存（压缩后大约是逻辑容量的 1/3）。
+#   默认 1 GiB 逻辑容量，塞满时实际约占 300 MiB。
+#   想改：ODIN_ZRAM_SIZE=2G systemctl restart odin-swap.service
 #
 # 失败一律不致命 —— 最坏只是没有 swap，绝不能把启动搞挂。
 set -u
 
-SIZE=${ODIN_SWAP_SIZE:-5G}
-FILE=${ODIN_SWAP_FILE:-/swapfile}
+SIZE=${ODIN_ZRAM_SIZE:-1G}
+DEV=${ODIN_ZRAM_DEVICE:-/dev/zram0}
 LOG=/var/log/odin-swap.log
 
 say() { echo "$(date -Is) $*" >> "$LOG" 2>/dev/null; echo "[odin-swap] $*" >&2; }
 
-# 已经挂上了就什么都不做（幂等）
-if swapon --show 2>/dev/null | grep -q "^$FILE"; then
-	[ -e "$LOG" ] && say "$FILE 已在用，跳过"
-	exit 0
-fi
+sysfs() {   # /dev/zram0 → /sys/block/zram0
+	printf '/sys/block/%s' "$(basename "$DEV")"
+}
 
-WANT_BYTES=$((5120 * 1024 * 1024))     # 5 GiB；改 SIZE 时这里要同步
-
-if [ -f "$FILE" ]; then
-	have=$(stat -c%s "$FILE" 2>/dev/null || echo 0)
-	# ⚠️ 不能只看"文件存在"。2026-09-04 实踩：本服务跑在 resize2fs 之前，
-	#    dd 在没扩容的文件系统上写出 231MB 就 ENOSPC 失败，留下一个**半截**的
-	#    /swapfile；此后每次开机都因为"文件存在"而跳过创建、直接 swapon，
-	#    于是 swap 永远起不来，而服务仍 exit 0 假装成功。
-	#    所以这里按大小判定：不够就删掉重建。
-	if [ "$have" -ge "$WANT_BYTES" ]; then
-		say "$FILE 已存在且大小足够（$have 字节），跳过创建"
+do_stop() {
+	if swapon --show 2>/dev/null | grep -q "^$DEV"; then
+		say "swapoff $DEV"
+		swapoff "$DEV" 2>/dev/null || say "  swapoff 失败，继续"
 	else
-		say "$FILE 不完整（$have < $WANT_BYTES 字节），删掉重建"
-		rm -f "$FILE"
+		say "$DEV 不在用，无需 stop"
 	fi
-fi
+	local s; s=$(sysfs)
+	[ -w "$s/reset" ] && echo 1 > "$s/reset" 2>/dev/null
+	say "已停止"
+}
 
-if [ ! -f "$FILE" ]; then
-	say "创建 $FILE（$SIZE）"
-	if ! fallocate -l "$SIZE" "$FILE" 2>/dev/null; then
-		say "  fallocate 不可用（ext4 关了 extents），改用 dd"
-		# 5120 个 1M 块 ≈ 5 GiB；SIZE 改了这里要同步
-		dd if=/dev/zero of="$FILE" bs=1M count=5120 status=none || { say "dd 失败，放弃"; exit 0; }
+do_start() {
+	# 已经在用就什么都不做（幂等）
+	if swapon --show 2>/dev/null | grep -q "^$DEV"; then
+		say "$DEV 已在用，跳过"
+		return 0
 	fi
-	chmod 600 "$FILE" 2>/dev/null
-	mkswap "$FILE" >/dev/null 2>&1 || { say "mkswap 失败，放弃"; rm -f "$FILE"; exit 0; }
-	say "  已建好"
-fi
 
-if ! swapon "$FILE" 2>/dev/null; then
-	say "swapon 失败；删掉 $FILE 后重试一次"
-	# 上一轮可能留了个 mkswap 过但格式不对的文件，清掉重来比留着强
-	swapoff "$FILE" 2>/dev/null
-	rm -f "$FILE"
-	if dd if=/dev/zero of="$FILE" bs=1M count=5120 status=none 2>/dev/null \
-	   && chmod 600 "$FILE" 2>/dev/null \
-	   && mkswap "$FILE" >/dev/null 2>&1 \
-	   && swapon "$FILE" 2>/dev/null; then
-		say "重试后 swapon 成功"
+	say "加载 zram 模块"
+	modprobe zram 2>/dev/null || say "  modprobe 失败，继续（可能已内建）"
+
+	local s; s=$(sysfs)
+	local i=0
+	while [ ! -e "$s" ] && [ "$i" -lt 20 ]; do
+		sleep 0.1; i=$((i + 1))
+	done
+	if [ ! -e "$s" ]; then
+		say "等不到 $s，放弃（最坏只是没有 swap）"
+		return 0
+	fi
+	say "  $s 就绪"
+
+	# 压缩算法：这台机器的 zram 只编了 lzo-rle / lzo，用内核默认的即可。
+	# （编了 lz4 / zstd 的机器上，可以取消下面两行的注释换更好的压缩率）
+	# [ -w "$s/comp_algorithm" ] && grep -q lz4 "$s/comp_algorithm" \
+	#	&& echo lz4 > "$s/comp_algorithm" 2>/dev/null
+
+	say "设置 disksize = $SIZE"
+	if ! echo "$SIZE" > "$s/disksize" 2>/dev/null; then
+		say "  写 disksize 失败，先 reset 再试"
+		echo 1 > "$s/reset" 2>/dev/null
+		echo "$SIZE" > "$s/disksize" 2>/dev/null || { say "  仍失败，放弃"; return 0; }
+	fi
+
+	say "mkswap $DEV"
+	mkswap "$DEV" >/dev/null 2>&1 || { say "  mkswap 失败，放弃"; return 0; }
+
+	# zram 比任何磁盘 swap 都快，给高优先级；将来若再加 eMMC swap 会自然排在后面
+	if swapon -p 100 "$DEV" 2>/dev/null; then
+		say "swapon 成功（优先级 100）"
 	else
-		say "重试后仍失败，放弃（最坏结果只是没有 swap）"
-		rm -f "$FILE"
-		exit 0
+		say "swapon 失败，放弃（最坏只是没有 swap）"
+		return 0
 	fi
-else
-	say "swapon 成功"
-fi
 
-# 写进 fstab，下次开机自动挂（先备份原文件，符合可逆改动的约定）
-if [ -f /etc/fstab ] && ! grep -q "^$FILE" /etc/fstab; then
-	[ -f /etc/fstab.odin-bak ] || cp -a /etc/fstab /etc/fstab.odin-bak 2>/dev/null
-	echo "$FILE none swap sw 0 0" >> /etc/fstab
-	say "已写入 /etc/fstab"
-fi
+	swapon --show 2>/dev/null | sed 's/^/    /' >> "$LOG" 2>/dev/null
+}
+
+case "${1:-start}" in
+	start) do_start ;;
+	stop)  do_stop  ;;
+	*)     echo "用法: $0 start|stop" >&2; exit 2 ;;
+esac
+exit 0
