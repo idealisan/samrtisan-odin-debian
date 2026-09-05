@@ -1,0 +1,77 @@
+diff --git a/drivers/power/supply/qcom-smbchg.c b/drivers/power/supply/qcom-smbchg.c
+index 6d3b8aa77901..d1b766c32052 100644
+--- a/drivers/power/supply/qcom-smbchg.c
++++ b/drivers/power/supply/qcom-smbchg.c
+@@ -738,6 +738,28 @@ static int smbchg_otg_switch(struct smbchg_chip *chip, bool enable)
+ 	dev_dbg(chip->dev, "%sabling OTG VBUS regulator",
+ 			enable ? "En" : "Dis");
+ 
++	if (enable) {
++		/*
++		 * 先禁用 OTG boost 的 pulse skip，再开 OTG。
++		 *
++		 * pulse skip 是转换器在轻载时跳过部分开关脉冲的省电模式。带外接存储
++		 * 设备时若保持开启，负载一突变转换器就响应不过来，VBUS 瞬间跌落，
++		 * PMIC 报 "otg-fail" 切断输出 —— 这就是"硬盘用着用着自己掉"的直接原因。
++		 * 顺序很重要：必须先禁 pulse skip，再写 OTG_EN_BIT，中间留 20ms 让配置生效
++		 * （原厂 qpnp-smbcharger.c 的 smbchg_otg_regulator_enable() 就是这个顺序）。
++		 * 见 reports/039。
++		 */
++		ret = regmap_update_bits(chip->regmap,
++					 chip->base + SMBCHG_OTG_TRIM6,
++					 TR_ENB_SKIP_BIT, TR_ENB_SKIP_BIT);
++		if (ret)
++			dev_err(chip->dev, "Failed to disable OTG pulse skip: %d\n",
++				ret);
++
++		/* 等 pulse skip 真正禁掉再开 OTG，否则可能白配 */
++		msleep(20);
++	}
++
+ 	ret = regmap_update_bits(chip->regmap,
+ 				 chip->base + SMBCHG_BAT_IF_CMD_CHG, OTG_EN_BIT,
+ 				 enable ? OTG_EN_BIT : 0);
+@@ -745,6 +767,16 @@ static int smbchg_otg_switch(struct smbchg_chip *chip, bool enable)
+ 		dev_err(chip->dev, "Failed to %sable OTG regulator: %d\n",
+ 			enable ? "en" : "dis", ret);
+ 
++	if (!enable) {
++		/* 关掉 OTG 后恢复 pulse skip，避免常驻高功耗模式 */
++		ret = regmap_update_bits(chip->regmap,
++					 chip->base + SMBCHG_OTG_TRIM6,
++					 TR_ENB_SKIP_BIT, 0);
++		if (ret)
++			dev_err(chip->dev, "Failed to re-enable OTG pulse skip: %d\n",
++				ret);
++	}
++
+ 	return ret;
+ }
+ 
+diff --git a/drivers/power/supply/qcom-smbchg.h b/drivers/power/supply/qcom-smbchg.h
+index 7d6a5a53f97b..e15eee9ed8a8 100644
+--- a/drivers/power/supply/qcom-smbchg.h
++++ b/drivers/power/supply/qcom-smbchg.h
+@@ -24,6 +24,22 @@
+ #define SMBCHG_OTG_TRIM6			0x1f6
+ #define SMBCHG_OTG_LOW_PWR_OPTIONS		0x1ff
+ 
++/*
++ * OTG_TRIM6 的 bit2 —— 控制 OTG boost 的 pulse skip（跳脉冲）。
++ *
++ * pulse skip 是开关转换器在**轻载**时为提高效率而跳过部分开关脉冲的模式。
++ * 在 OTG（boost）输出时若不禁用，一旦负载突变（比如外接硬盘突然有 I/O），转换器
++ * 来不及响应，VBUS 就会瞬间跌落，PMIC 随即报 "otg-fail" 并切断输出 ——
++ * 表现为外接存储设备用着用着自己就掉了。
++ *
++ * 原厂（下游）驱动在开关 OTG 时会显式禁用/恢复它（qpnp-smbcharger.c 的
++ * smbchg_otg_pulse_skip_disable()，REASON_OTG_ENABLED），并在写入后 msleep(20)
++ * 等其生效；主线此前从未使用过这个寄存器。
++ *
++ * 详见 reports/039。
++ */
++#define TR_ENB_SKIP_BIT				BIT(2)
++
+ /* BAT-IF */
+ #define SMBCHG_BAT_IF_BAT_PRES_STS		0x208
+ #define SMBCHG_BAT_IF_RT_STS			0x210
