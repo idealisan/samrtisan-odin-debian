@@ -21,6 +21,23 @@
 
 LOG=${ODIN_USB_ROLE_LOG:-/var/log/odin-usb-role.log}
 CFG=/sys/kernel/config/usb_gadget/odin
+
+# ------------------------------------------------------- 可选的外部配置文件
+#
+# 把 ODIN_* 变量写进 /etc/odin/usb-role.env 就能改配置，不必动脚本、不必重编镜像。
+# 文件不存在则静默跳过（默认安装不创建这个文件）。
+#
+# 只加载 **ODIN_ 前缀** 的键：env 文件是纯文本，整体 source 会让它里面的其它键覆盖
+# 脚本内部变量（比如有人顺手写了 LOCK=... 就完蛋了）。用白名单做隔离。
+ODIN_ENV=${ODIN_USB_ROLE_ENV:-/etc/odin/usb-role.env}
+if [ -r "$ODIN_ENV" ]; then
+	while IFS='=' read -r k v || [ -n "$k" ]; do
+		case "$k" in
+			ODIN_*) [ -n "$k" ] && printf -v "$k" '%s' "$v" ;;
+		esac
+	done < "$ODIN_ENV"
+fi
+
 # dnsmasq 由独立的 systemd unit 托管（见 etc/systemd/system/odin-dnsmasq@.service）。
 # 以前这里是 PIDFILE=/run/odin-dnsmasq.pid，但 --no-daemon 下 dnsmasq 根本不写
 # pidfile（实测 0 字节），靠它判定只会出错，已弃用。
@@ -49,6 +66,23 @@ GADGET_HOST_MAC="${ODIN_GADGET_HOST_MAC:-02:00:0d:1d:00:01}"   # PC 侧看到的
 GADGET_DEV_MAC="${ODIN_GADGET_DEV_MAC:-02:00:0d:1d:00:02}"     # 手机侧 usb0 的 MAC
 
 log() { echo "$(date -Is) $*" >> "$LOG" 2>/dev/null; }
+
+# ----------------------------------------- gadget function 类型（可配）
+#
+# ncm（默认）/ ecm / rndis。三者都已编进内核：
+#   CONFIG_USB_F_NCM=y、CONFIG_USB_F_ECM=y、CONFIG_USB_F_RNDIS=y
+#
+# 为什么做成可配：见 reports/038 与 WORKLOG —— NCM 在 OTG 拔插时会出现
+# "内核里设备还在、但它的 sysfs 目录已被注销"的半死状态（/sys/class/net/usb0 变成
+# 悬空符号链接）。换 function 类型是成本最低的对照实验：如果 ECM 没这个问题，
+# 就说明是 NCM 的锅，为修内核（方案 B）指明方向。
+#
+# 实测时写进 /etc/odin/usb-role.env（ODIN_GADGET_FN=ecm），不用改代码、不用重编镜像。
+GADGET_FN="${ODIN_GADGET_FN:-ncm}"
+case "$GADGET_FN" in
+	ncm|ecm|rndis) ;;
+	*) log "warn: 未知的 ODIN_GADGET_FN='$GADGET_FN'，回退到 ncm"; GADGET_FN=ncm ;;
+esac
 
 # --------------------------------- 链路状态：只读 sysfs，尽量不碰 netlink
 #
@@ -173,13 +207,29 @@ apply_device() {
 	fi
 
 	# 建 gadget（幂等：目录/软链已存在时 mkdir、ln 都允许失败）
-	mkdir -p "$CFG/functions/ncm.usb0" "$CFG/configs/c.1" 2>/dev/null
+	#
+	# function 类型可配（ODIN_GADGET_FN：ncm=默认 / ecm / rndis。三者都编进了内核：
+	# CONFIG_USB_F_NCM=y、CONFIG_USB_F_ECM=y、CONFIG_USB_F_RNDIS=y。
+	#
+	# 为什么做成可配：见 reports/038 与 WORKLOG —— NCM 在 OTG 拔插时会出现"设备还在但 sysfs
+	# 目录被注销"的半死状态（usb0 悬空链接）。换 function 类型是成本最低的对照实验：如果
+	# ECM 没这问题，就说明是 NCM 的锅。实测时通过 /etc/odin/usb-role.env 切，不用改代码、不用重编。
+
+	# 切类型前先摘掉旧链接，并清掉其它类型的 function 目录，避免多个 function 同时挂在 config 上
+	rm -f "$CFG/configs/c.1/f1" 2>/dev/null
+	for other in ncm ecm rndis; do
+		[ "$other" = "$GADGET_FN" ] && continue
+		rmdir "$CFG/functions/$other.usb0" 2>/dev/null
+	done
+
+	mkdir -p "$CFG/functions/$GADGET_FN.usb0" "$CFG/configs/c.1" 2>/dev/null
 	[ -f "$CFG/idVendor" ]  || echo 0x18d1 > "$CFG/idVendor"   2>/dev/null
 	[ -f "$CFG/idProduct" ] || echo 0x4ee1 > "$CFG/idProduct"  2>/dev/null
 	mkdir -p "$CFG/configs/c.1/strings/0x409" 2>/dev/null
 	[ -f "$CFG/configs/c.1/strings/0x409/configuration" ] \
 		|| echo "ODIN Debian" > "$CFG/configs/c.1/strings/0x409/configuration" 2>/dev/null
-	ln -sf "$CFG/functions/ncm.usb0" "$CFG/configs/c.1/f1" 2>/dev/null
+	ln -sf "$CFG/functions/$GADGET_FN.usb0" "$CFG/configs/c.1/f1" 2>/dev/null
+	log "device: gadget function=$GADGET_FN"
 
 	# MAC 固定 —— 注意两点（都踩过）：
 	#  1) configfs 的 host_addr/dev_addr 一旦绑定 UDC 就不可写（Permission denied）；
