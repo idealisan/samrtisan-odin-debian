@@ -3336,3 +3336,51 @@ probe 也不阻止 OTG 尝试。要真禁掉得改驱动侧。
 5. 复制子模块源码要排除 .git（它是个 gitlink 文件，指向父仓的 .git/modules），
    否则在副本里跑 git 会报
    "not a git repository: .../gen/../../.git/modules/ext/lk2nd"。
+
+## 2026-09-05（续）lk2nd 三个问题全部解决
+
+### 结论：三个都修好了
+
+1. **按键**（补丁 0008）—— 用户真机实测通过：音量上/下、Home 都能用，方向也对。
+2. **UI 文案** —— 屏幕第二行 `23.1-nomarkw-odinport` → `23.1-odin`；
+   文件名 `lk2nd-nomarkw.img` → `lk2nd-odin.img`（连带 flash 脚本、CI 校验、8 个文档）。
+3. **引导失败不再反复重启**（补丁 0007 + 0009）—— 擦掉 userdata 后重启，
+   设备 48s 进 fastboot，**稳住 120 秒没重启**。
+
+### 中间走了很长一段弯路，根因是我自己把测试弄脏了
+
+13:37 那次 `fastboot flash userdata` 被超时中断，但它**已经把 extlinux.conf 写回去了**。
+于是后面每一轮"改名 extlinux.conf → 重启"其实都没真的禁用掉：
+lk2nd 照样找到配置、去引导 Linux，而那个文件系统是半截的 → kernel panic → 复位。
+**我观察到的所有"循环"都是坏 userdata 造成的，不是 lk2nd。**
+
+教训：做 A/B 验证之前先确认前置状态真的成立了，别只看"我发过命令"。
+（`fastboot erase userdata` 比"改名配置"更干净 —— 直接让可启动 fs 不存在，
+不会被之前残留的内容干扰。）
+
+### 0007 到底修的是什么
+
+擦掉 userdata 之后，lk2nd 扫不到任何可启动 fs。上游在这里只打一行日志就返回，
+aboot 接着走 `boot_linux_from_mmc()`，去引导 boot 分区里的原厂安卓镜像
+（/dev/mmcblk0p21 实测有 **4 个 ANDROID!**，偏移 0 / 271236 / 524288 / 787184）——
+那个镜像挂不上 system 就复位，于是无限循环。0007 让它在扫不到时直接 goto fastboot。
+注意 `if (!boot_into_fastboot)` 是在 `lk2nd_boot()` **之前**判的，所以必须在之后
+重判一次，否则置位也没用。
+
+### 0009 修的是什么（菜单默认项是 Reboot）
+
+`menu_options[0]` 是 Reboot，而 `sel` 初值是 0。菜单画出来之后只要 wait_key()
+返回一个确认键，就执行 `opt_reboot` → reset。KEY_POWER 在这台机器上没有 GPIO
+（原厂放在 PMIC PON 上），只能退回 `pm8x41_get_pwrkey_is_pressed()`，这条路径不可靠
+（已排除另一个可能：`lk2nd,single-key-navigation` 只在三台 msm8226 上设了，我们没有）。
+改成默认选中 Continue 之后，同一个事件只会"再试一次引导" ——
+不是修"为什么会误触发"，而是修"**误触发的后果不该是复位**"。
+
+### 补充：块设备编号这次又漂了
+
+上一版是 mmcblk0p57，这版是 mmcblk1p57 —— 正好印证改用 GPT 分区名找根是必要的。
+
+### 真机验收（刷回系统后）
+
+`odin-fs-verify.sh` **14/14 全过**；`Startup finished in 16.859s (kernel) +
+32.037s (userspace) = 48.896s`；swap 两级 4607 MiB。
