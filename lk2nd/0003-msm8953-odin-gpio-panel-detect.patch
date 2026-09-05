@@ -80,7 +80,7 @@ over USB even when screen is dark; not persisted across reboots).
  		panel_id = R69006_1080P_CMD_PANEL;
  		if (platform_subtype == 0x01 || platform_subtype == 0x03)
  			panel_id = HX8399C_FHD_PLUSE_VIDEO_PANEL;
-@@ -489,3 +533,35 @@
+@@ -489,3 +533,57 @@
  	pinfo->pipe_type = MDSS_MDP_PIPE_TYPE_RGB;
  	return init_panel_data(panelstruct, pinfo, phy_db);
  }
@@ -115,4 +115,26 @@ over USB even when screen is dark; not persisted across reboots).
 +
 +	fastboot_okay("");
 +}
-+FASTBOOT_INIT(cmd_oem_panel);
++
++/*
++ * 注册必须用 FASTBOOT_REGISTER，不能用 FASTBOOT_INIT。
++ *
++ * FASTBOOT_INIT 的宏体是
++ *     static void (*_fastboot_init_##func)(void) __SECTION(".fastboot_init") = (func)
++ * 也就是把这个函数指针当成 **void (*)(void)** 存进 .fastboot_init 段；
++ * 而该段的消费者是（app/aboot/fastboot.h:65）
++ *     for (func = &__fastboot_init_start; func < &__fastboot_init_end; ++func)
++ *             (*func)();
++ * 按 **不传参数** 的方式调用。
++ *
++ * cmd_oem_panel 的原型是 void (*)(const char *, void *, unsigned)，
++ * 与 void (*)(void) 不兼容（GCC 会警告 "initialization of 'void (*)(void)'
++ * from incompatible pointer type"，GCC 14+ 直接当错误）。类型不匹配的后果是：
++ * 跳进去时 r0/r1/r2 没有被设置，函数却去读 arg/data/sz —— 读到的是垃圾，
++ * 于是在 aboot_fastboot_register_commands() 里就崩了。
++ *
++ * FASTBOOT_REGISTER(prefix, handlefunc) 会生成一个 void (*)(void) 的包装函数
++ * 再交给 FASTBOOT_INIT，类型就对了。上游所有 oem 命令（oem ramoops / oem hash）
++ * 用的都是它。
++ */
++FASTBOOT_REGISTER("oem panel", cmd_oem_panel);
