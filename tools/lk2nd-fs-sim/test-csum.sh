@@ -1,9 +1,10 @@
 #!/bin/bash
 # metadata_csum 专项测试
 #
-# metadata_csum 是 **ro_compat** 特性。lk2nd 挂载时只校验 ro_compat（白名单 SPARSE_SUPER|LARGE_FILE）
-# ⇒ 开了它会被拒。所以要做两件事：
+# metadata_csum 是 **ro_compat** 特性。lk2nd 挂载时只校验 ro_compat
+# （原白名单仅 SPARSE_SUPER|LARGE_FILE）⇒ 开了它会被拒。所以要做两件事：
 #   1. 把 metadata_csum 加进 lk2nd 的 ro_compat 白名单（只读路径不需要真的校验）
+#      补丁 0006 已完成，白名单现为 SPARSE_SUPER|LARGE_FILE|METADATA_CSUM
 #   2. 确认它不改变只读解析所需的布局 —— 重点怀疑：目录块尾部会多一个 12 字节的
 #      fake dirent (ext4_dir_entry_tail: inode=0, rec_len=12, name_len=0, file_type=0xDE)
 #
