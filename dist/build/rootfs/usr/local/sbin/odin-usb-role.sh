@@ -62,17 +62,30 @@ log() { echo "$(date -Is) $*" >> "$LOG" 2>/dev/null; }
 #   · 内核状态受损 ⇒ sshd 不再响应新连接
 #   · 反复发生会搞坏文件系统 ⇒ 无法启动，必须重刷（已发生两次）
 #
-# 内核那个竞态修好之前，脚本一律用 sysfs 判断状态，把 netlink 调用降到最少
-# （只保留真正需要改变状态的 ip link/addr，且调用前先确认设备还在）。
+# 内核那个竞态修好之前，脚本一律不轮询 netlink。判断依据按可靠性排序选：
 
-usb0_exists() { [ -d /sys/class/net/usb0 ]; }
+usb0_exists() {
+	# 用 /proc/net/dev，不用 [ -d /sys/class/net/usb0 ]。
+	#
+	# 原因（真机踩到，见 WORKLOG）：拔插 OTG 后 usb0 的 sysfs 节点会变成
+	# **悬空符号链接** —— [ -L ]=YES 但 [ -e ]=NO，因为
+	#   /sys/devices/.../7000000.usb/gadget.0/net/ 目录已被注销，
+	# 而此时内核里的网络设备其实还在（netlink 看得到、地址在、网络通）。
+	# 按 sysfs 判断会误判成"网卡不存在"，脚本于是跳过所有配置步骤，
+	# 只在 /proc/net/dev 里 usb0 依然列着 ⇒ 用它最准。
+	# 读 procfs 也不像 ip 那样会构造 netlink 消息，不会踩 reports/038 的崩溃点。
+	grep -q '^[[:space:]]*usb0:' /proc/net/dev 2>/dev/null
+}
 
 # IFF_UP = 0x1；/sys/class/net/usb0/flags 是十六进制，形如 0x1003
+#
+# 返回码：0=up，1=down，2=读不到（悬空链接，状态未知）
 usb0_is_up() {
 	local f
-	usb0_exists || return 1
-	[ -r /sys/class/net/usb0/flags ] || return 1
-	f=$(cat /sys/class/net/usb0/flags 2>/dev/null) || return 1
+	# 注意：这里不能先调 usb0_exists —— 悬空链接下 usb0_exists 仍可能为真（/proc 有），
+	# 而 flags 读不到应如实报告"未知(2)"，让调用方决定怎么补，不要伪装成 down。
+	[ -r /sys/class/net/usb0/flags ] || return 2
+	f=$(cat /sys/class/net/usb0/flags 2>/dev/null) || return 2
 	[ $(( f & 0x1 )) -ne 0 ]
 }
 
@@ -226,13 +239,25 @@ apply_device() {
 	# netlink RTM_GETADDR/GETLINK，正好踩在 reports/038 的崩溃点上，而且是在
 	# usb0 刚被创建、最不稳定的那几秒里连踩 10 次。改成读 sysfs 的链路标志，
 	# 一次 netlink 都不发。
-	local w=0
+	# 返回值：0=up  1=down  2=未知（sysfs 悬空，flags 读不到）
+	local w=0 up=1
 	while [ "$w" -lt 10 ]; do
-		usb0_is_up && break
+		usb0_is_up; up=$?
+		[ "$up" -eq 0 ] && break
 		sleep 1; w=$((w+1))
 	done
-	if ! usb0_is_up; then
-		log "device: usb0 10s 内未 up（exists=$(usb0_exists && echo yes || echo no)），仍尝试启动 dnsmasq（看门狗会重试）"
+	usb0_is_up; up=$?
+	if [ "$up" -ne 0 ]; then
+		# 未 up，或者状态未知。**未知不等于坏掉** —— 真机见过：flags 读不到
+		# （gadget.0/net/ 已注销），但 netlink 里 state UP、地址在、PC 也连得上。
+		# 所以这里补一次幂等的 up + 补地址，而不是直接放弃等看门狗。
+		# ip link/addr 走的是 RTM_NEWLINK/NEWADDR，不是崩溃所在的 rtnl_getlink。
+		if usb0_exists; then
+			ip link set usb0 up 2>/dev/null
+			ip addr add ${HOST_IP}/24 dev usb0 2>/dev/null
+		fi
+		log "device: usb0 up 状态=$up（0=up 1=down 2=未知）"
+		log "device:   exists=$(usb0_exists && echo yes || echo no)，已补一次 up/addr；继续启动 dnsmasq（看门狗会重试）"
 	fi
 
 	if dnsmasq_running; then
