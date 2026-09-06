@@ -999,12 +999,12 @@ index 000000000..3dc8f434d
 +		 *     STK3311A_CHIP_ID_VAL = 0x15
 +		 * 正好对上（该驱动用 0x3E 作 ID 寄存器，且 0x15 在它接受的
 +		 * 芯片 ID 表里）。走 sensortek,stk3311（CONFIG_STK3310=m 已开）。
++		 * ⚠️ 别给它补 vdd-supply：stk3310 驱动不申请 regulator，写了不生效
++		 *   （真机实测 l10 处于 disabled 时照度照样读到 51~59）。
 +		 */
 +		light-sensor@48 {
 +			compatible = "sensortek,stk3311";
 +			reg = <0x48>;
-+
-+			vdd-supply = <&pm8953_l10>;
 +		};
 +
 +		/*
