@@ -4277,3 +4277,43 @@ fatal error received: dog.c:1526:Watchdog detects stalled initialization
 **当前取舍**：&mpss 保持 enabled 在库里（modem 能起来但 crash 循环）。若嫌耗电/不稳，
 可临时把 status 改回 disabled。传感器在这版镜像上复验正常（stk3310 + bmi160，加速度 z 有波动
 -16082~-16202；室内恒定灯光下 lux 稳定在 40 不跳，属环境真稳定，不是传感器不动。
+
+### 8. ✅ rmtfs 跑对了 —— modem 从"每 50 秒崩一次"变成完全稳定（2026-09-06 22:56~23:10）
+
+qrtr-look 段错误修好了：原因是 `qrtr_decode()` 内部解引用第 4 个参数 `sq->sq_port`，
+我传了 NULL。改成用 `qrtr_recvfrom()` 拿到 node/port 组成 sockaddr_qrtr 再传进去；
+顺手加"只有 poll>0 才 recv"，免得刷屏 `Resource temporarily unavailable`。
+
+**rmtfs 的正确启动方式**（之前一直没起来，两个原因）：
+1. 必须以 root 跑（`rmtfs -r -P -s -o /var/lib/rmtfs`）—— 之前没用 sudo
+2. **EFS 文件要预先建好**，否则 modem 一请求就 stalled：
+   ```
+   /boot/modem_fs1 → modemst1 (或 modem_fs1)
+   /boot/modem_fs2 → modemst2 (或 modem_fs2)
+   /boot/modem_fsc → fsc / modem_fsc
+   /boot/modem_fsg → fsg / modem_fsg
+   ```
+   实测日志先是 `requested '/boot/modem_fs1'`，补齐后又变成 `requested '/boot/modem_fsg'` —— 四个都要建。
+
+**效果（决定性）**：
+```
+崩溃计数（前）: 35
+崩溃计数（后）: 35        ← 60 秒内 0 次新崩溃
+remoteproc1 name=4080000.remoteproc state=running
+```
+之前是每约 50 秒 `Watchdog detects stalled initialization` → crash → recover，循环不停。
+现在三个 remoteproc 全 running，且稳定。
+
+**QRTR 上现在有一整套 modem 服务**（说明 modem 真在工作）：
+```
+0 CTL  1 WDS  2 DMS  3 NAS  4  5 WMS  7  8  11 12 14(RMTFS) 15 17 22 23 24 26 29 34 36 42 46 47 48 54 68 71 769
+```
+❗但**没有 16 (LOC，就是 GPS)**，也没有 6 (PDS 老 GPS)。所以 modem 通了，**GPS 还没通**。
+
+**还差的**：
+- ModemManager：镜像里被 mask 了（`ModemManager.service -> /dev/null`）。unmask 后能起来，
+  但 `mmcli -L` 说 `No modems were found` —— MM 没识别到 QRTR modem，还得配（udev 规则 / MM 的 QRTR 后端）。
+- **Debian bookworm 里没有 rmtfs 包**（`apt-cache search rmtfs` 空；只有 libqrtr-glib0）。
+  所以 rmtfs 得自己提供：要么把上游源码（github.com/andersson/rmtfs）编进镜像，
+  要么预置二进制 + systemd 服务 + 那四个 EFS 文件。目前是**手工跑的，重启就没了**，
+  下一步要固化进镜像才算真解。
