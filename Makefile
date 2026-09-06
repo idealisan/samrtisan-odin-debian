@@ -168,7 +168,14 @@ $(STAMPS)/fetch-$(KDIR_TAG): | $(STAMPS)
 #   · 两棵树的补丁状态会各自漂移，出现"这边打了那边没打"的诡异问题
 # 统一走幂等脚本后，dtb 与 kernel 共用同一棵树即可，重复调用是安全的。
 dtb: $(STAMPS)/dtb-$(KDIR_TAG)
-$(STAMPS)/dtb-$(KDIR_TAG): | $(STAMPS) fetch-kernel
+# 依赖必须是**真的**，不能只挂 order-only 的 fetch-kernel。
+# 2026-09-06 修：原来写 `| $(STAMPS) fetch-kernel`，于是改了设备树补丁或 dts/
+# 之后 `make dtb` 直接命中时间戳跳过 —— 编出来的还是旧的 DTB，且不报错。
+# 这正是今天踩两次的同一类坑（另一次是 CI 缓存键没跟着包清单变）。
+$(STAMPS)/dtb-$(KDIR_TAG): $(REPO)/config-postmarketos-qcom-msm8953.aarch64 \
+		$(wildcard $(REPO)/patches/*.patch) \
+		$(REPO)/dts/build-dtb.sh $(wildcard $(REPO)/dts/*.dts) \
+		| $(STAMPS) fetch-kernel
 	@mkdir -p $(DTB_OUT)
 	if [ "$${ODIN_DTB_CACHE_HIT:-false}" = true ] && \
 		[ -s "$(DTB_OUT)/msm8953-smartisan-odin.dtb" ] && \
@@ -236,7 +243,15 @@ $(STAMPS)/dtb-$(KDIR_TAG): | $(STAMPS) fetch-kernel
 # ================================================================ 内核与模块
 # 全部补丁都打：CI 的价值之一就是持续证明它们仍适用于钉死的 commit。
 kernel: $(STAMPS)/kernel-$(KDIR_TAG)
-$(STAMPS)/kernel-$(KDIR_TAG): | $(STAMPS) fetch-kernel
+# 同 dtb：依赖必须写全。原来这三样改了都不触发重编：
+#   · 内核配置（config-postmarketos-qcom-msm8953.aarch64）
+#   · 补丁（patches/*.patch）
+# 结果就是 `make kernel` 命中旧时间戳直接跳过 —— **配置改了、内核没变**，
+# 而且完全静默。下面这段注释自己都写着"改了配置想在同一棵树上重编内核是
+# 家常便饭"，却没有任何依赖去兑现它，全靠人记得删时间戳。
+$(STAMPS)/kernel-$(KDIR_TAG): $(REPO)/config-postmarketos-qcom-msm8953.aarch64 \
+		$(wildcard $(REPO)/patches/*.patch) \
+		| $(STAMPS) fetch-kernel
 	@mkdir -p $(KERNEL_OUT)
 	@echo "[kernel] 应用全部补丁"
 	# 打补丁必须**可重跑**：改了配置想在同一棵树上重编内核是家常便饭，
