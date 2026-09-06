@@ -4092,3 +4092,55 @@ rmdir /sys/kernel/config/device-tree/overlays/mpss   # 撤销
 2. 本地跑一次 `make dtb`（容器里），确认真的编得出来
 
 只做 `--check` 会漏掉"截断"这种错误 —— `--check` 只验证上下文对得上，不管行数对不对。
+
+## 2026-09-06 晚：三项真机验收（设备 20:51 接回后）
+
+### 1. 震动马达 —— ✅ 用户当场确认在振
+- 官方 sensors5 内核**确实带** `qcom-spmi-haptics`（`strings vmlinuz | grep spmi-haptics` 命中
+  `qcom,spmi-haptics` / `drivers/input/misc/qcom-spmi-haptics.c`，是内建所以没有 .ko）
+- 真机上出现了 `event0 name=spmi_haptics ff=107030000`（支持力反馈）—— 之前从来没有过
+- `tmp/ffvib` 走 input 的 FF_RUMBLE 接口触发：`找到 FF 设备 /dev/input/event0 → 效果已上传 → 振 3 秒`，
+  **用户在旁边确认"确实震动成功"**
+- ⚠️ 麦克风录音这条路**没走通**：`arecord -D plughw:CARD=smartisanodin,DEV=1` 报 `audio open error:
+  Invalid argument`（capture 通路没配好，跟马达无关）。所以 RMS 对比证据这次没有，
+  结论是靠用户耳朵确认的。
+
+### 2. 传感器 —— ✅ 8/8，全部"非 0 且有波动"（判据按用户要求）
+官方镜像 DTB（64016 字节，md5 cf1a1f46…）换上后：
+
+| 通道 | 采样（8 次） | 结论 |
+|---|---|---|
+| 光感 lux | 38~39 | 非 0 且波动 |
+| 距离 prox | 672~676 | 非 0 且波动 |
+| 加速度 x/y/z | 402~462 / -1355~-1304 / -16170~-16096 | 非 0 且波动，z×scale ≈ 9.63 m/s² |
+| 陀螺 x/y/z | 2~3 / -13~-11 / -10~-8 | 非 0 且波动 |
+
+（早先 12:51 / 13:03 那两次是同一套传感器，数值也吻合：als 58→57→36~40，随环境光变）
+
+### 3. GPS / modem —— 有实质进展，但**没修好**，先关着
+- 弄清楚了：**定位挂在 modem 上**。主线那个 `gps_mem` 只是给 memshare 用的；
+  真正的定位是 modem 通过 QMI 的 LOC(16) 服务提供，走 QRTR/SMD。
+- `&mpss status="okay"` **本身不会让机器重启**！换上后系统正常起来（uptime 连续），
+  `remoteproc1 name=4080000.remoteproc fw=mba.mbn` 出现了，固件也被 `odin-modem-fw.sh` 从原厂
+  modem 分区取到位（mba.mbn 238464、modem.mdt 7964，日志"固件就位"）
+  ⇒ 下午那次"反复重启"不能全算在 &mpss 头上（当时是随整包一起刷的，还有别的变量）
+- 卡在供电，报错很明确：
+      qcom-q6v5-mss 4080000.remoteproc: Failed to request voltage for 0
+      unbalanced disables for regulator-dummy
+  驱动要两路（`msm8953_mss`）：proxy `"pll"` 100mA、active `"mss"` 1.05V 100mA；我们没写 ⇒
+  `devm_regulator_get` 拿到 dummy ⇒ `regulator_set_voltage` 必然失败
+- 从**原厂 DTB** 挖到了该接哪两路（phandle 已解析）：
+      vdd_mss-supply = pm8953_s2      vdd_pll-supply = pm8953_l7_ao
+      vdd_cx-supply  = pm8953_s2_floor_level   vdd_mx-supply = pm8953_s7_level_so
+- **试了一次**：补 `pm8953_s2: s2`（1.00~1.15V）+ `pll-supply=<&pm8953_l7>` `mss-supply=<&pm8953_s2>`
+  → 编出来 64115 字节（md5 e9d7a985…），换上后**起不来了，停在 fastboot**。
+  已用官方镜像重刷恢复（2 分 25 秒，验收 16/16）。
+- 下一步（不要再随整包刷）：先搞清 s2 在主线里到底该怎么写 —— 原厂 s2 是 **RPM 管理的**
+  （只有 s2_level 有 0x10~0x180 的 level 范围，没有 uV），直接给它 min/max-microvolt 可能
+  与 RPM 冲突。可以先只加 `pll-supply`（l7 已在用、风险小）单独试，确认不炸再加 mss 那一路。
+
+### 4. 顺带确认的两件事
+- 运行时设备树覆盖这条路**走不通**：`CONFIG_OF_OVERLAY=y` 但 `CONFIG_OF_CONFIGFS` 没开，
+  所以 `/sys/kernel/config/device-tree/overlays` 目录根本不存在（之前判断错了，以为 OF_OVERLAY 就够）
+- lk2nd 的"启动失败停在 fastboot"**这次正常工作了**（K 版 DTB 起不来后自动停在 fastboot，
+  没有无限重启），所以有救回来的余地
