@@ -26,17 +26,37 @@ log() { echo "$(date -Is) $*" >> "$LOG" 2>/dev/null; }
 WHERE="/run/media/$NAME"
 
 # 只管 USB
-BUS=$(udevadm info -q property -n "$DEV" 2>/dev/null | sed -n 's/^ID_BUS=//p')
-if [ "$BUS" != "usb" ]; then
-	log "$DEV ID_BUS='$BUS' != usb, skip"
+#
+# ⚠️ 只认 ID_BUS=usb 会把 **UAS 设备整类漏掉**（2026-09-06 实测踩到）：
+#   UAS（USB Attached SCSI）盘的 SCSI 层把总线报成 **ID_BUS=ata**，
+#   USB 那套属性全在 ID_USB_* 上（这台是 ID_USB_DRIVER=uas）。
+#   所以判定要改成"ID_BUS=usb **或** 有 ID_USB_DRIVER"。
+#   内部 eMMC / SD 没有 ID_USB_DRIVER，天然排除，不会误挂。
+PROPS=$(udevadm info -q property -n "$DEV" 2>/dev/null)
+BUS=$(printf '%s\n' "$PROPS" | sed -n 's/^ID_BUS=//p')
+USBDRV=$(printf '%s\n' "$PROPS" | sed -n 's/^ID_USB_DRIVER=//p')
+if [ "$BUS" != usb ] && [ -z "$USBDRV" ]; then
+	log "$DEV ID_BUS='$BUS' ID_USB_DRIVER='$USBDRV' —— 不是 USB 设备，skip"
 	exit 0
 fi
 
-FSTYPE=$(udevadm info -q property -n "$DEV" 2>/dev/null | sed -n 's/^ID_FS_TYPE=//p')
+FSTYPE=$(printf '%s\n' "$PROPS" | sed -n 's/^ID_FS_TYPE=//p')
 [ -n "$FSTYPE" ] || { log "$DEV no ID_FS_TYPE, skip"; exit 0; }
 
 OPTS=$(/usr/local/sbin/odin-mount-opts.sh "$FSTYPE")
 [ -n "$OPTS" ] || OPTS=noatime
+
+# blkid / udev 对 NTFS 盘报的类型是 **ntfs**，不是 ntfs3。
+# 而我们镜像里既没有老的内核 ntfs 驱动，也没装 ntfs-3g（无 mount.ntfs helper），
+# 所以让 systemd 自己探测会去找 `ntfs` ⇒ 直接
+#     mount: unknown filesystem type 'ntfs'
+# 实测（2026-09-06 虚拟盘）：
+#     -t ntfs3        → type ntfs3 (rw,...)，中文名读写正常
+#     不指定类型       → 有 ntfs-3g 时走 fuseblk；没装时 unknown filesystem type 'ntfs'
+#     没装 ntfs-3g + 显式 -t ntfs3 → 仍可用 ✅
+# 内核 ntfs3 是内建的（CONFIG_NTFS3_FS=y），比 FUSE 的 ntfs-3g 更好，归一到它。
+MNT_TYPE=$FSTYPE
+[ "$FSTYPE" = ntfs ] && MNT_TYPE=ntfs3
 
 # 已挂载则幂等返回
 if mountpoint -q "$WHERE" 2>/dev/null; then
@@ -44,9 +64,9 @@ if mountpoint -q "$WHERE" 2>/dev/null; then
 	exit 0
 fi
 
-log "mount $DEV ($FSTYPE) -> $WHERE [$OPTS]"
-if ! /usr/bin/systemd-mount --no-block --collect --options="$OPTS" \
-		"$DEV" "$WHERE" >> "$LOG" 2>&1; then
+log "mount $DEV ($FSTYPE → -t $MNT_TYPE) -> $WHERE [$OPTS]"
+if ! /usr/bin/systemd-mount --no-block --collect --type="$MNT_TYPE" \
+		--options="$OPTS" "$DEV" "$WHERE" >> "$LOG" 2>&1; then
 	log "systemd-mount FAILED for $DEV ($FSTYPE)"
 fi
 exit 0

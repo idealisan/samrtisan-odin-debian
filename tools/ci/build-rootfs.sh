@@ -77,7 +77,12 @@ if [ ! -d "$ROOT/etc" ]; then
     # 必须写成 `if ! ... | tee` 而不是靠 set -e：后者会在管道失败的瞬间直接退出，
     # 下面那句"debootstrap 失败"永远打印不出来。
     if ! debootstrap --arch arm64 --variant=minbase \
-      --include=busybox-static,udev,ssh,sudo,systemd,iproute2,dnsmasq,parted,e2fsprogs \
+      # dosfstools / exfatprogs：2026-09-06 加。OTG 外接盘在本机上会因为电池
+      # 欠压突然掉电（见 reports/040），掉完那个盘很可能需要 fsck 才救得回来 ——
+      # 而镜像里原本只有 e2fsprogs（ext 系），vfat / exFAT 盘的 fsck 一个都没有。
+      # **不装 ntfs-3g**：内核 NTFS3 是内建的（CONFIG_NTFS3_FS=y），比 FUSE 的
+      # ntfs-3g 更好，装了反而会让自动探测优先走 fuseblk（实测，见 reports/041）。
+      --include=busybox-static,udev,ssh,sudo,systemd,iproute2,dnsmasq,parted,e2fsprogs,dosfstools,exfatprogs \
       "$SUITE" "$ROOT" "$MIRROR" \
       2>&1 | tee /tmp/odin-debootstrap.log; then
       echo "debootstrap 失败，日志见上面（同一份也留在 /tmp/odin-debootstrap.log）" >&2

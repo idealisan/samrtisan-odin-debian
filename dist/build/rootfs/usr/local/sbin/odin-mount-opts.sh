@@ -8,8 +8,10 @@
 #   vfat   : uid= gid= fmask= dmask= utf8= iocharset=（iocharset 别给 utf8，见下）
 #   msdos  : 同上但没有长文件名，utf8= 无意义
 #   exfat  : uid= gid= fmask= dmask= iocharset=（默认已是 utf8，不用给）
-#   ntfs3  : uid= gid= umask= iocharset=
-#   ntfs   : 同上（走 mount.ntfs → ntfs-3g，FUSE）
+#   ntfs3  : uid= gid= umask= iocharset=（内核内建驱动，2026-09-06 实测可读写、中文名正常）
+#   ntfs   : udev/blkid 报的就是这个名字，**不是 ntfs3**；由 odin-automount.sh
+#            归一成 ntfs3 再挂。我们镜像不装 ntfs-3g，若不归一就会
+#            `unknown filesystem type 'ntfs'` 挂不上（实测，见 reports/041）
 #   ext4/btrfs/xfs/f2fs : 只有 POSIX 权限，给 uid= 会被拒绝 → 仅 noatime
 #
 # 历史教训（参见 WORKLOG 12:26）：systemd 252 的 systemd-mount **不读**

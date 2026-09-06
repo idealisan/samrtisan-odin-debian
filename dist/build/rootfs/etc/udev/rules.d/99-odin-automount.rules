@@ -9,14 +9,28 @@
 #      --collect 在设备消失后回收 .mount 单元，等价于自动卸载，
 #      因此不需要额外的 remove 规则。
 #
-# 匹配范围：USB 总线上带文件系统的块设备。
+# 匹配范围：挂在 USB 总线上的、带文件系统的块设备。
 #   **不要求 ID_PART_ENTRY_NUMBER**：实测不少 U 盘是"整盘一个文件系统、无分区表"
 #   的形态，加上分区号限制会把它们全部排除。有分区表的盘同样适用（整盘自身
 #   ID_FS_USAGE 不是 filesystem，不会被挂；各分区各自挂载）。
-#   内部 eMMC / SD 的 ID_BUS 不是 usb，天然排除（也在脚本里二次确认）。
+#
+# ⚠️ **不能只认 ID_BUS=usb**（2026-09-06 实测踩到）：
+#   UAS（USB Attached SCSI）设备 —— 现在的 USB 硬盘盒基本都走这个协议 ——
+#   在 SCSI 层把总线报成 **ID_BUS=ata**，USB 那套属性全在 ID_USB_* 上
+#   （实测 KIOXIA SATA 硬盘盒：ID_BUS=ata、ID_USB_DRIVER=uas）。
+#   只写 ID_BUS=="usb" 会把 UAS 盘**整类漏掉**，插上去毫无反应。
+#   所以下面第二条专门认 `ID_BUS==ata 且 ID_USB_DRIVER 非空`。
+#   内部 eMMC / SD 既不是 usb 也没有 ID_USB_DRIVER，两条都不匹配，天然排除。
 #
 # 真正的挂载动作在 odin-automount.sh 里，udev 只负责触发。
 
+# 普通 USB 存储（U 盘、读卡器…）
 SUBSYSTEM=="block", ACTION=="add", ENV{ID_BUS}=="usb", \
+  ENV{ID_FS_USAGE}=="filesystem", ENV{ID_FS_TYPE}!="", \
+  RUN+="/usr/local/sbin/odin-automount.sh $devnode %k"
+
+# UAS 硬盘盒（ID_BUS 被报成 ata，靠 ID_USB_DRIVER 认出它是 USB 设备）
+SUBSYSTEM=="block", ACTION=="add", ENV{ID_BUS}=="ata", \
+  ENV{ID_USB_DRIVER}!="", \
   ENV{ID_FS_USAGE}=="filesystem", ENV{ID_FS_TYPE}!="", \
   RUN+="/usr/local/sbin/odin-automount.sh $devnode %k"
