@@ -59,6 +59,16 @@ say "变体: $VARIANT（staging: $ROOT）"
 # 缓存键由 workflow 计算（suite + arch + debootstrap 版本 + --include 列表，
 # 见 .github/workflows/release-build.yml）。这里只按 $ODIN_BASE_TAR 指到的路径
 # 解包 / 打包；不设这个变量就退化成原来的行为（总是 debootstrap）。
+# 包清单的**唯一来源**。
+#   CI 的缓存键直接按本文件的 hash 变化（见 workflow），所以改这里必定让缓存失效。
+#   ⚠️ 绝不要在 .github/workflows 里再抄一份来算键 —— 两份清单一定会漂移，
+#      漂移的结果是"改了包但缓存命中、改动静默不生效"（2026-09-06 实测踩到）。
+DEB_INCLUDE=busybox-static,udev,ssh,sudo,systemd,iproute2,dnsmasq,parted,e2fsprogs,dosfstools,exfatprogs
+#  dosfstools / exfatprogs 是 2026-09-06 加的：OTG 外接盘在本机会因电池欠压突然
+#  掉电（reports/040），掉完很可能要 fsck —— 原本只有 e2fsprogs（ext 系），
+#  vfat / exFAT 的一个都没有。**不装 ntfs-3g**：内核 NTFS3 是内建的
+#  （CONFIG_NTFS3_FS=y），比 FUSE 的 ntfs-3g 更好，装了反而让自动探测优先走
+#  fuseblk（实测，见 reports/042）。
 BASE_TAR=${ODIN_BASE_TAR:-}
 if [ ! -d "$ROOT/etc" ]; then
   if [ -n "$BASE_TAR" ] && [ -s "$BASE_TAR" ]; then
@@ -76,13 +86,12 @@ if [ ! -d "$ROOT/etc" ]; then
     # tee 双写：既实时进 CI 日志，也留一份文件。
     # 必须写成 `if ! ... | tee` 而不是靠 set -e：后者会在管道失败的瞬间直接退出，
     # 下面那句"debootstrap 失败"永远打印不出来。
+    # 注意：注释只能写在这里，**不能**写进下面命令的续行中间 ——
+    # bash 的 `\` 续行一旦被 `#` 打断，后面的 `--include=` 与
+    # `"$SUITE" "$ROOT" "$MIRROR"` 会变成独立命令，参数静默丢失
+    #（实测：`--include=...: command not found`，而 debootstrap 拿到残缺参数）。
     if ! debootstrap --arch arm64 --variant=minbase \
-      # dosfstools / exfatprogs：2026-09-06 加。OTG 外接盘在本机上会因为电池
-      # 欠压突然掉电（见 reports/040），掉完那个盘很可能需要 fsck 才救得回来 ——
-      # 而镜像里原本只有 e2fsprogs（ext 系），vfat / exFAT 盘的 fsck 一个都没有。
-      # **不装 ntfs-3g**：内核 NTFS3 是内建的（CONFIG_NTFS3_FS=y），比 FUSE 的
-      # ntfs-3g 更好，装了反而会让自动探测优先走 fuseblk（实测，见 reports/041）。
-      --include=busybox-static,udev,ssh,sudo,systemd,iproute2,dnsmasq,parted,e2fsprogs,dosfstools,exfatprogs \
+      --include=$DEB_INCLUDE \
       "$SUITE" "$ROOT" "$MIRROR" \
       2>&1 | tee /tmp/odin-debootstrap.log; then
       echo "debootstrap 失败，日志见上面（同一份也留在 /tmp/odin-debootstrap.log）" >&2

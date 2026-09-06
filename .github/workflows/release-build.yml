@@ -484,11 +484,21 @@ jobs:
           sudo update-binfmts --enable qemu-aarch64
           # 基础根缓存键：debootstrap 的产物只由下面这几样决定，与变体无关，
           # 所以 core 与 gui 两条 job 用的是**同一份**缓存。
-          #   suite / arch / --include 列表 / debootstrap 版本
+          #   suite / arch / debootstrap 版本 / build-rootfs.sh 的内容
           # （镜像站不进键：不同镜像拉到的包内容应当一致，且 CI 固定用官方源）
-          inc="busybox-static,udev,ssh,sudo,systemd,iproute2,dnsmasq,parted,e2fsprogs"
+          #
+          # ⚠️ 2026-09-06 修：这里**曾经**自己抄了一份 `--include` 清单来算键：
+          #       inc="busybox-static,udev,ssh,sudo,systemd,iproute2,dnsmasq,parted,e2fsprogs"
+          #     后果是给 tools/ci/build-rootfs.sh 加包后，键不变 ⇒ 缓存命中 ⇒
+          #     debootstrap 被跳过 ⇒ **新包静默没进镜像**（实测撞到：加了
+          #     dosfstools/exfatprogs，编出来的镜像里一个都没有）。
+          #
+          #     两份真相一定会漂移。现在改成按 build-rootfs.sh 的 hash 变化：
+          #     改任何一个包、或改任何一步构建逻辑，缓存都会失效。代价是最多
+          #     偶尔多跑一次 debootstrap（约 5 分钟），比静默编出错误内容便宜得多。
           debver=$(debootstrap --version | awk '{print $NF}' | tr -d ' ')
-          echo "basekey=odin-baseroot-v3-bookworm-arm64-${debver}-$(printf '%s' "$inc" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+          brs=$(sha256sum tools/ci/build-rootfs.sh | cut -c1-16)
+          echo "basekey=odin-baseroot-v4-bookworm-arm64-${debver}-${brs}" >> "$GITHUB_OUTPUT"
       # debootstrap 是 rootfs job 的最大单项开销（core 变体实测 283 秒、占 83%），
       # 而它的产物与变体无关 —— 缓存起来每个变体省 4~5 分钟。
       # 打包/解包由 tools/ci/build-rootfs.sh 按 ODIN_BASE_TAR 指到的路径完成，
