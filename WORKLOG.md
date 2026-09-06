@@ -4077,3 +4077,18 @@ rmdir /sys/kernel/config/device-tree/overlays/mpss   # 撤销
 2. **先 `fastboot getvar all` 存一份**，确认有没有 `partition-type:lk2nd`
 3. `bash flash/flash-all.sh --from 30`（dist/ 里是今天刷成功两次的 CI 镜像）
 4. 起来后：传 `odin-accept-all.sh / ffvib / qrtr-look / mpss.dtbo` → 跑一遍 → 拿证据
+
+### 又一个坑：手工改 patch 只做 `git apply --check` 是不够的（会静默截断）
+14:14 sensors4 的 dtb 任务失败。本地 `make dtb` 复现：
+```
+/dts/msm8953-smartisan-odin.dts:978:9: error: unterminated comment
+```
+真因：我上一轮把 `&mpss` 改成 `status = "disabled"` 并加了一大段注释，
+**却没重算 hunk 行数** —— 声明还是 979，实际 995。`git apply --check` 照样通过，
+但正经应用时 git 按声明的行数截断，把 `&mpss {` 之后的内容全丢掉 ⇒ 注释没闭合 ⇒ 编译失败。
+
+**规矩：改完 patches/*.patch 之后必须做两件事，缺一不可**
+1. 重算 hunk 头的行数（`@@ -0,0 +1,N @@`）
+2. 本地跑一次 `make dtb`（容器里），确认真的编得出来
+
+只做 `--check` 会漏掉"截断"这种错误 —— `--check` 只验证上下文对得上，不管行数对不对。
