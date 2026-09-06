@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,835 @@
+@@ -0,0 +1,934 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -63,6 +63,8 @@ index 000000000..3dc8f434d
 +#include "msm8953.dtsi"
 +#include "pm8953.dtsi"
 +#include "pmi8950.dtsi"
++/* 震动马达的 HAP_TYPE_* / HAP_WAVE_* / HAP_PLAY_* 宏 */
++#include <dt-bindings/input/qcom,spmi-haptics.h>
 +
 +/ {
 +	model = "Smartisan U2 Pro (ODIN)";
@@ -884,5 +886,102 @@ index 000000000..3dc8f434d
 +		regulator-name = "smbcharger-otg-vbus";
 +	};
 +};
++
++/*
++ * 震动马达 —— LRA 线性马达
++ *
++ * 参数全部照原厂 u3-p1-msm8953-haptics.dtsi:13-37：
++ *   actuator-type="lra"        → HAP_TYPE_LRA
++ *   wave-shape="sine"          → HAP_WAVE_SINE
++ *   play-mode="buffer"         → HAP_PLAY_BUFFER
++ *   vmax-mv=<2545>             → qcom,vmax-millivolt
++ *   wave-play-rate-us=<4255>   （235 Hz，原厂原值，就在这个 dtsi 里，
++ *                                不是 mtp 那份覆盖率，mtp 不在 qrd 链上）
++ *   ilim-ma=<80>：主线 qcom-spmi-haptics 驱动不读这个属性，略。
++ *
++ * ⚠️ 主线其它 msm8953 板（potter / mido / vince / markw …）用的都是 **ERM**：
++ *      HAP_TYPE_ERM + HAP_WAVE_SQUARE + 5263us + 2600mV，
++ *    我们这台是 **LRA**，**不要照抄那些板的参数**，否则马达不振动或振感不对。
++ *    pmi8950.dtsi:207 的 pmi8950_haptics 节点（reg/interrupt/play-mode）已就位，
++ *    这里只需补参数并 enable。
++ */
++&pmi8950_haptics {
++	qcom,actuator-type = <HAP_TYPE_LRA>;
++	qcom,play-mode = <HAP_PLAY_BUFFER>;
++	qcom,wave-shape = <HAP_WAVE_SINE>;
++	qcom,wave-play-rate-us = <4255>;
++	qcom,vmax-millivolt = <2545>;
++
++	status = "okay";
++};
++
++/*
++ * 传感器总线 —— GPIO 软件模拟 i2c
++ *
++ * 为什么不是 BLSP QUP（这段是踩过坑才明白的，别删）：
++ *   本机把 8 条 BLSP i2c 都开过、逐个扫过，只扫到触摸屏(0x38) 与 FUSB301(0x25)，
++ *   **一个传感器都没有**。但 pmOS 时代的记录
++ *   （evidence/device-probe/08-peripherals-firmware.txt）显示它们一直在跑：
++ *       bmi120@0x68（加速度+陀螺，驱动 bmi160_i2c）
++ *       yas537@0x2e（地磁）      ltr559@0x23（光感+距离）   aw2013@0x45（LED）
++ *   且 dmesg 里明确有一条
++ *       i2c-gpio i2c-gpio: using lines 526 (SDA) and 527 (SCL)
++ *   ⇒ 传感器**根本不在 BLSP QUP 上**，而是挂在 GPIO 模拟的 i2c 上。
++ *
++ *   主线 mido 板的注释写得很直白（msm8953-xiaomi-mido.dts:55-56）：
++ *       "normally proxied via ADSP firmware. GPIOs aren't protected."
++ *   平时由 ADSP/SLPI 固件代理，主线改用 i2c-gpio 让 AP 直接访问。
++ *
++ * GPIO 编号：526 / 527 减去内核给 gpiochip 的动态基址 512 = **14 / 15**，
++ *   与 mido 的 sda-gpios=<&tlmm 14> / scl-gpios=<&tlmm 15> 一致。
++ *   ⚠️ 这是**推断**，待实测确认：扫到 0x68 上的 bmi120 即证明 GPIO 猜对了。
++ *
++ * 供电照 mido：vdd = pm8953_l10(2.8V)、vddio = pm8953_l6(1.8V)，
++ *   这两个 regulator 已在本文件上方定义。
++ */
++/ {
++	i2c-sensors {
++		compatible = "i2c-gpio";
++		sda-gpios = <&tlmm 14 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
++		scl-gpios = <&tlmm 15 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
++		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
++
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		/*
++		 * 先只挂 IMU：扫到 bmi120 就证明 GPIO 猜对了，
++		 * 再补地磁 yas537@2e 与光感 ltr559@23。
++		 */
++		imu@68 {
++			compatible = "bosch,bmi160";
++			reg = <0x68>;
++
++			vdd-supply = <&pm8953_l10>;
++			vddio-supply = <&pm8953_l6>;
++
++			/*
++			 * mount-matrix 是**占位值**（照抄 mido）。芯片在板上的真实
++			 * 朝向未知，要等真机读出原始值、把手机转几个方向看符号才能定。
++			 */
++			mount-matrix = "0", "1", "0",
++				       "1", "0", "0",
++				       "0", "0", "1";
++		};
++	};
++};
++
++/*
++ * 【临时】开全 BLSP i2c 总线 —— 只为扫出 aw2013 LED 控制器在哪条上。
++ *   pmOS 记录里 aw2013 在 0x45，而我们已开的两条（78b7000 触摸、
++ *   7af6000 FUSB301）都扫不到它 ⇒ 必在剩下某条上。
++ *   扫到之后就删掉这一段、只保留那一条总线。
++ */
++&i2c_1 { status = "okay"; };
++&i2c_2 { status = "okay"; };
++&i2c_4 { status = "okay"; };
++&i2c_5 { status = "okay"; };
++&i2c_7 { status = "okay"; };
++&i2c_8 { status = "okay"; };
 -- 
 2.48.1

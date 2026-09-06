@@ -2428,6 +2428,12 @@ CONFIG_INPUT_UINPUT=m
 # CONFIG_INPUT_PWM_VIBRA is not set
 # CONFIG_INPUT_GPIO_ROTARY_ENCODER is not set
 # CONFIG_INPUT_DA7280_HAPTICS is not set
+# 2026-09-06 开：本机震动马达是 PMI8950 内置的 haptics（SPMI 0xc000），
+# 主线驱动 drivers/input/misc/qcom-spmi-haptics.c（compatible "qcom,spmi-haptics"），
+# 节点 pmi8950.dtsi:207 的 pmi8950_haptics 已就位、DTS 里已 enable。
+# 之前这个符号根本不存在 ⇒ 驱动不编译 ⇒ 马达没有任何驱动可绑定。
+# 用 =y 而不是 =m：震动是基础功能，编进内核免得像 exfat 那样还要等自动加载。
+CONFIG_INPUT_QCOM_SPMI_HAPTICS=y
 # CONFIG_INPUT_ADXL34X is not set
 # CONFIG_INPUT_IBM_PANEL is not set
 # CONFIG_INPUT_IMS_PCU is not set
