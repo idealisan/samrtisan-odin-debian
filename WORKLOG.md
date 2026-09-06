@@ -4317,3 +4317,88 @@ remoteproc1 name=4080000.remoteproc state=running
   所以 rmtfs 得自己提供：要么把上游源码（github.com/andersson/rmtfs）编进镜像，
   要么预置二进制 + systemd 服务 + 那四个 EFS 文件。目前是**手工跑的，重启就没了**，
   下一步要固化进镜像才算真解。
+
+## 2026-09-06 夜间总结：三件事两件成了，GPS 差最后一步
+
+### 今晚的最终状态
+
+| 项目 | 结论 | 证据 |
+|---|---|---|
+| **震动马达** | ✅ **通过** | 真机出现 `event0 name=spmi_haptics`（支持力反馈）；`tmp/ffvib` 走 FF_RUMBLE 触发成功，**用户当场确认"确实震动成功"**。麦克风录音没录成（`arecord` 报 `audio open error: Invalid argument`，capture 通路没配好），所以 RMS 数值证据缺失，结论靠耳朵确认 |
+| **传感器** | ✅ **8/8 通过** | 光感 38~39、距离 672~676、加速度三轴与陀螺三轴全部"非 0 且有波动"，重力自检 z×scale ≈ 9.63 m/s² |
+| **GPS** | ❌ **还没通，但 modem 本身通了** | modem 稳定运行 + QRTR 上有一整套 QMI 服务，唯独缺 16 (LOC = GPS) |
+
+### 传感器的判据说明（别再纠结"lux 不动"）
+室内恒定灯光下 `lux` 稳定在 40 不跳 —— 这是**环境光真的稳定**，不是传感器死了。同一时刻加速度 z 一直在 -16082~-16202 之间跳，证明传感器在正常工作。之前也测到过 lux 变化（24→31、38→39），只要环境光一变它就跟着变。
+
+### GPS 这一路的完整链条（今晚的进展）
+1. `&mpss` 能起来，但每约 50 秒崩一次：`Watchdog detects stalled initialization` → crash → recover 循环
+2. **根因 1（已解）**：`mss-supply` 接错了轨。
+   之前死磕 s2（RPM 管理的轨，不能 set_voltage：`s2: voltage operation not allowed`）。
+   **正解 = 照抄同芯片的 Asus Zenfone 3（Snapdragon 625 = MSM8953）**：
+   ```dts
+   pm8953_s1: s1 { regulator-min-microvolt = <870000>; regulator-max-microvolt = <1156000>; };
+   &mpss { mss-supply = <&pm8953_s1>; pll-supply = <&pm8953_l7>; status = "okay"; };
+   ```
+   我们 DTS 里 `pm8953_s1` 本来就定义了（192 行，之前 grep 漏了）。
+   改完 modem 能"is now up"，但仍 crash 循环。
+3. **根因 2（已解）**：**镜像里没有 rmtfs 用户态守护进程**（只有内核模块 rmtfs_mem + /dev/qcom_rmtfs_mem1）。
+   modem 起来后要靠 rmtfs 读写 EFS，没有它就 stalled —— 正好对上 watchdog 的报错。
+   正确起法（两个条件缺一不可）：
+   - 必须以 **root** 跑：`rmtfs -r -P -s -o /var/lib/rmtfs`
+   - **EFS 文件要先建好**（modem 按路径要）：
+     `/boot/modem_fs1→modemst1`、`/boot/modem_fs2→modemst2`、`/boot/modem_fsc→fsc`、`/boot/modem_fsg→fsg`
+   效果：崩溃计数 35 → 60 秒后仍是 35（**0 次新崩溃**），三个 remoteproc 全 running。
+4. **固化（已落库 + 已在真机验证）**：新建
+   `dist/build/rootfs/etc/systemd/system/odin-rmtfs.service`，
+   通过 `tmp/gps/install_rmtfs.sh` 装到真机并 `enable --now`：
+   - 起不来一次（`start-limit-hit`，`bind(14): Address already in use`）—— 是**之前手工跑的
+     rmtfs（PID 4057）占着 QRTR socket**。杀掉 + `systemctl reset-failed` 后
+     服务 **active**，journal 只有 `Started odin-rmtfs.service`，
+     `remoteproc0 a204000 / remoteproc1 4080000 / remoteproc2 adsp` 全 running。
+   - ⚠️ 手工装的只活在这一次开机；重刷镜像会丢（二进制不在仓库），见 P0。
+
+### 顺手修好的工具
+- `tmp/gps/qrtr-look` 段错误：原因是 `qrtr_decode()` 内部解引用第 4 个参数 `sq->sq_port`，我传了 NULL。改用 `qrtr_recvfrom()` 取 node/port 组成 sockaddr_qrtr 再传；加了"只有 poll>0 才 recv"，不再刷屏 EAGAIN。
+
+### 下一步 TODO（按优先级）
+
+**P0 — 把 rmtfs 固化进镜像**（现在 rmtfs 是手工跑的，**重启就没了，modem 会回到崩溃循环）。
+- 源码：`github.com/andersson/rmtfs`（pmOS 用 `695d0668`）。我已经交叉编好 aarch64 版本：`tmp/gps/src/rmtfs/rmtfs`。
+- 要落的：二进制 + systemd 服务（我们不是 OpenRC）：
+  ```ini
+  ExecStartPre=/bin/mkdir -p /var/lib/rmtfs（并建 4 个 EFS 文件）。
+  ExecStart=/usr/sbin/rmtfs -P -s
+  ```
+- ⚠️ 二进制不入库（AGENTS 铁律 5：二进制不进版本库），要么在 CI 里加一步编它，要么预置。
+- ✅ **服务文件已经进仓库了**（上面第 4 条），真机上已 active；**缺的只是二进制**。
+
+**P1 — 继续查 GPS**
+- QRTR 上的服务：`0 CTL 1 WDS 2 DMS 3 NAS 4 5 WMS 7 8 11 12 14(RMTFS) 15 17 22 23 24 26 29 34 36 42 46 47 48 54 68 71 769 —— **没有 16 (LOC)，也没有 6 (PDS 老 GPS)。
+- 试过 ModemManager：镜像里被 mask（`ModemManager.service -> /dev/null`）；unmask 后能起，但 `mmcli -L` 说 `No modems were found`，得配 udev 规则 / MM 的 QRTR 后端。
+- 待确认：是不是这版 modem 固件不含 GNSS，还是 LOC 要额外触发。
+
+**P2 — 传感器扫尾**
+- `mount-matrix` 还是**占位值**（照抄 daisy）：需要把手机平放/立起/侧翻读加速度原始值来定符号。要用户动手。
+- 地磁：三条总线上 `0x0c/0x0d/0x0e/0x1e/0x2e 全无应答 —— 暂缺。
+- 指示灯（aw2013）：还没定位到在哪个 BLSP 总线上（⚠️ 有 TZ 复位风险，一次只试一条）。
+- 环境光 tcs3400 / nxu8010：硬件大概率没焊，放弃。
+- 霍尔：原厂没有。
+
+**提示**：如果暂时不搞 GPS，建议把 `&mpss` 改回 `status = "disabled"` —— 免得重启后没 rmtfs 又进崩溃循环，白耗电。
+
+### 参考：pmOS 的用户态 modem 栈（已查本地 pmaports：`modem/` 目录）
+- `qrtr`（linux-msm/qrtr v1.1，提供 libqrtr
+- `rmtfs`（andersson/rmtfs）：装到 `/usr/sbin/rmtfs`；initd 逻辑：
+  - `rmtfs_files_path` 没设 → 加 `-P`（用**真实的 EFS 分区** modemst1/modemst2）
+  - `rmtfs_avoid_writing="true"`（默认）→ 加 `-r`（只读不回写）
+  - 没有下游 preload 库 → 加 `-s`（rmtfs 顺带管 modem rproc 启停）
+- `pd-mapper`（andersson/pd-mapper）：老平台用不上 —— 我们 modem 已经起来了，说明不需要 ✅
+
+**参数含义（读源码确认）**：
+- `-o` 存 EFS 镜像的目录；与 `-P` 一起用时表示"从这个目录里按名字找原始分区
+- `-P` 使用原始 EFS 分区（modemst1/modemst2）
+- `-r` read_only，不回写存储
+- `-s` 同步 mss rproc（modem 启停交给 rmtfs 管
+- `-S` A/B 分区的 slot 后缀
+- `-v` verbose

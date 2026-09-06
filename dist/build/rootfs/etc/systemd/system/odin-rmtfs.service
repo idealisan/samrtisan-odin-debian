@@ -1,0 +1,31 @@
+[Unit]
+Description=Qualcomm Remote Filesystem Service (rmtfs)
+#
+# 为什么必须有它：
+#   modem（4080000.remoteproc）起来之后要靠 rmtfs 读写 EFS（modemst1/modemst2）。
+#   没有 rmtfs，modem 初始化会卡住并每约 50 秒崩一次：
+#       fatal error received: dog.c:1526:Watchdog detects stalled initialization。
+#
+# ⚠️ 这个服务依赖 /usr/sbin/rmtfs 这个**二进制**，它不在本仓库（铁律 5：二进制不入库。上游源码：github.com/andersson/rmtfs，pmOS 用的是 695d0668。
+#    目前是手工装到真机上的；重新刷镜像会丢。要长期生效得在 CI 里加一步编它，或者在镜像预置。
+#
+# 参考 pmOS 的 rmtfs（modem/rmtfs/rmtfs.initd）：
+#   -P  用原始 EFS 分区（modemst1/modemst2）
+#   -o  EFS 镜像目录；与 -P 同用时表示"从这个目录里按名字找原始分区。
+#   -s  同步 mss rproc（modem 的启停交给 rmtfs 管
+#   -r  read_only，不回写（pmOS 默认开启；我们这里先不加，让 modem 能写 EFS。
+
+After=systemd-udev-settle.service
+Before=ModemManager.service NetworkManager.service
+
+[Service]
+Type=simple
+ExecStartPre=/bin/mkdir -p /var/lib/rmtfs
+# EFS 文件要预先存在，否则 modem 一请求就 stalled
+ExecStartPre=/bin/sh -c 'for f in modem_fs1 modem_fs2 modem_fsc modem_fsg modemst1 modemst2 fsc fsg; do [ -f /var/lib/rmtfs/$f ] || : > /var/lib/rmtfs/$f; done'
+ExecStart=/usr/sbin/rmtfs -P -s -o /var/lib/rmtfs
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target
