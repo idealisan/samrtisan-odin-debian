@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,968 @@
+@@ -0,0 +1,979 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -91,7 +91,7 @@ index 000000000..3dc8f434d
 +			reg = <0x0 0x84a00000 0x0 0x1e00000>;
 +			no-map;
 +		};
-+
++		/*
 +		/*
 +		 * ramoops —— 崩溃转储的落点，空间必须够。
 +		 *
@@ -1016,6 +1016,33 @@ index 000000000..3dc8f434d
 +		 * 见上面 i2c_4 的警告，一次只能试一条），要么从厂商内核找线索。
 +		 */
 +	};
++};
++/*
++ * modem（mpss）—— **GPS 就挂在它上面**（主线给的 gps_mem 是给 memshare 用的，
++ * 真正的定位是 modem 通过 QMI 的 LOC 服务提供，走 QRTR/SMD）。
++ *
++ * 内核侧都已就绪：CONFIG_QCOM_Q6V5_MSS=m、QCOM_RMTFS_MEM=m、QRTR=m、QRTR_SMD=m。
++ * 固件 mba.mbn + modem.mdt + modem.bXX 就在原厂 modem 分区的 /image/ 里，
++ * 与 wcnss.* / venus.* / adsp.* 同级 —— 由 odin-modem-fw.sh 现取。
++ */
++&mpss {
++	/*
++	 * ⚠️⚠️ 2026-09-06 实测：写 "okay" 会让真机**反复重启**，SSH 完全拿不到，
++	 * 只能靠人工进原厂 fastboot 重刷。**在搞清楚之前保持 disabled**。
++	 *
++	 * 怀疑方向：qcom_q6v5_mss.c 会调 qcom_scm_pas_mem_setup() /
++	 * qcom_scm_assign_mem() 等 TrustZone(SCM) 调用；本机有 TZ 保护的前科 ——
++	 * 2026-08-30 单独使能 &i2c_4（BLSP 被 TZ 保护）同样是无限重启。
++	 *
++	 * 正确的验证方式是**运行时设备树覆盖**（内核 CONFIG_OF_OVERLAY=y、
++	 * CONFIGFS_FS=y 都已开），覆盖层只在内存里、重启即失效，
++	 * 最坏情况不会把机器锁住：
++	 *   mkdir -p /sys/kernel/config/device-tree/overlays/mpss
++	 *   cat mpss.dtbo > /sys/kernel/config/device-tree/overlays/mpss/dtbo
++	 * 覆盖层源码：tmp/gps/mpss-overlay.dts（已编好 tmp/gps/mpss.dtbo）。
++	 * 确认不会触发复位之后，再把这里改回 "okay"。
++	 */
++	status = "disabled";
 +};
 -- 
 2.48.1

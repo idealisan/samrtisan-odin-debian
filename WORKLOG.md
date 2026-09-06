@@ -3969,3 +3969,66 @@ ls .../kernel/fs/nls/ → 只有 nls_ucs2_utils.ko
 - bmi160 的 `mount-matrix` 还是占位值（照抄 daisy），要等真机把机器转几个方向
   看符号才能定 —— 需要用户动手
 - 地磁没找到（三条总线上所有常见罗盘地址都无应答），指示灯 aw2013 还没定位到总线
+
+## ⚠️ 2026-09-06 事故：把 &mpss(modem) 随整包刷进去，真机反复重启（未恢复）
+
+### 时间线
+- 13:24~13:29 本地 Docker 编出一套完整镜像（内核 16s / rootfs 1min，都是缓存命中）
+- **13:30 把 `&mpss { status = "okay"; }`（modem）编进 DTB，随整包刷入**
+- 13:33 设备反复重启（lk2nd），SSH 完全拿不到 → 用户人工恢复到"原厂 fastboot"
+- 13:33~13:38 我接着刷（--from 30）→ 等 USB 网卡 240s 超时，还是没起来
+- 13:40~13:45 换**今天刷成功过两次、验收 16/16 的 CI 镜像**（tmp/ci-core-usb）再刷
+  → 同样卡在"等 USB 网卡 240s 超时"
+- 13:46 起 `fastboot getvar` 挂住、`fastboot devices` 为空、SSH 不通
+  ⇒ 设备处于重启循环 / 离线，**我现在完全联系不上它**
+- 用户已出门，无法现场恢复。**停手，等用户回来。**
+
+### 教训（这条最重要）
+**任何"新使能某块硬件"的 DTS 改动，绝不能随整包镜像一次刷入。**
+本机有 TrustZone 保护的前科：2026-08-30 单独使能 `&i2c_4`（BLSP 被 TZ 保护）
+就会无限重启。modem(mss) 是同类风险区 —— `drivers/remoteproc/qcom_q6v5_mss.c`
+会调 `qcom_scm_pas_mem_setup()` / `qcom_scm_assign_mem()` 等 SCM(TZ) 调用。
+一旦踩雷，DTB 是启动时就要用的，机器直接陷在重启循环里，只能人工进原厂 fastboot 重刷。
+
+**正确做法：先用"运行时设备树覆盖"在内存里试**（内核 `CONFIG_OF_OVERLAY=y`、
+`CONFIG_CONFIGFS_FS=y` 都已开）：
+```
+mkdir -p /sys/kernel/config/device-tree/overlays/mpss
+cat mpss.dtbo > /sys/kernel/config/device-tree/overlays/mpss/dtbo
+dmesg | tail          # 看 mss 有没有 probe、有没有 SCM 报错
+rmdir /sys/kernel/config/device-tree/overlays/mpss   # 撤销
+```
+覆盖层只在内存里、**重启即失效**，最坏情况就是"这一次开机挂了"，不会把机器锁住。
+源码与产物都已备好：`tmp/gps/mpss-overlay.dts` / `tmp/gps/mpss.dtbo`
+（用 target-path 而不是 &mpss 引用 —— 我们的 DTB 编译时没带 -@，没有 __symbols__）。
+
+### 处置
+- `patches/0007` 里 `&mpss` 已改回 `status = "disabled"`，并在原地写清原因与验证方法
+  （不改回 disabled 的话，下一个人编出来又是一颗雷）
+- GPS 的路径没变（**定位挂在 modem 上**：主线给的 gps_mem 只是 memshare 用，
+  真正的定位是 modem 的 QMI LOC 服务，走 QRTR/SMD），但**必须先过"覆盖层验证"这一关**
+- 顺带准备好的东西（都没经过真机验证，别直接刷）：
+  · `dist/build/rootfs/usr/local/sbin/odin-modem-fw.sh` —— 从原厂 modem 分区
+    取 mba.mbn + modem.mdt/bXX，再把 modem remoteproc 拉起来
+  · `dist/build/rootfs/etc/systemd/system/odin-modem-fw.service` + 已在
+    `apply-staging-fixes.sh` 里 enable
+  · `tmp/gps/src/rmtfs`（交叉编译好的 rmtfs 守护进程）、`tmp/gps/qrtr-look.c`
+    （查 QRTR 上有没有 LOC(16) 服务的探针）
+
+### 恢复预案（等用户回来，需人工）
+1. 长按电源关机 → **音量减 + 电源** 进原厂 fastboot
+2. 确认 `fastboot devices` 能看到设备
+3. `dist/` 里现在放的就是 tmp/ci-core-usb 那套（今天 12:18 / 12:44 两次 16/16 通过，
+   ft8716.dtb 的 md5 = 076f0dcb747909b5830b625a09b0e332），直接：
+   `bash flash/flash-all.sh --from 30`
+4. 若还是起不来，按 flash-all.sh 第 30 阶段的注释用
+   `evidence/live-device-backup/boot-partition.img` 把 lk2nd 恢复回来
+
+### 另外两条流程上的坑（今天各踩一次）
+- `make dtb` 有产物缓存：`ODIN_DTB_CACHE_HIT` 为真时直接跳过编译，
+  我改了 DTS 却拿到旧 DTB，一度以为改动没生效
+- `tools/ci/apply-patches.sh` 判定"已打过"很严格：我删掉编译树里的 DTS 想让它重新打，
+  它反而报"要创建的文件不存在，也不像打过"直接失败。**不要手动删编译树里的文件**，
+  本地编 DTB 用 `tmp/build_dtbs_variant.sh <KDIR> <输出目录>` 更省事
+- `make publish-*` 只在自己的时间戳过期时才重新汇总，`out/publish/` 里可能还是旧 DTB；
+  刷之前一定 `md5 -q dist/*.dtb` 与 `out/dtb/*.dtb` 对一下

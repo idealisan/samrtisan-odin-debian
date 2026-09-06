@@ -1,0 +1,25 @@
+[Unit]
+Description=Provision modem (mpss) firmware and start the remoteproc
+Documentation=file:/usr/local/sbin/odin-modem-fw.sh
+
+# GPS 挂在 modem 上：主线给 msm8953 留的 gps_mem 只是 memshare 用，
+# 真正的定位是 modem 通过 QMI 的 LOC 服务提供（走 QRTR/SMD）。
+# 所以 modem 起不来 = 没有 GPS（也没有蜂窝数据/短信）。
+#
+# 时序：qcom,msm8953-mss-pil 是 remoteproc，可以在用户态重新启动，
+# 不需要回到内核 probe 阶段 —— 跟 odin-adsp-fw.service 同一套路。
+# 排在 local-fs 之后即可。
+#
+# 依赖：DTB 里必须 &mpss { status = "okay"; }（patches/0007 已开），
+# 并需要 rmtfs 保留内存节点（rmtfs_mem）。
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# mss 的 probe 出现得晚（要等 smp2p/rpmpd/时钟），脚本内部还会等 60s + 启动 30s
+TimeoutStartSec=180
+ExecStart=/usr/local/sbin/odin-modem-fw.sh
+
+[Install]
+WantedBy=multi-user.target
