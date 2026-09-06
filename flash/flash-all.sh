@@ -259,7 +259,10 @@ if run 80 && [ "$DRY" = 0 ]; then
   mod_loaded() { r "grep -q '^$1 ' /proc/modules && echo 1 || echo 0"; }
 
   chk "hostname"        "odin"         "$(r 'cat /etc/hostname')"
-  has "内核版本"         "6.19"         "$(r 'uname -r')"
+  # 期望值跟着 Makefile 的 KERNEL_SHA 走（现在钉在 7.1.3/main）。
+  # 只匹配主次版本号，别把稳定的第三位（7.1.3 → 7.1.4）也钉死 ——
+  # 那种升级不改变基线，不需要改这里。升基线时才同步改这一行。
+  has "内核版本"         "7.1"          "$(r 'uname -r')"
 
   # --- 显示链路：必须"先证明驱动加载了"，再查有没有报错 ---
   # 反面教训：只查 dmesg 里错误串的条数，是"无错即通过"——驱动压根没加载时

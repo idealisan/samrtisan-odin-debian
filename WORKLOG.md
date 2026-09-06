@@ -3805,3 +3805,45 @@ device: usb0 10s 内未 up（exists=no），仍尝试启动 dnsmasq（看门狗�
   ASCII 仍不区分大小写、非 ASCII 不折叠，对中文名无影响
 - 顺手改正一个事实错误：exfat **支持** iocharset（`super.c:254`），
   只是默认值已经是 utf8，不需要给
+
+## 2026-09-06 v0.9.7-upstream-713b 真机验收：7.1.3 起来了，16/16 全通过
+
+- **08:38 完成** — 刷完跑验收 **16 项全过**，设备 `uname -r` = `7.1.3-postmarketos-qcom-msm8953`
+- 刷机全程 2 分 10 秒（自动进 fastboot 10s、刷 lk2nd 0.1s、刷 userdata 43s、
+  重启到 USB 网卡 15s、SSH 40s）
+- **唯一的"失败"是验收脚本自己的期望值过期**：`flash/flash-all.sh:262` 硬写了
+  期望 `6.19`。改成 `7.1`（只钉主次版本，第三位留给 7.1.4 这类稳定版升级）后重跑全过
+- 下载教训：`gh release download` **不带 -p 会把 gui 那 5.6 GB（6 个分片）也下下来**，
+  18 分钟没下完。刷机只下 core：`-p lk2nd-odin.img -p '*.dtb' -p odin-debian-sparse.img
+  -p SHA256SUMS`，**1 分 57 秒**
+- DTB 大小从 63431 → 63475 字节（+44，就是 PDM 改名那段注释）
+
+## 2026-09-06 FAT32 中文：真机实测结论（决定性证据）
+
+用只读方式挂设备上现成的 vfat 分区 `/dev/mmcblk0p52`（modem，不写盘）：
+
+```
+### A) iocharset=utf8（老写法）—— 挂载失败
+mount: /tmp/a: wrong fs type, bad option, bad superblock on /dev/mmcblk0p52, ...
+dmesg:
+  FAT-fs (mmcblk0p52): utf8 is not a recommended IO charset for FAT filesystems,
+                       filesystem will be case sensitive!
+  FAT-fs (mmcblk0p52): IO charset utf8 not found          ← 卡在这里
+
+### B) utf8=1（新写法）—— 挂载成功
+/dev/mmcblk0p52 on /tmp/b type vfat (ro,relatime,fmask=0022,dmask=0022,
+        codepage=437,iocharset=iso8859-1,shortname=mixed,utf8,errors=remount-ro)
+                                                    ^^^^ utf8 生效了
+
+### C) nls_utf8 确实不存在
+modprobe: FATAL: Module nls_utf8 not found in directory /lib/modules/7.1.3-...
+ls .../kernel/fs/nls/ → 只有 nls_ucs2_utils.ko
+```
+
+三条合起来坐实：`utf8=1` 生效、`iocharset` 仍是默认的 iso8859-1、
+全程不需要 `nls_utf8`。与提交时在源码里查到的路径完全一致。
+
+**遗留**：core 镜像里**没有 dosfstools**（`mkfs.vfat` 不存在），所以没能在本机造
+带中文名的盘做"写入→读回"的闭环。上面的只读对比已经足够证明挂载与名字转换路径
+是对的，等手上有 FAT32 U 盘时再补一次端到端确认。
+（顺带：设备没有外网，apt 装不了 dosfstools。）
