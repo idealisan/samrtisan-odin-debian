@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,995 @@
+@@ -0,0 +1,1001 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -253,6 +253,14 @@ index 000000000..3dc8f434d
 +		pm8953_s4: s4 {
 +			regulator-min-microvolt = <1900000>;
 +			regulator-max-microvolt = <2050000>;
++		};
++
++		/*
++		 * s2 —— modem(mss) 的主供电。原厂 DTB 里 modem 的 vdd_mss-supply 就是 pm8953_s2。
++		 * 只打标签、不写 min/max-microvolt：s2 是 RPM 管理的轨，Linux 侧
++		 * regulator_set_voltage 会被拒（s2: voltage operation not allowed）。
++		 */
++		pm8953_s2: s2 {
 +		};
 +
 +		pm8953_l1: l1 {
@@ -1026,23 +1034,21 @@ index 000000000..3dc8f434d
 + * 与 wcnss.* / venus.* / adsp.* 同级 —— 由 odin-modem-fw.sh 现取。
 + */
 +&mpss {
++	status = "okay";
++	pll-supply = <&pm8953_l7>;
 +	/*
-+	 * ⚠️⚠️ 2026-09-06 实测：写 "okay" 会让真机**反复重启**，SSH 完全拿不到，
-+	 * 只能靠人工进原厂 fastboot 重刷。**在搞清楚之前保持 disabled**。
++	 * mss 接 s2，配合内核补丁 0011（把 msm8953_mss 的 .uV 从 1050000 改成 0）。
++	 * s2 是 RPM 管理的轨，驱动那边不再 set_voltage，只 enable + set_load，
++	 * 电压交给 RPM。
 +	 *
-+	 * 怀疑方向：qcom_q6v5_mss.c 会调 qcom_scm_pas_mem_setup() /
-+	 * qcom_scm_assign_mem() 等 TrustZone(SCM) 调用；本机有 TZ 保护的前科 ——
-+	 * 2026-08-30 单独使能 &i2c_4（BLSP 被 TZ 保护）同样是无限重启。
-+	 *
-+	 * 正确的验证方式是**运行时设备树覆盖**（内核 CONFIG_OF_OVERLAY=y、
-+	 * CONFIGFS_FS=y 都已开），覆盖层只在内存里、重启即失效，
-+	 * 最坏情况不会把机器锁住：
-+	 *   mkdir -p /sys/kernel/config/device-tree/overlays/mpss
-+	 *   cat mpss.dtbo > /sys/kernel/config/device-tree/overlays/mpss/dtbo
-+	 * 覆盖层源码：tmp/gps/mpss-overlay.dts（已编好 tmp/gps/mpss.dtbo）。
-+	 * 确认不会触发复位之后，再把这里改回 "okay"。
++	 * 背景（别再走弯路）：
++	 *   · 上游 msm8953 的 mss 要求 1.05V 的 regulator，而本机 s2 是 RPM 轨不给设；
++	 *   · SDM632（Moto G7 river，GPS 可用）走的是另一条路 —— .proxy_pd_names 里
++	 *     加 "mss"，用 RPM 电源域 VDDMD 供电，驱动里没有 active_supply；
++	 *   · 上游已把 msm8953 的 VDDMD 删掉（rpmpd: remove VDDMD* from MSM8953），
++	 *     所以 msm8953 只能靠补丁 0011 绕开 set_voltage。
 +	 */
-+	status = "disabled";
++	mss-supply = <&pm8953_s2>;
 +};
 -- 
 2.48.1

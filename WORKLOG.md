@@ -4180,3 +4180,55 @@ unbalanced disables for s2
    没有 GNSS 支持。
 另外：就算 modem 起来了，还得有 rmtfs（已交叉编译好）+ QRTR 上的 LOC(16) 客户端
 （tmp/gps/qrtr-look 探针已就绪，但还没在真机上跑过）。
+
+### 6. 内核补丁 0011 之后：modem 往前走了一大步（2026-09-06 21:57~22:36）
+
+**参考对象**：Moto G7 (motorola-river) —— **SDM632，本质就是 msm8953 的马甲**，pmOS wiki 上它的
+GPS / 短信 / 移动数据都是 Works。它的 DTS 里 modem 只有：
+```dts
+&mpss {
+	firmware-name = "qcom/msm8953/motorola/river/mba.mbn",
+			"qcom/msm8953/motorola/river/modem.mbn";
+	pll-supply = <&pm8953_l7>;
+	status = "okay";
+};
+```
+为什么它能起来？因为 **SDM632 走的是另一条路**：驱动里 `sdm632_mss` **没有 active_supply**，而是
+`.proxy_pd_names = { "cx", "mx", "mss" }`，靠 **RPM 电源域 SDM632_VDDMD** 给 modem 供电：
+```dts
+// sdm632.dtsi
+&mpss {
+	compatible = "qcom,sdm632-mss-pil";
+	power-domains = <SDM632_VDDCX>, <SDM632_VDDMX_AO>, <SDM632_VDDMD>;
+	power-domain-names = "cx", "mx", "mss";
+};
+```
+而 **msm8953 的 VDDMD 被上游删掉了**（`pmdomain: qcom: rpmpd: remove VDDMD* from MSM8953`），
+取而代之要求板级给 `mss-supply`（1.05V 的 regulator）—— 这就是我们卡住的根子。参考 river 是没用的，
+因为 msm8953 没有 VDDMD 可用。
+
+**补丁 0011**（patches/0011）：把 `msm8953_mss.active_supply` 的 `.uV` 从 1050000 改成 0
+（驱动只在 `uV > 0` 时才 set_voltage），即**不再设电压，只 enable + set_load，电压交给 RPM**。
+
+**结果（两轮）**：
+
+| 配置 | 现象 |
+|---|---|
+| 0011 + mss=s2（s2 空定义） | ✅ 系统正常起来！供电错误消失，modem 进入启动流程：<br>`powering up 4080000.remoteproc` → `Booting fw image mba.mbn` → **`PBL boot timed out`**（-110） |
+| 0011 + mss=s2（写死 1.05V） | ❌ **黑屏挂住**：启动 Linux 时黑屏、USB 网络不出现、也不自动重启，只能人工按进 fastboot |
+
+`PBL boot timed out` 的原因也查到了：**s2 实际只有 0.744V**（`cat /sys/class/regulator/*/microvolts`
+测得），而 modem 要 1.05V —— 但 s2 是 RPM 轨，设备树里一写死 min/max-microvolt 系统就起不来
+（这次是黑屏挂死，之前 K 版是停 fastboot）。**s2 这条路走不通。**
+
+**当前状态**：`patches/0007` 里 s2 又撤成空定义（避免后人踩），`&mpss` 暂时保持 disabled，
+设备刷回官方 sensors5 镜像（16/16）。补丁 0011 留在库里但**未验证到最终成功**（它解决了供电报错，
+但 modem 仍起不来）。
+
+**下一步真正的方向**（按可行性排）：
+1. **把 msm8953 的 VDDMD 加回 rpmpd**（撤销上游那个删除），然后照抄 SDM632：驱动加
+   `.proxy_pd_names += "mss"`、DTS 的 &mpss 加第三个 power-domain —— 这是唯一跟 river 对齐的做法，
+   但要动 rpmpd 驱动，风险不低。
+2. 或者查原厂/厂商内核里 modem 上电的**完整时序**（vdd_cx/mx/mss/pll 谁先谁后），
+   也许还差 `vdd_cx` / `vdd_mx` 两路（原厂是 s2_floor_level / s7_level_so）。
+3. 再或者：接受 GPS 做不了 —— 主线 msm8953 全线设备都没开 modem，不是我们一台的问题。
