@@ -380,7 +380,20 @@ rootfs: rootfs-$(ODIN_VARIANT)
 rootfs-core: $(STAMPS)/rootfs-core
 rootfs-gui:  $(STAMPS)/rootfs-gui
 
-$(STAMPS)/rootfs-%: | $(STAMPS) kernel dtb
+# 依赖同样必须是真的。2026-09-06 修：原来写 `| $(STAMPS) kernel dtb`，
+# kernel / dtb 只是**排序**前提，不是真依赖 ⇒ 改了内核或设备树之后
+# `make rootfs` 直接命中旧时间戳跳过 —— 镜像里装的还是旧内核，且不报错。
+# 更要命的是**改了 dist/build/ 下的用户态脚本也不会重建**（31 个文件：
+# udev 规则、systemd 单元、挂载脚本、extlinux.conf 全在这里）。
+# 这已经是今天第三次撞同一类坑（另两次：CI 缓存键抄包清单、
+# kernel/dtb 漏配置与补丁依赖）—— 依赖关系没表达出来，改动就静默消失。
+$(STAMPS)/rootfs-%: $(STAMPS)/kernel-$(KDIR_TAG) $(STAMPS)/dtb-$(KDIR_TAG) \
+		$(REPO)/tools/ci/build-rootfs.sh \
+		$(REPO)/dist/build/setup-rootfs.sh \
+		$(REPO)/dist/build/apply-staging-fixes.sh \
+		$(shell find $(REPO)/dist/build/rootfs $(REPO)/dist/build/initramfs \
+			-type f 2>/dev/null) \
+		| $(STAMPS)
 	@case "$*" in \
 		core|gui) ;; \
 		*) echo "[rootfs] 未知变体: $*（可选 core 或 gui）" >&2; exit 1 ;; \
