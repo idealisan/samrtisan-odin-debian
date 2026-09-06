@@ -3847,3 +3847,106 @@ ls .../kernel/fs/nls/ → 只有 nls_ucs2_utils.ko
 带中文名的盘做"写入→读回"的闭环。上面的只读对比已经足够证明挂载与名字转换路径
 是对的，等手上有 FAT32 U 盘时再补一次端到端确认。
 （顺带：设备没有外网，apt 装不了 dosfstools。）
+
+## 2026-09-06 OTG 持续读取稳定性测试（第一轮：纯电池供电）
+
+- **08:48 结束** — 撑了 **3 分 17 秒（197 秒 / 20 轮）**就掉电，**但系统没被拖垮**
+- 方法：sda1 raw 直读 `dd iflag=direct`（绕开页缓存，真实打 USB 总线），
+  每轮 200 MB、30.3~30.4 MB/s，同时每秒级记电压/电流/电量/dmesg 报错
+- 掉电瞬间三条（顺序很清楚）：
+  ```
+  qcom-smbchg ...: OTG regulator failure
+  sd 0:0:0:0: [sda] tag#12 data cmplt err -71 uas-tag 1 inflight: CMD
+  usb 1-1: USB disconnect, device number 2
+  ```
+- 电压一路下滑：3.862 V（n=1）→ 3.410 V（n=19），电流 -390~-450 mA，
+  电量 87%→82%。跟 040 号报告量的 0.54Ω 内阻完全对得上 —— **7.1.3 也改变不了它**
+- **这次的关键成果：掉电没再拖垮系统**
+  - 0 个 Oops / BUG / panic / Call trace（grep 到的 4 条全是 ramoops 初始化日志）
+  - pstore 空
+  - 根文件系统仍 `rw`，**没有** remount 成只读，0 个 EXT4 错误
+  - ssh/sshd active，负载 0.67，内存正常
+  - ⇒ 上一版（6.19.5 + 手写 0011）掉电是会把系统搞坏的；换成上游 `ec35c1969650`
+    的正统修法后，掉电退化成"这块盘用不了"，系统照常跑。这就是要的健壮性底线。
+
+## 2026-09-06 顺带查清的三件事（都在真机上实测）
+
+- **NTFS3 是内建的**：`CONFIG_NTFS3_FS=y`、`modinfo ntfs3 → (builtin)`、
+  `/proc/filesystems` 有 ntfs3。虚拟盘实测读写 + 中文名全正常。
+  镜像里**没有** ntfs-3g（也不需要，ntfs3 更好）。
+- **UAS 硬盘盒从来不会被自动挂载**（已修）：udev 报 `ID_BUS=ata`（SCSI 层按 ATA 报），
+  不是 usb ⇒ 规则与脚本双双 skip。现在 USB 硬盘盒基本都走 UAS，等于核心场景一直是坏的。
+- **NTFS 盘会挂不上**（已修）：`blkid` 报 `TYPE="ntfs"` 不是 `ntfs3`；
+  我们既无老 ntfs 驱动也无 `mount.ntfs` ⇒ 自动探测必然 `unknown filesystem type 'ntfs'`。
+  对比实测：显式 `-t ntfs3` 可用；不指定类型时，装了 ntfs-3g 走 fuseblk、没装就失败。
+- **镜像缺 fsck 工具**（已补）：debootstrap --include 原本只有 e2fsprogs。
+  OTG 掉电后外接盘很可能要 fsck，vfat/exFAT 的一个都没有 ⇒ 补 dosfstools、exfatprogs。
+  刻意**不装** ntfs-3g：装了会让自动探测优先走 fuseblk（实测），而内核 ntfs3 更好。
+
+## 2026-09-06 OTG 第二轮：带电源的 USB Hub（进行中）
+
+- **08:58 开始** — 20 分钟，跑到 09:18
+- 顺带验证了 UAS 修复**在真机上生效**（脚本已手动推到设备上）：
+  ```
+  08:57:26 mount /dev/sda1 (vfat → -t vfat) -> /run/media/sda1 [...,utf8=1]
+  /dev/sda1 on /run/media/sda1 type vfat (rw,...,utf8,errors=remount-ro)
+  ```
+  之前是 `ID_BUS='ata' != usb, skip`，现在自动挂上了，且生效选项里有 `utf8=1`
+- 按用户要求全程只读：脚本把自动挂载的 rw 改成 ro 才开始测
+
+## 2026-09-06 传感器（i2c-gpio）落地 + 一轮真机代码评审
+
+### 结果：光感/距离 + 加速度/陀螺 都通了（变体 F，受控实验）
+
+- **12:51 受控实验**（scp 传 DTB + 写前/写后/重启后三次 md5 校验）：
+  设备端 `/boot/dtbs/qcom/msm8953-smartisan-odin-ft8716.dtb`
+  三次都是 `c47c8464761cf55717579d730a6a6100`（= 本地 tmp/dtbs-F 那一份）
+- 开机后自动出现：
+  ```
+  0-0048 0-0068 1-0038 2-0025
+  iio:device0 stk3310      ← 光感 + 距离
+  iio:device2 bmi160       ← 加速度 + 陀螺
+  ```
+- 读数：**als = 58 58 58 59 59 59（×0.1 = 约 5.8 lux，室内弱光，合理）**，ps = 672
+  ⇒ 之前"开机 als 恒为 0"**不是硬件问题**，是下面两条干扰造成的假象
+- 芯片实测（0x48 寄存器）：`0x3E = 0x15` = STK3311A 的 ID；驱动使能后
+  `0x00 = 0x03`（ALS+PS 都开）、`0x11/12 = 02 a4`(676)、`0x13/14 = 00 33`(51)
+
+### 踩坑 1：用 base64 往设备写 DTB —— 不能只校验字节数
+
+- 之前那版脚本是 `echo '<base64>' | base64 -d > xxx.dtb`，写完只 `stat -c %s` 看字节数。
+  字节数对（64032）但**内容可能已经坏掉**，而坏 DTB 照样能开机、照样能 probe 出设备，
+  只是行为诡异（als 恒 0）。
+- **改法**：一律 `scp` 二进制传，写前/写后/重启后**各查一次 md5**，
+  `tmp/swap_dtb_scp.py` 已经把这三步固化进去了。
+
+### 踩坑 2：上一轮的后台任务还在跟我抢设备（这次的"灵异事件"就是这个）
+
+- 现象：`/boot` 里的 DTB 在 09:37:10（重启前 2 秒）自己从 64032 变成 **63944**，
+  而且是一次干净的 systemd reboot。查遍仓库也没有任何用户态代码会写 `/boot/dtbs`。
+- 真因：**63944 正好是 `tmp/dtbs-B`（变体 B，11:29 编）的大小** —— 是上一轮会话
+  遗留的后台任务（`devstate.py --watch` 那条，以及"变体B稳定性检查"）在我眼皮底下
+  写 DTB + 重启。已 `TaskStop` 停掉。
+- **教训**：真机操作前先确认没有遗留后台任务；每一步都验证"机器上现在是哪一份"。
+
+### 踩坑 3：`fastboot boot` 在这台机器上根本不可用（代码层面就是废的）
+
+- 实测：`Booting  FAILED (remote: 'dtb not found')`
+- 代码位置（ext/lk2nd）：
+  - `app/aboot/aboot.c:3442-3453` —— 先 `copy_dtb()`（走 header 的 `dt_size`，偏移 40），
+    没找到才去内核尾部找 appended DTB，再找不到就 `fastboot_fail("dtb not found")`
+  - `platform/msm_shared/dev_tree.c:1281-1298` —— `dev_tree_appended()` 的 DTB 偏移是
+    **从内核镜像 0x2C 处读 4 字节**（`dev_tree.h:49  DTB_OFFSET 0x2C`），
+    我们的内核那 4 字节是 0 ⇒ 直接当没找到
+  - 也就是说：**要么在 header 的 dt_size 里给，要么往内核 0x2C 写偏移**，
+    单纯 `cat vmlinuz dtb > x` 是没用的（上一轮 `vmlinuz-with-dtb` 里 0x2C 实测也是 0）
+- 结论（用户拍板）：**恢复一律走 `flash/flash-all.sh` 刷写，不要再试 fastboot boot**
+
+### 代码评审发现：DTS 里给 stk3310 挂的 `vdd-supply` 是装饰品
+
+- `drivers/iio/light/stk3310.c` 里**没有任何 regulator 调用**（grep 为空）
+  ⇒ DTS 写 `vdd-supply = <&pm8953_l10>` 它一个字都不会去使能
+- 对照 `drivers/iio/imu/bmi160/bmi160_core.c:714`：`regulator_bulk_enable(...)`，
+  bmi160 是**真的**会开 l10/l6 的
+- 真机实测：现在 `l10 = disabled(2.8V)`、`l6 = enabled(1.8V)`（bmi160 空闲后把 l10 关了），
+  **光感照样读到 51~59** ⇒ 这颗芯片根本不靠 l10 供电，属性该删

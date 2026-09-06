@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,934 @@
+@@ -0,0 +1,968 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -933,8 +933,22 @@ index 000000000..3dc8f434d
 + *   平时由 ADSP/SLPI 固件代理，主线改用 i2c-gpio 让 AP 直接访问。
 + *
 + * GPIO 编号：526 / 527 减去内核给 gpiochip 的动态基址 512 = **14 / 15**，
-+ *   与 mido 的 sda-gpios=<&tlmm 14> / scl-gpios=<&tlmm 15> 一致。
-+ *   ⚠️ 这是**推断**，待实测确认：扫到 0x68 上的 bmi120 即证明 GPIO 猜对了。
++ *   与 mido / daisy 的 sda-gpios=<&tlmm 14> / scl-gpios=<&tlmm 15> 一致。
++ *
++ *   ✅ **2026-09-06 真机实测确认**：加完这条总线后 `0-0068` 上出现 bmi160，
++ *     加速度三轴合成 ≈ 9.68 m/s²（≈1g），陀螺静止时接近 0，数值在实时变化。
++ *     GPIO 猜对了，总线是通的。
++ *
++ * ⚠️⚠️ **千万不要再去使能 `&i2c_4`（78b8000）那条 BLSP 总线！**
++ *   传感器**物理上就接在 QUP4 的脚上**，但 **BLSP 被 TrustZone 保护**，
++ *   主线驱动去访问会触发复位 ⇒ 真机无限重启。实测对照：
++ *       同时开 i2c-gpio 与 &i2c_4  → 死循环（lk2nd 起不来 Linux）
++ *       只开 i2c-gpio              → 正常启动，传感器能读到数据
++ *   daisy 的 DTS 原话（msm8953-xiaomi-daisy.dts:62-63）：
++ *       "We bitbang on &i2c_4 because BLSP is protected by TZ as sensors are
++ *        normally proxied via ADSP firmware. GPIOs aren't protected."
++ *   同理，其余**没验证过**的 BLSP QUP 也不要随便开 —— 08-30 排查触摸屏时
++ *   就有过"单独只开 i2c_3、不带任何设备节点，一样循环"的记录。
 + *
 + * 供电照 mido：vdd = pm8953_l10(2.8V)、vddio = pm8953_l6(1.8V)，
 + *   这两个 regulator 已在本文件上方定义。
@@ -950,8 +964,11 @@ index 000000000..3dc8f434d
 +		#size-cells = <0>;
 +
 +		/*
-+		 * 先只挂 IMU：扫到 bmi120 就证明 GPIO 猜对了，
-+		 * 再补地磁 yas537@2e 与光感 ltr559@23。
++		 * 加速度 + 陀螺。本机实际芯片是 **bmi120**，主线没有 bmi120 的
++		 * compatible；用 `bosch,bmi160` 即可 —— 两者寄存器兼容，pmOS 上也是
++		 * bmi160_i2c 驱动的（见 evidence/device-probe/08-peripherals-firmware.txt：
++		 * `0-0068  name=bmi120  driver=bmi160_i2c`）。
++		 * ✅ 真机已确认能读到数据。
 +		 */
 +		imu@68 {
 +			compatible = "bosch,bmi160";
@@ -961,27 +978,44 @@ index 000000000..3dc8f434d
 +			vddio-supply = <&pm8953_l6>;
 +
 +			/*
-+			 * mount-matrix 是**占位值**（照抄 mido）。芯片在板上的真实
-+			 * 朝向未知，要等真机读出原始值、把手机转几个方向看符号才能定。
++			 * mount-matrix 是**占位值**（照抄 daisy 的 bmi160）。芯片在板上的真实
++			 * 朝向未知 —— 要等真机读出原始值、把手机转几个方向看符号才能定。
 +			 */
 +			mount-matrix = "0", "1", "0",
-+				       "1", "0", "0",
++				       "-1", "0", "0",
 +				       "0", "0", "1";
 +		};
++
++		/*
++		 * 光感 + 距离。**芯片是 STK3311A，地址 0x48** —— 这是实测坐实的，
++		 * 不是照抄：当时按 pmOS 的记录填了 liteon,ltr559@0x23，结果驱动
++		 * probe 到一半就失败、创建不出 IIO 设备。后来交叉编译了个裸 I2C
++		 * 扫描工具（tmp/i2cscan2.c，读写两种都试）扫这三条总线，结果是
++		 *     i2c-0(i2c-gpio) : 0x48, 0x68
++		 *     i2c-1(78b7000)   : 0x38(触摸), 0x44(原厂标 nxu8010)
++		 *     i2c-2(7af6000)   : 0x25(FUSB301)
++		 * **根本没有 0x23**，pmOS 那条记录在这一点上不适用于本机。
++		 * 再读 0x48 的寄存器：0x3E = 0x15，而主线 stk3310 驱动里
++		 *     STK3311A_CHIP_ID_VAL = 0x15
++		 * 正好对上（该驱动用 0x3E 作 ID 寄存器，且 0x15 在它接受的
++		 * 芯片 ID 表里）。走 sensortek,stk3311（CONFIG_STK3310=m 已开）。
++		 */
++		light-sensor@48 {
++			compatible = "sensortek,stk3311";
++			reg = <0x48>;
++
++			vdd-supply = <&pm8953_l10>;
++		};
++
++		/*
++		 * 地磁（电子罗盘）**暂缺** —— 同上那次扫描里，三条总线都没有
++		 * 任何罗盘地址（0x0c/0x0d/0x0e/0x1e/0x2e 全无应答）。
++		 * pmOS 记录写的是 yamaha,yas537@0x2e，但本机 0x2e 无应答，
++		 * 所以这里先不填，免得再出一个"probe 静默失败"的假节点。
++		 * 下一步：要么逐个使能剩下的 BLSP 总线找（有触发 TZ 复位死循环的风险，
++		 * 见上面 i2c_4 的警告，一次只能试一条），要么从厂商内核找线索。
++		 */
 +	};
 +};
-+
-+/*
-+ * 【临时】开全 BLSP i2c 总线 —— 只为扫出 aw2013 LED 控制器在哪条上。
-+ *   pmOS 记录里 aw2013 在 0x45，而我们已开的两条（78b7000 触摸、
-+ *   7af6000 FUSB301）都扫不到它 ⇒ 必在剩下某条上。
-+ *   扫到之后就删掉这一段、只保留那一条总线。
-+ */
-+&i2c_1 { status = "okay"; };
-+&i2c_2 { status = "okay"; };
-+&i2c_4 { status = "okay"; };
-+&i2c_5 { status = "okay"; };
-+&i2c_7 { status = "okay"; };
-+&i2c_8 { status = "okay"; };
 -- 
 2.48.1
