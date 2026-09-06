@@ -4232,3 +4232,48 @@ GPS / 短信 / 移动数据都是 Works。它的 DTS 里 modem 只有：
 2. 或者查原厂/厂商内核里 modem 上电的**完整时序**（vdd_cx/mx/mss/pll 谁先谁后），
    也许还差 `vdd_cx` / `vdd_mx` 两路（原厂是 s2_floor_level / s7_level_so）。
 3. 再或者：接受 GPS 做不了 —— 主线 msm8953 全线设备都没开 modem，不是我们一台的问题。
+
+### 7. ✅ 找到正解：mss-supply 该接 **s1**（照抄同芯片的 Asus Zenfone 3）
+
+用户提示"这款手机使用 625 芯片（= MSM8953），GPS 能用，参考 Asus Zenfone 3 (asus-zenfone3)"——
+**这次找对人了**：Zenfone 3 就是 MSM8953，它的 DTS 就在我们的内核树里：
+
+```dts
+// msm8953-asus-common.dtsi
+pm8953_s1: s1 {
+	regulator-min-microvolt = <870000>;
+	regulator-max-microvolt = <1156000>;
+};
+
+&mpss {
+	mss-supply = <&pm8953_s1>;
+	pll-supply = <&pm8953_l7>;
+	status = "okay";
+};
+```
+
+**我们之前一直在死磕 s2（RPM 轨，不能 set_voltage），方向就错了。** s1 是普通 SMPS，0.87~1.156V
+正好覆盖驱动要的 1.05V。而且我们自己的 DTS 里 `pm8953_s1: s1` **本来就定义了**（192 行，之前 grep 漏了）。
+补丁 0011（改 uV=0）随之作废，移到 tmp/superseded-patches/。
+
+**实测（DTB 7999fb53）**：
+```
+remoteproc1 name=4080000.remoteproc state=running fw=mba.mbn
+qcom-q6v5-mss: MBA booted without debug policy, loading mpss
+remoteproc1: remote processor 4080000.remoteproc is now up     ← modem 真的起来了！
+```
+❗但**不稳**：约每 50 秒崩一次并自动恢复（`crash #3/#4/#11`），报错：
+```
+fatal error received: dog.c:1526:Watchdog detects stalled initialization
+```
+查到的下一步嫌疑：**镜像里没有 rmtfs 用户态守护进程**（只有内核模块 rmtfs_mem +
+/dev/qcom_rmtfs_mem1）。modem 起来后要靠 rmtfs 读写 EFS（modemst1/2），没有它初始化就卡住 ——
+跟 watchdog 报的"stalled initialization"对得上。rmtfs 已交叉编译好（tmp/gps/src/rmtfs/rmtfs），
+在设备上以 `rmtfs -r -P -s -o /var/lib/rmtfs` 起过，但**还没成功跑起来**（报
+`unable to open remoteproc "state" control file`，待排查是权限还是路径）。
+
+另：QRTR 探针 tmp/gps/qrtr-look 在真机上**段错误**，还没修。
+
+**当前取舍**：&mpss 保持 enabled 在库里（modem 能起来但 crash 循环）。若嫌耗电/不稳，
+可临时把 status 改回 disabled。传感器在这版镜像上复验正常（stk3310 + bmi160，加速度 z 有波动
+-16082~-16202；室内恒定灯光下 lux 稳定在 40 不跳，属环境真稳定，不是传感器不动。

@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,1001 @@
+@@ -0,0 +1,991 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -260,8 +260,6 @@ index 000000000..3dc8f434d
 +		 * 只打标签、不写 min/max-microvolt：s2 是 RPM 管理的轨，Linux 侧
 +		 * regulator_set_voltage 会被拒（s2: voltage operation not allowed）。
 +		 */
-+		pm8953_s2: s2 {
-+		};
 +
 +		pm8953_l1: l1 {
 +			regulator-min-microvolt = <1000000>;
@@ -1035,20 +1033,12 @@ index 000000000..3dc8f434d
 + */
 +&mpss {
 +	status = "okay";
-+	pll-supply = <&pm8953_l7>;
 +	/*
-+	 * mss 接 s2，配合内核补丁 0011（把 msm8953_mss 的 .uV 从 1050000 改成 0）。
-+	 * s2 是 RPM 管理的轨，驱动那边不再 set_voltage，只 enable + set_load，
-+	 * 电压交给 RPM。
-+	 *
-+	 * 背景（别再走弯路）：
-+	 *   · 上游 msm8953 的 mss 要求 1.05V 的 regulator，而本机 s2 是 RPM 轨不给设；
-+	 *   · SDM632（Moto G7 river，GPS 可用）走的是另一条路 —— .proxy_pd_names 里
-+	 *     加 "mss"，用 RPM 电源域 VDDMD 供电，驱动里没有 active_supply；
-+	 *   · 上游已把 msm8953 的 VDDMD 删掉（rpmpd: remove VDDMD* from MSM8953），
-+	 *     所以 msm8953 只能靠补丁 0011 绕开 set_voltage。
++	 * 两路供电，跟同芯片的 Asus Zenfone 3 一致：
++	 *   mss = pm8953_s1（1.05V / 100mA）  pll = pm8953_l7（100mA）
 +	 */
-+	mss-supply = <&pm8953_s2>;
++	mss-supply = <&pm8953_s1>;
++	pll-supply = <&pm8953_l7>;
 +};
 -- 
 2.48.1
