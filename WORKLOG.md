@@ -4051,3 +4051,29 @@ rmdir /sys/kernel/config/device-tree/overlays/mpss   # 撤销
 
 所以恢复第一步一定是：**进 fastboot 后先 `fastboot getvar all` 存一份，
 看有没有 lk2nd 分区，再决定怎么刷。**
+
+## 2026-09-06 待恢复：设备当前完全不在 USB 总线上
+
+14:00 复查：
+- `fastboot devices` 空、`ssh user@172.16.42.1` 不通
+- `ioreg -p IOUSB` 里**只有集线器**（USB3.2 Hub / Xiaomi Type-C 5-in-1 Hub / USB2.0 Hub），
+  **没有任何高通的 VID**（0x05c6 / 0x18d1 一类）
+⇒ 手机压根没挂在 USB 上：可能是线被拔了、关机了、或者被人带走了。
+这种情况**刷机脚本什么也做不了**（它要能看见 fastboot 才动）。
+
+### 已备好、设备一回来就能直接用的东西
+| 文件 | 用途 |
+|---|---|
+| `tmp/odin-accept-all.sh` | **一键验收**：传感器按"有值 / 不为 0 / 会波动"逐项判 PASS/FAIL；震动录基线+震动两段 wav；`--with-modem` 才开 modem（走运行时覆盖层） |
+| `tmp/rms.py` | 回宿主机后算两段录音的 RMS，判定马达到底振没振 |
+| `tmp/ffvib` | 震动触发（input 力反馈 FF_RUMBLE），已交叉编译 |
+| `tmp/gps/mpss-overlay.dts` / `mpss.dtbo` | 开 modem 的**运行时覆盖层**（内存里，重启即失效，最坏不会锁机） |
+| `tmp/gps/qrtr-look` | 查 QRTR 上有没有 LOC(16) 定位服务，已交叉编译（只依赖 libc） |
+| `tmp/gps/src/rmtfs/rmtfs` | modem 要的 EFS 守护进程，已交叉编译（依赖 libudev.so.1，Debian 里有） |
+| `tmp/swap_dtb_scp.py` | 换 DTB：scp 传 + 写前/写后/重启后三次 md5 |
+
+### 设备回来后的最短路径
+1. 插线、进 fastboot（长按电源关机 → 音量减+电源）
+2. **先 `fastboot getvar all` 存一份**，确认有没有 `partition-type:lk2nd`
+3. `bash flash/flash-all.sh --from 30`（dist/ 里是今天刷成功两次的 CI 镜像）
+4. 起来后：传 `odin-accept-all.sh / ffvib / qrtr-look / mpss.dtbo` → 跑一遍 → 拿证据
