@@ -147,6 +147,25 @@ print-config:
 $(STAMPS):
 	@mkdir -p $(STAMPS)
 
+# 声明"kernel / dtb 的产物已经就位，别再去追它们的构建链"。
+#
+# 给 CI 的 rootfs job 用的：那个 job **故意不拉内核子模块**（源码全部来自 artifact：
+# 只下载 out/kernel 与 out/dtb），所以它跑不了 fetch-kernel。
+# 平时靠 staging 缓存把 out/.stamps 一并恢复，make 就不会去追 fetch-kernel；
+# 可一旦缓存冷启动（比如改了 dist/build/ 下的脚本 ⇒ staging 键变了 ⇒ 缓存未命中），
+# out/.stamps 是空的 ⇒ make 一路追到 fetch-kernel ⇒ 子模块没初始化 ⇒ **整条 job 挂掉**。
+# 2026-09-06 实测撞到：rootfs (core) / (gui) 双双失败，日志就是
+#   [fetch] ❌ 内核子模块未初始化：.../ext/linux-msm8953
+#
+# 用法（下载完 artifact 之后、跑 rootfs 之前）：
+#   make stamp-artifacts OUT=out
+#   make -o kernel -o dtb rootfs-core OUT=out
+stamp-artifacts:
+	@mkdir -p $(STAMPS)
+	@touch $(STAMPS)/fetch-$(KDIR_TAG) $(STAMPS)/kernel-$(KDIR_TAG) $(STAMPS)/dtb-$(KDIR_TAG)
+	@echo "[stamp-artifacts] kernel / dtb 产物已标记就位（$(STAMPS)）"
+.PHONY: stamp-artifacts
+
 # ================================================================ 内核源码
 # 保留脚本：三级回退（depth 1 → shallow-since → 整支 master）+ 重试，
 # 上游 GitHub 只让取 ref 能到达的 commit，这段是纯逻辑，留在脚本里。

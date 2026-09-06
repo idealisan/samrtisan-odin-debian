@@ -556,6 +556,17 @@ jobs:
           # -o kernel -o dtb：这两个是上一个 job 的 artifact、刚下载到 out/ 里，
           # 不是这个 runner 编出来的。make 的 --old-file 正是"视为最新、不要重造"
           # 的语义，正好对上；不加就会在这里把内核重编一遍（20+ 分钟）。
+          #
+          # ⚠️ 但 `-o` 只压住 kernel / dtb 这两个**伪目标**，压不住
+          # out/.stamps/fetch-* 这个**文件**目标。缓存命中时 out/.stamps 随 staging
+          # 一起恢复，风平浪静；一旦缓存冷启动（改了 dist/build/ 下的脚本 ⇒ staging
+          # 键变了 ⇒ 未命中），out/.stamps 是空的 ⇒ make 一路追到 fetch-kernel
+          # ⇒ 本 job 没拉子模块 ⇒ **整条 job 挂掉**。2026-09-06 实测：core 与 gui
+          # 双双失败，日志是 `[fetch] ❌ 内核子模块未初始化：.../ext/linux-msm8953`。
+          #
+          # 所以这里先显式声明"kernel / dtb 产物已就位"，把 fetch/kernel/dtb 三个
+          # 时间戳补齐，rootfs 就不会再去追内核那一条依赖链。
+          sudo -E make stamp-artifacts OUT=out
           sudo -E make -o kernel -o dtb rootfs-${{ matrix.variant }} OUT=out
           sudo chown -R "$(id -u):$(id -g)" out/rootfs-${{ matrix.variant }}
           # cache action 由 runner 用户收尾；staging 内有 root 创建的文件，先交还读取权限。
