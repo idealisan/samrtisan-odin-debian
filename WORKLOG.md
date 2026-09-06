@@ -4144,3 +4144,39 @@ rmdir /sys/kernel/config/device-tree/overlays/mpss   # 撤销
   所以 `/sys/kernel/config/device-tree/overlays` 目录根本不存在（之前判断错了，以为 OF_OVERLAY 就够）
 - lk2nd 的"启动失败停在 fastboot"**这次正常工作了**（K 版 DTB 起不来后自动停在 fastboot，
   没有无限重启），所以有救回来的余地
+
+### 5. modem 供电：四种接法全试过，结论是主线在这台机器上过不去（2026-09-06 21:20~21:50）
+
+驱动（msm8953_mss）两阶段供电，只有 `uV > 0` 的才会调 regulator_set_voltage：
+- proxy  `"pll"` 100mA（uV=0，只 enable）
+- active `"mss"` 1.05V/100mA ← **真正调 set_voltage 的就是这路**，报错里的 0 指的是它
+
+四种接法与结果：
+
+| # | 接法 | DTB | 结果 |
+|---|---|---|---|
+| 1 | 什么都不写 | 64012（J，ece1ab08） | 开机正常，但 `Failed to request voltage for 0` + `unbalanced disables for regulator-dummy` |
+| 2 | pll=l7 + mss=**新定义 s2**（写死 1.00~1.15V） | 64115（K，e9d7a985） | **起不来，停 fastboot** |
+| 3 | 只加 pll=l7（隔离变量） | 64028（L，4805bcfe） | 开机正常，但仍是 mss 那路失败（证明 pll 不是问题） |
+| 4 | pll=l7 + mss=**s2 空定义**（不写死电压） | 64083（M，43f96a9a） | 开机正常，但 `s2: voltage operation not allowed` |
+| 5 | pll=l7 + mss=**l1**（1.0~1.1V 空闲 LDO） | 64071（N，2b79c36a） | **起不来，停 fastboot** |
+
+**决定性证据（第 4 种）：**
+```
+s2: voltage operation not allowed
+qcom-q6v5-mss 4080000.remoteproc: Failed to request voltage for 0.
+unbalanced disables for s2
+```
+原厂 DTB 里 modem 的 `vdd_mss-supply` 确实是 **pm8953_s2**，但 s2 是 **RPM 管理的轨**
+（原厂只有 `s2_level` 带 0x10~0x180 的 level 范围，没有 µV），**Linux 侧不允许直接 set_voltage**。
+也就是说：主线这个驱动要求"能直接设 1.05V 的 regulator"，而本机给 modem 供电的那路
+恰恰是 RPM 轨 —— 这就是所有主线 msm8953 板子都把 &mpss 留成 disabled 的原因。
+
+**当前处置：`&mpss` 保持 disabled**（patches/0007 里就是这么写的），GPS 暂时不做。
+真要做，路只有两条，且都不轻：
+1. 给内核打补丁：让 msm8953 的 mss 走 RPM level 调压（或改用 power-domains 设性能态），
+   而不是 regulator_set_voltage；
+2. 或者绕过 mss，直接用 WCNSS 那颗芯片的 GNSS（如果有）—— 但主线 wcn36xx 只管 WiFi，
+   没有 GNSS 支持。
+另外：就算 modem 起来了，还得有 rmtfs（已交叉编译好）+ QRTR 上的 LOC(16) 客户端
+（tmp/gps/qrtr-look 探针已就绪，但还没在真机上跑过）。
