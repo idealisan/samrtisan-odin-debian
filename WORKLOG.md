@@ -4032,3 +4032,22 @@ rmdir /sys/kernel/config/device-tree/overlays/mpss   # 撤销
   本地编 DTB 用 `tmp/build_dtbs_variant.sh <KDIR> <输出目录>` 更省事
 - `make publish-*` 只在自己的时间戳过期时才重新汇总，`out/publish/` 里可能还是旧 DTB；
   刷之前一定 `md5 -q dist/*.dtb` 与 `out/dtb/*.dtb` 对一下
+
+### 恢复预案的更正（补记）
+上一条预案第 4 步提到的 `evidence/live-device-backup/boot-partition.img` **根本不存在**
+（库里只有 fastboot-getvar-all.txt / rootfs-full.tar / STATE*.txt），以它为准会扑空。
+可用的 lk2nd 产物是 `tmp/ci-core-usb/lk2nd-odin.img`（今天刷成功两次，366608 字节）。
+
+判断"现在这个 fastboot 是谁的"是恢复的关键：
+- `evidence/live-device-backup/fastboot-getvar-all.txt`（8-30 正常状态）里有
+      (bootloader) partition-type:lk2nd:raw
+      (bootloader) partition-size:lk2nd: 0x80000
+  也就是说**lk2nd 活着的时候，fastboot 会导出 lk2nd 这个 512KB 的分区**
+- 如果 `fastboot getvar all` 里**没有** lk2nd 分区 ⇒ 当前是**原厂 fastboot**，
+  此时 flash-all.sh 第 30 阶段会回退去刷 `boot`，而按该阶段的实测注释，
+  刷 boot 只写到偏移 512KB、动不了偏移 0 的 lk2nd ⇒ 刷完还是进不了 Debian。
+  这种情况下得先把 lk2nd 装回偏移 0，具体办法要等拿到 `fastboot getvar all`
+  与分区表之后再定（不要凭猜动手）。
+
+所以恢复第一步一定是：**进 fastboot 后先 `fastboot getvar all` 存一份，
+看有没有 lk2nd 分区，再决定怎么刷。**
