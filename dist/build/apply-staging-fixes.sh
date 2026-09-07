@@ -245,6 +245,10 @@ enable_from_tree odin-touchscreen.service multi-user.target
 # 只在 kb 变体里有意义，但 enable_from_tree 对"覆盖树里没有这个 unit"会自动
 # 跳过，所以无条件写在这里是安全的。
 enable_from_tree odin-buffyboard-redraw.timer timers.target
+# 电源键 = 开关屏（kb 变体）。core/gui 里没有 triggerhappy，unit 会起不来 ——
+# 但 enable_from_tree 只看文件在不在，所以加一条 ConditionPathExists 兜底：
+# 没有 thd 就不要排进启动，免得每次开机多一条 failed。
+enable_from_tree odin-hotkey.service multi-user.target
 
 # ------------------------------------------------- 6. 阶段 3：USB 角色自动切换
 # 旧 odin-usb-gadget.sh 是 set -e 的一次性单元：开机那一刻 UDC 不在就永久 failed，

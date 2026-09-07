@@ -1,0 +1,24 @@
+[Unit]
+Description=ODIN 热键守护进程（电源键 = 开关屏幕）
+Documentation=file:///etc/triggerhappy/triggers.d/odin-screen.conf
+After=systemd-udev-settle.service
+
+# core / gui 变体没有装 triggerhappy，这个 unit 排进启动只会是一条 failed。
+# ConditionPathExists 让它在那种情况下安静跳过（status 显示 condition failed，不红）。
+ConditionPathExists=/usr/sbin/thd
+
+[Service]
+Type=simple
+# 刻意**自带** unit 而不用发行版那个 triggerhappy.service：
+# Debian 默认以 `--user nobody` 跑，命令也就以 nobody 身份执行 —— 写不了
+# /sys/class/graphics/fb0/blank，也跑不了 systemctl。这里显式 --user root。
+#
+# --deviceglob 只吃 event*，不吃 /dev/input/mice 之类（thd 打开鼠标类设备会
+# 抢走事件，实测表现为键盘没反应）。
+ExecStart=/usr/sbin/thd --triggers /etc/triggerhappy/triggers.d/ \
+                        --user root --deviceglob /dev/input/event*
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -406,6 +406,29 @@ else
 	say "变体=core（无 GUI）"
 fi
 
+# --- 变体 kb：触屏键盘配套 ---
+# BuffyBoard 本体由 tools/ci/build-buffyboard.sh 在 chroot 里编译（那一步要在
+# apt 就绪之后，所以放在本脚本之后由 build-rootfs.sh 调用）。这里只装**配套
+# 的运行时依赖**：
+#
+#   triggerhappy —— 把电源键变成"开关屏幕"。
+#     有了触屏键盘之后，屏幕平时是亮着的，兜里/包里误触会打出字来，所以需要有
+#     个办法把屏幕关掉。而 99-odin-powerkey.conf 已经把 logind 的全部电源动作
+#     设成 ignore（防误触关机），于是改用 triggerhappy 直接监听按键。
+#     udev 干不了这件事 —— 它只在设备插拔时触发，监听不到按键事件。
+if [ "$ODIN_VARIANT" = "kb" ]; then
+	say "变体=kb：装 triggerhappy（电源键 = 开关屏）"
+	fix_dns
+	chroot $R apt-get update -qq
+	if ! chroot $R apt-get install -y -qq $APT_OPTS triggerhappy; then
+		echo "[setup-rootfs] FATAL: triggerhappy 没装上，构建中止" >&2
+		exit 1
+	fi
+	# 用自带的 odin-hotkey.service（以 root 跑 thd），不启用发行版那个默认以
+	# nobody 跑的 triggerhappy.service —— nobody 写不了 /sys、跑不了 systemctl。
+	chroot $R systemctl mask triggerhappy.service 2>/dev/null || true
+fi
+
 # 蜂窝网络（移动数据）：本设备**有**基带，不是没有硬件。
 #   - SoC 是骁龙 626（MSM8953 Pro），基带是 msm8953 的 MSS
 #   - 固件在原厂 modem 分区（mba.mbn + modem.mdt + modem.b00~b20，约 43MB）
