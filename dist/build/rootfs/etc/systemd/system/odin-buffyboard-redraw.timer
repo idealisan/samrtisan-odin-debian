@@ -1,0 +1,18 @@
+[Unit]
+Description=每秒让 BuffyBoard 全量重绘一次
+#
+# 周期的选择（真机实测）：
+#   · 0.5s：控制台刷新后几乎无感就补回来了，但退出时会明显闪一下；
+#   · 1s  ：仍能在"闪一下之后整块亮回来"，键盘可用；CPU 占用再减半。
+# 取 1s —— 这个定时器只是给"控制台抢屏"兜底，不需要更密。
+#
+# OnBootSec 留 10s：buffyboard 自己也是开机启动的，别在它还没起来时空转
+# （脚本里对"没有 buffyboard 进程"是直接 exit 0 的，不会报错）。
+
+[Timer]
+OnBootSec=10s
+OnUnitActiveSec=1s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

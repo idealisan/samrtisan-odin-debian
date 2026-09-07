@@ -1,0 +1,16 @@
+[Unit]
+Description=ODIN: 让 BuffyBoard 全量重绘一次（控制台整屏刷新后补回键盘）
+#
+# 控制台一整屏刷新（登录 / exit / 清屏）就会把 BuffyBoard 的键盘顶掉，
+# 变成"整块黑、只有摸到的那一小块会显形"。原理与为什么用 SIGUSR1 见
+# /usr/local/sbin/odin-buffyboard-redraw.sh 的头部注释。
+#
+# 刻意写成 oneshot + 独立 timer，而不是一个常驻的 while 循环：
+# 循环形式一旦被杀就再也不恢复，timer 由 systemd 保证周期；
+# 而且 timer 的触发节奏能在 `systemctl list-timers` 里直接看到。
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/odin-buffyboard-redraw.sh
+# 没跑 buffyboard 时（比如 core / gui 变体）什么都不做，也不该报错
+RemainAfterExit=no

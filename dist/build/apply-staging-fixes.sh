@@ -240,6 +240,11 @@ enable_from_tree odin-backlight.service multi-user.target
 # device unit 上，等显示真就绪了再强制重新 probe 一次。
 # 时间线与"为什么不在 DT 里补 vcc-supply"见脚本头部注释。
 enable_from_tree odin-touchscreen.service multi-user.target
+# 周期全量重绘 BuffyBoard：控制台一整屏刷新（登录 / exit）会把键盘顶成黑块，
+# 靠每秒一次的 SIGUSR1 把它补回来。原理见脚本头部注释。
+# 只在 kb 变体里有意义，但 enable_from_tree 对"覆盖树里没有这个 unit"会自动
+# 跳过，所以无条件写在这里是安全的。
+enable_from_tree odin-buffyboard-redraw.timer timers.target
 
 # ------------------------------------------------- 6. 阶段 3：USB 角色自动切换
 # 旧 odin-usb-gadget.sh 是 set -e 的一次性单元：开机那一刻 UDC 不在就永久 failed，

@@ -49,8 +49,14 @@ BUILD=$SRCDIR/_build
 # 构建期需要；运行时只需要右边那组
 BUILD_DEPS="gcc meson ninja-build pkg-config git ca-certificates \
             libinih-dev libinput-dev libudev-dev libxkbcommon-dev libdrm-dev"
-# 显式装成"手动安装"，免得 purge 构建依赖时被 autoremove 一起带走
-RUN_DEPS="libinput10 libdrm2 libxkbcommon0 libinih1"
+# 显式装成"手动安装"，免得 purge 构建依赖时被 autoremove 一起带走。
+#
+# libinput-bin 是**运行时**必需的，不是构建依赖：它提供 /usr/share/libinput/*.quirks。
+# 少了它 libinput 会报
+#   failed to find data files / Failed to load the device quirks ...
+#   This will negatively affect device behavior.
+# —— 触摸屏的 quirks 不生效，行为就不对了。第一版只留了 libinput10 就踩到这个。
+RUN_DEPS="libinput10 libinput-bin libdrm2 libxkbcommon0 libinih1"
 
 # chroot 里的 apt / git 都要解析域名，而 Debian 默认把 resolv.conf 做成指向
 # systemd-resolved 的符号链接 —— 设备没事，构建 chroot 里它是悬空的。
@@ -89,10 +95,15 @@ chroot "$ROOT" sh -c "
 "
 
 say "配置与编译（meson + ninja）"
+# lvgl_backends 特意只给 drm，不给默认的 framebuffer+drm：
+#   本机的 fbdev 加速路径是残的 —— 内核里 screen_buffer 为空，于是
+#   sys_fillrect / sys_copyarea / sys_imageblit 全是空操作，dmesg 会报
+#     fb0: sys_fillrect: framebuffer is not in virtual address space.
+#   走 drm 后端让 LVGL 直接提交自己的 buffer，不碰这条坏掉的通路。
 chroot "$ROOT" sh -c "
 	set -e
 	cd '$SRCDIR'
-	meson setup '$BUILD' -Dman=false -Dsystemd=true
+	meson setup '$BUILD' -Dman=false -Dsystemd=true -Dlvgl_backends=drm
 	meson compile -C '$BUILD' buffyboard
 "
 
@@ -117,6 +128,10 @@ printf 'uinput\n' > "$ROOT/etc/modules-load.d/odin-uinput.conf"
 # 启用服务。getty@tty1 也要显式开：键盘是给登录提示词用的，framebuffer 上
 # 没有 getty 就只剩一块键盘、无处可输。
 chroot "$ROOT" systemctl enable buffyboard.service getty@tty1.service
+# 注意：周期全量重绘的 timer **不在这里**启用 —— 它的 unit 在
+# dist/build/rootfs/ 覆盖树里，而覆盖树要到 apply-staging-fixes.sh 才铺下去，
+# 这里 enable 会因为文件不存在而失败。统一走 apply-staging-fixes.sh 的
+# enable_from_tree（那边的注释写了为什么）。
 say "  已启用 buffyboard.service 与 getty@tty1.service"
 
 say "清掉构建依赖与源码树（镜像里只留产物）"

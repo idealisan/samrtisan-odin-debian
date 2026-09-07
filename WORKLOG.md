@@ -4572,3 +4572,52 @@ BuffyBoard 依赖 libinput / libudev / libdrm / xkbcommon / inih，全是动态�
 - `multi-user.target.wants/` 里有 buffyboard.service，`getty.target.wants/` 里有
   getty@tty1.service；
 - /usr/src/buffybox 已清掉，gcc 已 purge。
+
+## 2026-09-07 BuffyBoard 真机实测：键盘能出、能摸，但会被控制台抢屏
+
+### 现象
+
+键盘画得出来、uinput 虚拟键盘设备也造出来了（`/proc/bus/input/devices` 里
+多一个 `buffyboard`），libinput 也认到了触摸屏（`New input device: generic ft5x06 (8d)`）。
+但**一登录或 exit，键盘区域就整块变黑**；还能触摸，只是手指按到的那一小块会
+重新显形，其余仍是黑的。
+
+### 原因不是 fbdev 加速
+
+换 drm 后端重编（`-Dlvgl_backends=drm`）后症状**一样**，所以不是 framebuffer
+那一套的问题。本质是**控制台和 BuffyBoard 抢同一个 CRTC**：控制台每次整屏刷新
+（登录 / exit / 清屏）就把自己那份 buffer 翻上去，把 BuffyBoard 顶掉；之后 LVGL
+只把被触摸的那一小块标脏重画，于是只有那一小块回来。
+
+（顺带查实：本机 fbdev 的加速路径确实是残的 —— `screen_buffer` 为空，
+`sys_fillrect/copyarea/imageblit` 全是空操作，dmesg 报
+`fb0: sys_fillrect: framebuffer is not in virtual address space.`。
+所以后端照样选 drm，不碰这条坏通路。）
+
+### 解法：周期全量重绘（用户拍板用这个）
+
+上游本来就有重绘接口：**SIGUSR1** → `main.c: on_new_terminal()` →
+`lv_obj_invalidate(keyboard)`，也就是整块键盘标脏全量重画。getty 那个 drop-in
+（`getty@.service.d/buffyboard.conf`）用的就是它。
+
+于是做成 `odin-buffyboard-redraw.timer`（1 秒一跳）+ 同名 oneshot 服务，周期性
+发 SIGUSR1。控制台抢屏之后最多 1 秒键盘自己补回来。不发私有信号、不改上游代码。
+
+周期是实测选的：0.5s 几乎无感但退出时会明显闪；**1s 仍能"闪一下之后整块亮回来"，
+CPU 再省一半**，取 1s。
+
+### 另外补掉的两处
+
+- **libinput-bin 没装**：它提供 `/usr/share/libinput/*.quirks`。只留 libinput10 时
+  libinput 报 `failed to find data files ... This will negatively affect device behavior`
+  —— 触摸屏 quirks 不生效。已加进 RUN_DEPS。
+- **redraw timer 不能在 build-buffyboard.sh 里 enable**：它的 unit 在
+  dist/build/rootfs/ 覆盖树里，而覆盖树要到 apply-staging-fixes.sh 才铺下去，
+  那时 enable 会因为文件不存在而失败。改走 enable_from_tree。
+
+### 本地验证（把容器里编好的二进制直接上机）
+
+- `buffyboard --help` 正常，ldd 缺的只是 libinih/libinput（设备没网，从 arm64 根
+  里带过去放 /opt/buffy-libs，用 LD_LIBRARY_PATH 指，不动系统文件）；
+- 启动后输入设备列表多出 `buffyboard`；
+- 1 秒重绘生效后，登录/退出时键盘会闪一下然后整块亮回来，可用。
