@@ -467,7 +467,8 @@ jobs:
       # 而且 gui 挂掉时留着 core 的日志对比更容易定位。
       fail-fast: false
       matrix:
-        variant: [core, gui]
+        # kb = core + BuffyBoard（framebuffer 上的触屏虚拟键盘，给无 SSH 的场合用）
+        variant: [core, gui, kb]
     name: rootfs (${{ matrix.variant }})
     steps:
       - uses: actions/checkout@v4
@@ -613,6 +614,8 @@ jobs:
         with: { name: odin-rootfs-core, path: out }
       - uses: actions/download-artifact@v4
         with: { name: odin-rootfs-gui, path: out }
+      - uses: actions/download-artifact@v4
+        with: { name: odin-rootfs-kb, path: out }
       - name: 生成校验和
         # 校验和按"逻辑资产"算，也就是**重组之后**的那个文件。
         # 下一步会把超过 2 GiB 的切成片段，片段自身的校验和没有意义；

@@ -192,6 +192,14 @@ say "  initramfs: $(stat -c%s "$ROOT/boot/initramfs.cpio.gz" 2>/dev/null || stat
 say "setup-rootfs.sh（用户 / 网络 / 服务）"
 ODIN_ROOTFS="$ROOT" ODIN_VARIANT="$VARIANT" bash "$REPO/dist/build/setup-rootfs.sh"
 
+# 变体 kb：在 core 之上加 BuffyBoard（framebuffer 上的触屏虚拟键盘）。
+# 必须在 chroot 里编（不能交叉编译，原因见 tools/ci/build-buffyboard.sh 头部），
+# 所以放在 setup-rootfs.sh 之后 —— 那时包与 DNS 都已就位。
+if [ "$VARIANT" = "kb" ]; then
+	say "变体=kb：在 arm64 根里编译 BuffyBoard（qemu 下较慢）"
+	bash "$REPO/tools/ci/build-buffyboard.sh" "$ROOT"
+fi
+
 else
   say "staging 层缓存已包含包和基础配置"
 fi

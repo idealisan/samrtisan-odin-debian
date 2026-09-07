@@ -4463,3 +4463,112 @@ remoteproc1 name=4080000.remoteproc state=running
 - **SSH 登录方式**：镜像里 `PermitRootLogin no`，要用 `user`/`user` 且必须
   `-o PreferredAuthentications=password -o PubkeyAuthentication=no`
   （否则先卡在 publickey，sshpass 传的密码永远轮不上）。见 docs/04。
+
+## 2026-09-07 触摸屏回归修复：不是芯片坏了，是 probe 比面板早了 5 秒
+
+### 症状
+
+真机上 `/proc/bus/input/devices` 里**没有触摸屏**，dmesg 只有一句
+`edt_ft5x06 1-0038: touchscreen probe failed` / `... failed with error -5`。
+看着像硬件或驱动坏了，其实芯片好得很。
+
+### 根因：TDDI 依赖面板先上电，而时序反了
+
+FT8716 与显示集成在同一颗 **TDDI** 上，面板没上电时它不响应 I2C。
+但 `msm`(DRM) 与 `panel_ft8716` 都是模块、靠 udev 冷插逐个加载，实测这条链
+到 48s 才跑完，而触摸在 43s 就 probe 了：
+
+```
+[33.776] ibb: disabling                              ← 面板 probe 试过一次，推迟，释放负压轨
+[43.152] edt_ft5x06 1-0038: supply vcc not found, using dummy regulator
+[43.729] edt_ft5x06 1-0038: touchscreen probe failed  ← 触摸先到，拿 -5(EIO)
+[48.466] msm_dpu 1a01000.display-controller: bound 1a94000.dsi   ← 显示才起来
+[48.962] [drm] fb0: msmdrmfb frame buffer device
+```
+
+失败后内核**不会重试**，于是整个会话都没有触摸设备。
+（2026-09-01 那次能用，是因为当时面板 5 秒就起来了，没有 race。）
+
+**决定性验证**：开机后手工 `modprobe -r edt_ft5x06 && modprobe edt_ft5x06`
+（此时面板已起）立刻成功：
+`input: generic ft5x06 (8d) as .../1-0038/input/input6`。
+
+### 为什么不在 DT 里补 vcc-supply
+
+同芯片的 vince 是 `vcc-supply` + `iovcc-supply` 都声明的（内核树
+`msm8953-xiaomi-vince.dts:188`），看起来照抄就行。但**原厂 DTS**
+（`evidence/stock-rom-battery/odin-stock.dts:6367`）里 focaltech@38
+**只声明了 `vcc_i2c-supply`**，没有独立主电 —— 说明主电就是跟显示共享的，
+没有第二路轨可以指。照抄 vince 是猜，不如直接把时序理顺。
+
+### 修法
+
+`odin-touchscreen.service`（绑 `dev-dri-card0.device`）+ `odin-touchscreen.sh`：
+等显示真就绪了再强制重新 probe 一次。与既有的 `odin-venus-fw` 是同一个套路
+（依赖就绪后重建 probe），已在 apply-staging-fixes.sh 里注册启用。
+
+### 真机验证
+
+- 卸掉模块模拟失败态 → 跑脚本 → `✅ 触摸已注册`，`generic ft5x06 (8d)` 回来；
+- 手摸屏幕，`/dev/input/event5` 采到真实事件：
+  `BTN_TOUCH=1`、`ABS_MT_POSITION_X=138/139`、`ABS_MT_POSITION_Y=13/17/19`、`EV_SYN`。
+
+### 待办
+
+- 需要**重启一次**验证开机时序下也生效（重启有丢 SSH 的风险，先问用户）。
+- 顺带发现：显示要 48s 才起来，比老记录的 5s 慢很多，值得单独查一轮。
+
+## 2026-09-07 第三个 rootfs 变体 kb：core + BuffyBoard 触屏键盘
+
+BuffyBoard 是跑在 framebuffer 上的触屏虚拟键盘（LVGL 写的），用 uinput 造一个
+虚拟键盘设备，给"SSH 不通、图形界面也没有"的场合当交互方式。
+参考 https://wiki.postmarketos.org/wiki/Buffyboard 。
+
+### 前提都在（先逐项核实过）
+
+- `CONFIG_INPUT_UINPUT=m`、`CONFIG_DRM_FBDEV_EMULATION=y`、`CONFIG_FB=y`；
+- 真机 `/dev/fb0` 与 `/dev/uinput` 都在。
+
+### 为什么在 chroot 里编，不交叉编译
+
+BuffyBoard 依赖 libinput / libudev / libdrm / xkbcommon / inih，全是动态库。
+跟 rmtfs 是同一道题：交叉编译就要在 runner（Ubuntu）上装这些的 arm64 版，
+链接进去的 glibc 符号版本高于设备上 bookworm 的 2.36 ⇒ 设备上运行时才炸。
+所以改成**在 debootstrap 出来的 arm64 根里借 qemu 直接编**，用的就是根目录自己
+的 bookworm 库，ABI 天然一致。
+
+代价是慢：471 个编译单元，原生 arm64 约 19 秒，qemu 下整个脚本约 10 分钟。
+编完 purge 构建依赖 + 删源码树 + apt clean，镜像里只留产物（921200 字节）。
+
+### 踩坑
+
+1. **忘了装 gcc**。meson 不会自带编译器，报
+   `Unknown compiler(s): [['cc'], ['gcc'], ...]`。BUILD_DEPS 里显式写 gcc。
+2. **chroot 里没 DNS**：`Temporary failure resolving 'deb.debian.org'`。
+   Debian 把 resolv.conf 做成指向 systemd-resolved 的符号链接，构建 chroot 里
+   是悬空的。照 setup-rootfs.sh 的 fix_dns 拿构建环境的顶上；自己的脚本里也
+   加了一道，不依赖调用顺序（导出前 build-rootfs.sh 会换回 stub 链接）。
+
+### 落地
+
+- `tools/ci/build-buffyboard.sh`（新）：chroot 内 apt 装依赖 → 取 buffybox @ 3.6.0
+  + lvgl 子模块 @ 85aa60d1 → `meson setup -Dman=false -Dsystemd=true` → 编 buffyboard
+  → 装二进制/配置/systemd unit → 预加载 uinput → 启用 buffyboard.service 与
+  getty@tty1.service → purge 清理。
+  `-Dsystemd=true` 不能省：带上 meson 才生成 buffyboard.service 与
+  getty@.service.d/buffyboard.conf（后者在新 getty 会话时给 buffyboard 发
+  SIGUSR1 让它重绘），自己手写容易漏掉这个联动。
+- `Makefile`：VARIANTS 加 kb，补 rootfs-kb / publish-kb，变体校验改 core|gui|kb。
+- `build-rootfs.sh`：setup-rootfs.sh 之后、变体=kb 时调用（必须在 setup 之后，
+  那时包与 DNS 才就位）。
+- CI：rootfs 矩阵加 kb，publish 下载 odin-rootfs-kb。
+
+### 本地验证（容器里对 arm64 根副本跑了一遍）
+
+- `/usr/bin/buffyboard` 921200 字节，aarch64，`chroot` 里 `--help` 正常；
+- `ldd` 链的是根目录自己的 bookworm 库（libinih/libinput/libudev/libc 2.36）；
+- 四个文件都在：/etc/buffyboard.conf、buffyboard.service、
+  getty@.service.d/buffyboard.conf、modules-load.d/odin-uinput.conf；
+- `multi-user.target.wants/` 里有 buffyboard.service，`getty.target.wants/` 里有
+  getty@tty1.service；
+- /usr/src/buffybox 已清掉，gcc 已 purge。

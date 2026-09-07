@@ -7,15 +7,20 @@
 #   make kernel     只编内核与模块
 #   make lk2nd      只编二级引导（完整版 + 精简版）
 #   make rootfs     组装根文件系统并导出镜像（变体取 ODIN_VARIANT，默认 gui）
-#   make rootfs-core / make rootfs-gui      显式指定变体
-#   make publish / publish-core / publish-gui   产物汇总到 out/publish + SHA256SUMS
+#   make rootfs-core / make rootfs-gui / make rootfs-kb      显式指定变体
+#   make publish / publish-core / publish-gui / publish-kb   产物汇总到 out/publish
+#
+# 三个变体：
+#   core  无 GUI，服务器 / 开发基线
+#   gui   带 Plasma Mobile 桌面
+#   kb    core + BuffyBoard（framebuffer 上的触屏虚拟键盘）
 #   make clean      清 out/；make distclean 连内核源码树一起清
 #
 # 两个变体：core（无 GUI，服务器 / 开发基线）与 gui（带 Plasma Mobile 桌面）
-#   dtb / kernel / lk2nd 与变体无关 —— 两个变体共用同一份产物，只编一次。
+#   dtb / kernel / lk2nd 与变体无关 —— 所有变体共用同一份产物，只编一次。
 #   差别只在 rootfs 阶段装什么包，所以变体维度从 rootfs 才引入。
 #   core 是 gui 的子集 ⇒ 本地默认只编 gui（ODIN_VARIANT ?= gui）；
-#   CI 两个都编，各一条 job，共用上一步的 kernel / dtb artifact。
+#   CI 三个都编，各一条 job，共用上一步的 kernel / dtb artifact。
 #
 # 设计取向（与用户的共识）：
 #   **能写成直线命令的，直接写在这里；有真逻辑的，仍然放脚本。**
@@ -84,7 +89,7 @@ SUITE         ?= bookworm
 # 本地默认 gui：core 是它的子集，本地没必要为求证子集再花一遍 debootstrap。
 # CI 会显式跑两条：make rootfs-core 与 make rootfs-gui。
 ODIN_VARIANT  ?= gui
-VARIANTS      := core gui
+VARIANTS      := core gui kb
 
 # ---------------------------------------------------------------- 工具链
 CROSS ?= aarch64-linux-gnu-
@@ -123,8 +128,8 @@ KDIR_TAG := $(subst /,_,$(abspath $(KDIR)))
 
 .PHONY: all help print-config fetch-kernel dtb kernel lk2nd \
         rmtfs \
-        rootfs rootfs-core rootfs-gui \
-        publish publish-core publish-gui \
+        rootfs rootfs-core rootfs-gui rootfs-kb \
+        publish publish-core publish-gui publish-kb \
         clean distclean
 
 .DEFAULT_GOAL := all
@@ -413,6 +418,7 @@ $(STAMPS)/rmtfs: $(REPO)/tools/ci/build-rmtfs.sh \
 rootfs: rootfs-$(ODIN_VARIANT)
 rootfs-core: $(STAMPS)/rootfs-core
 rootfs-gui:  $(STAMPS)/rootfs-gui
+rootfs-kb:   $(STAMPS)/rootfs-kb
 
 # 依赖同样必须是真的。2026-09-06 修：原来写 `| $(STAMPS) kernel dtb`，
 # kernel / dtb 只是**排序**前提，不是真依赖 ⇒ 改了内核或设备树之后
@@ -430,8 +436,8 @@ $(STAMPS)/rootfs-%: $(STAMPS)/kernel-$(KDIR_TAG) $(STAMPS)/dtb-$(KDIR_TAG) \
 			-type f 2>/dev/null) \
 		| $(STAMPS)
 	@case "$*" in \
-		core|gui) ;; \
-		*) echo "[rootfs] 未知变体: $*（可选 core 或 gui）" >&2; exit 1 ;; \
+		core|gui|kb) ;; \
+		*) echo "[rootfs] 未知变体: $*（可选 core / gui / kb）" >&2; exit 1 ;; \
 	esac
 	@mkdir -p $(OUT)/rootfs-$*
 	SUITE="$(SUITE)" ODIN_VARIANT="$*" ODIN_RMTFS_BIN="$(RMTFS_OUT)/rmtfs" \
@@ -443,11 +449,12 @@ $(STAMPS)/rootfs-%: $(STAMPS)/kernel-$(KDIR_TAG) $(STAMPS)/dtb-$(KDIR_TAG) \
 publish: publish-$(ODIN_VARIANT)
 publish-core: $(STAMPS)/publish-core
 publish-gui:  $(STAMPS)/publish-gui
+publish-kb:   $(STAMPS)/publish-kb
 
 $(STAMPS)/publish-%: | $(STAMPS) rootfs-% lk2nd
 	@case "$*" in \
-		core|gui) ;; \
-		*) echo "[publish] 未知变体: $*（可选 core 或 gui）" >&2; exit 1 ;; \
+		core|gui|kb) ;; \
+		*) echo "[publish] 未知变体: $*（可选 core / gui / kb）" >&2; exit 1 ;; \
 	esac
 	@mkdir -p $(PUBLISH)
 	cp -f $(DTB_OUT)/*.dtb   $(PUBLISH)/
