@@ -4621,3 +4621,37 @@ CPU 再省一半**，取 1s。
   里带过去放 /opt/buffy-libs，用 LD_LIBRARY_PATH 指，不动系统文件）；
 - 启动后输入设备列表多出 `buffyboard`；
 - 1 秒重绘生效后，登录/退出时键盘会闪一下然后整块亮回来，可用。
+
+## 2026-09-07 电源键开关屏：三个坑，一个个踩过来
+
+### 坑 1：我把自己的脚本文件覆盖成了压缩包（提交里带了个垃圾文件）
+
+写过一个 scp 循环：
+```
+for f in thd.tgz thd-libs.tgz odin-screen-toggle.sh; do
+  scp ... tmp/buffy/out/$f dist/build/rootfs/usr/local/sbin/odin-screen-toggle.sh
+done
+```
+变量名用错 ⇒ 把 `thd-libs.tgz` 拷到了**仓库里脚本的路径**上（1371839 字节，
+gzip 魔数 `037 213`），然后 `git add -A` 把它提交进了 1ab6bba。设备上装到的
+也就是这个压缩包，于是 sh 报 `odin-screen-toggle.sh: not found` / `Exec format error`。
+教训：**scp 的目标路径别用变量拼，尤其别和源混在一个循环里。**
+
+### 坑 2：thd 的 --triggers 给目录不生效
+
+真机实测（triggerhappy 0.5.0-1.1+b2）：传 `/etc/triggerhappy/triggers.d/`
+一条触发器都不执行，journal 里只有 `Device /dev/input/event0 not suitable.`；
+改成传**具体文件**立刻就执行了。
+（Debian 自带的 triggerhappy.service 传的是目录，但它被我们 mask 了。）
+
+### 坑 3：用 console blank 会"灭了马上又亮"
+
+第一版写 `/sys/class/graphics/fb0/blank`。真机现象是按下后灭一下立刻亮回来 ——
+**console blank 会被任意输入事件自动解除**，而按电源键的抬手、甚至一次触摸
+都算输入。改用**背光**：`/sys/class/backlight/*/bl_power`（0 亮 / 1 灭），
+关的是 WLED 背光本身，输入事件管不着它。没有背光设备的机器再退回 console blank。
+
+### 验证
+
+手动跑脚本：关 → `bl_power=1` 且 buffyboard 停；开 → `bl_power=0` 且 buffyboard 起。
+脚本里加了带时间戳的日志，方便判断"一次物理按键到底触发几次"。
