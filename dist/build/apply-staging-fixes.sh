@@ -234,6 +234,12 @@ enable_from_tree odin-swap.service      sysinit.target
 enable_from_tree odin-adsp-fw.service  multi-user.target
 enable_from_tree odin-modem-fw.service multi-user.target
 enable_from_tree odin-backlight.service multi-user.target
+# FT8716 是 TDDI（触摸与显示同一颗芯片），面板没上电就不应答 I2C。
+# 而 msm(DRM) / panel_ft8716 都是模块、靠 udev 冷插加载，实测比触摸晚约 5 秒
+# 就绪 ⇒ 触摸先 probe 拿 -5(EIO)，整个会话没触摸。这个服务绑在 card0 这个
+# device unit 上，等显示真就绪了再强制重新 probe 一次。
+# 时间线与"为什么不在 DT 里补 vcc-supply"见脚本头部注释。
+enable_from_tree odin-touchscreen.service multi-user.target
 
 # ------------------------------------------------- 6. 阶段 3：USB 角色自动切换
 # 旧 odin-usb-gadget.sh 是 set -e 的一次性单元：开机那一刻 UDC 不在就永久 failed，

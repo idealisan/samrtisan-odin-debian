@@ -1,0 +1,21 @@
+[Unit]
+Description=ODIN: 面板就绪后重新 probe 触摸屏（FT8716 是 TDDI）
+#
+# FT8716 与显示共用一颗 TDDI，面板没上电它就不应答 I2C。而 msm(DRM) 和
+# panel_ft8716 都是模块、靠 udev 冷插加载，实测比触摸（edt_ft5x06）晚约 5 秒
+# 就绪 —— 于是触摸先 probe，拿到 -5(EIO) 就再也不重试，整个会话没触摸。
+# 完整的时间线与"为什么不在 DT 里补 vcc-supply"见
+# /usr/local/sbin/odin-touchscreen.sh 的头部注释。
+#
+# 绑到 card0 这个 device unit 上：它是"显示真的起来了"的可靠信号，
+# 比写死 sleep 可靠，也比 After=systemd-udev-settle 更精确。
+After=dev-dri-card0.device
+Wants=dev-dri-card0.device
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/odin-touchscreen.sh
+
+[Install]
+WantedBy=multi-user.target
