@@ -6,8 +6,10 @@ Description=Qualcomm Remote Filesystem Service (rmtfs)
 #   没有 rmtfs，modem 初始化会卡住并每约 50 秒崩一次：
 #       fatal error received: dog.c:1526:Watchdog detects stalled initialization。
 #
-# ⚠️ 这个服务依赖 /usr/sbin/rmtfs 这个**二进制**，它不在本仓库（铁律 5：二进制不入库。上游源码：github.com/andersson/rmtfs，pmOS 用的是 695d0668。
-#    目前是手工装到真机上的；重新刷镜像会丢。要长期生效得在 CI 里加一步编它，或者在镜像预置。
+# /usr/sbin/rmtfs 这个**二进制**不入库（铁律 5：二进制不进版本库），由
+# `make rmtfs` 在上游源码（github.com/andersson/rmtfs @ v1.3）基础上编出来，
+# build-rootfs.sh 再拷进镜像 —— 所以刷 CI 编出来的镜像是自带它的，不用手工装。
+# 上游源码、为何去掉 libudev、为何全静态链接，见 tools/ci/build-rmtfs.sh 头部。
 #
 # 参考 pmOS 的 rmtfs（modem/rmtfs/rmtfs.initd）：
 #   -P  用原始 EFS 分区（modemst1/modemst2）

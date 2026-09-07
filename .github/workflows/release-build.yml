@@ -478,8 +478,13 @@ jobs:
         id: debinst
         run: |
           sudo apt-get update -qq
+          # gcc-aarch64-linux-gnu 是给 `make rmtfs` 用的：modem 的 EFS 读写守护
+          # 进程必须自己编（Debian 没这个包），而 rootfs 是 arm64 的。
+          # 注意**不要**顺手装 libudev-dev:arm64 —— 我们编的 rmtfs 走 sysfs、
+          # 不链 libudev（原因见 tools/ci/build-rmtfs.sh 头部注释）。
           sudo apt-get install -y -qq debootstrap qemu-user-static binfmt-support \
-            e2fsprogs android-sdk-libsparse-utils kmod cpio parted
+            e2fsprogs android-sdk-libsparse-utils kmod cpio parted \
+            gcc-aarch64-linux-gnu
           # apt 装的 binfmt 条目不一定已注册进内核，chroot 进 arm64 根之前补一次
           sudo update-binfmts --enable qemu-aarch64
           # 基础根缓存键：debootstrap 的产物只由下面这几样决定，与变体无关，

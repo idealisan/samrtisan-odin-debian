@@ -204,6 +204,29 @@ if [ -d "$DOUT" ]; then
 fi
 bash "$REPO/dist/build/apply-staging-fixes.sh" "$ROOT"
 
+# ---------------------------------------------------------------- 5. rmtfs
+# modem 起来后要靠这个用户态守护进程读写 EFS（modemst1/modemst2）。
+# 没有它，modem 初始化会卡住，watchdog 每约 50 秒把它拽崩一次：
+#   fatal error received: dog.c:1526:Watchdog detects stalled initialization
+#
+# 二进制**不入库**（AGENTS 铁律 5），由 `make rmtfs` 从上游源码编出来，
+# 路径经 ODIN_RMTFS_BIN 传进来。详见 tools/ci/build-rmtfs.sh 的头部注释。
+#
+# 刻意放在 staging 缓存判断**之外**：缓存命中时整个 $ROOT 是从 tar 里解出来的，
+# 但 rmtfs 是构建期产物、不进那份 tar，所以每次都得重新装一遍，否则会出现
+# "改了 rmtfs 却因为缓存命中而没进镜像"这种静默失效。
+if [ -n "${ODIN_RMTFS_BIN:-}" ]; then
+	if [ ! -f "$ODIN_RMTFS_BIN" ]; then
+		echo "[rootfs] ODIN_RMTFS_BIN 指向的文件不存在: $ODIN_RMTFS_BIN" >&2
+		exit 1
+	fi
+	install -d -m 0755 "$ROOT/usr/sbin"
+	install -m 0755 "$ODIN_RMTFS_BIN" "$ROOT/usr/sbin/rmtfs"
+	say "rmtfs: 已装入 /usr/sbin/rmtfs（$(stat -c%s "$ROOT/usr/sbin/rmtfs" 2>/dev/null || stat -f%z "$ROOT/usr/sbin/rmtfs") 字节）"
+else
+	say "rmtfs: 未提供 ODIN_RMTFS_BIN，跳过 —— 镜像里不会有 /usr/sbin/rmtfs"
+fi
+
 # ---------------------------------------------------------------- 6. 导出前卫生
 # 构建期为了方便在 chroot 里装包，动过两处与运行环境有关的东西，导出前必须还原，
 # 否则本地编出来的镜像会带着构建机的痕迹，和 CI 编出来的不是一回事

@@ -4402,3 +4402,64 @@ remoteproc1 name=4080000.remoteproc state=running
 - `-s` 同步 mss rproc（modem 启停交给 rmtfs 管
 - `-S` A/B 分区的 slot 后缀
 - `-v` verbose
+
+## 2026-09-07 P0 完成：rmtfs 进 CI，不再手工装二进制
+
+上一版（sensors6-rmtfs）只把**服务文件**进了仓库，二进制还是手工 scp 到真机的 ——
+重刷镜像就丢，modem 回到崩溃循环。这一版把**编译**也搬进 CI：镜像自带 `/usr/sbin/rmtfs`。
+
+### 为什么不能只是「装个 libudev-dev:arm64 交叉编译」
+
+按上游默认编法，rmtfs 用 libudev 读共享内存设备的两个 sysfs 属性。这条依赖在 CI 上有两个硬伤：
+
+1. **glibc 版本错配**：runner 是 Ubuntu（24.04 → glibc 2.39），设备是 Debian bookworm（2.36）。
+   链进去的符号版本一旦高于 2.36，设备上是**运行时**才炸（`GLIBC_2.xx not found`），
+   构建期全绿 —— 属于最难查的那类问题。
+2. **静态不了**：Debian 的 `libudev-dev` **不带 `libudev.a`**（实测确认），所以想靠
+   全静态链接绕开版本问题也绕不开。
+
+### 正解：绕开 libudev，改成读 sysfs
+
+上游源码里**本来就有**一套不用 libudev 的实现（原来的 ANDROID 分支），直接读
+`/sys/class/rmtfs/qcom_rmtfs_mem%d/{phys_addr,size}`。逐项核实过这条路对本机成立：
+
+- 内核 `drivers/soc/qcom/rmtfs_mem.c`：`rmtfs_class` 的 `.name = "rmtfs"`、
+  设备名 `"qcom_rmtfs_mem%d"`、属性 `phys_addr / size / client_id`（0444）。
+- **真机实测**：`cat /sys/class/rmtfs/qcom_rmtfs_mem1/phys_addr` → `0x00000000f2d00000`，
+  `size` → `0x0000000000180000`（`%pa` 打的、带 `0x` 前缀，`strtoull(..,16)` 能解析）。
+
+于是补丁 `tools/ci/rmtfs/0001-sharedmem-drop-libudev-read-sysfs.patch` 只改 3 行：
+把开关从 `#ifndef ANDROID` 换成 `#ifdef RMTFS_USE_LIBUDEV`（默认走 sysfs），
+并把 `<sys/endian.h>` 改成 `<endian.h>`（前者是 musl/BSD 的拼法，glibc 只有后者）。
+
+去掉 libudev 之后就能**全静态链接**（-static，870696 字节），运行期不依赖设备上任何
+.so，构建机是 Ubuntu 还是 Debian、什么版本，都不再影响产物能不能跑。构建脚本里加了
+一道自检：产物不是静态链接就直接失败，不等到刷机才暴露。
+
+### 落地改动
+
+- `tools/ci/build-rmtfs.sh`（新）：取 qrtr @ `27d2c9df`（上游无 tag，钉 SHA）+
+  rmtfs @ `v1.3`（=`b30a3eb`），手工编 `libqrtr.a`（躲开 meson 交叉文件），再静态链 rmtfs。
+  用 `git fetch --depth 1 origin <ref>`：钉 SHA 时能且只能这么取，对 tag 同样成立，两个仓库一套代码。
+- `Makefile`：新增 `rmtfs` 目标与 `RMTFS_OUT`；`rootfs-%` 依赖它并传 `ODIN_RMTFS_BIN`。
+- `tools/ci/build-rootfs.sh`：把二进制装进 `$ROOT/usr/sbin/rmtfs`。
+  刻意放在 staging 缓存判断**之外** —— rmtfs 是构建期产物、不进那份 tar，
+  放里面就会出现「改了 rmtfs 却因缓存命中而没进镜像」的静默失效。
+- CI rootfs job 的 apt 行加 `gcc-aarch64-linux-gnu`。
+
+### 真机验证（换上静态版之后）
+
+- 服务 active，rmtfs 进程在，`ls /proc/<pid>/fd` 显示 **fd 5 → `/dev/qcom_rmtfs_mem1`** ——
+  新代码路径真的打开了共享内存设备。
+- 崩溃计数 **35 → 35**（无新增），三个 remoteproc 全 running，稳定运行 4 分钟以上。
+- journal 干净，只有 `Started odin-rmtfs.service`。
+
+### 踩坑
+
+- **裸跑 `/usr/sbin/rmtfs` 会永久阻塞**：它是前台守护进程，加 `| head -3` 也没用
+  （不输出）。脚本里想"看看能不能执行"要改用 `ldd` / `file`，不要直接跑。
+- **zsh 不做词分割**：`SSHOPT="-o A -o B"; scp $SSHOPT ...` 会把整串当成一个参数，
+  报 `keyword connecttimeout extra arguments at end of line`。ssh 的 `-o` 要逐个写。
+- **SSH 登录方式**：镜像里 `PermitRootLogin no`，要用 `user`/`user` 且必须
+  `-o PreferredAuthentications=password -o PubkeyAuthentication=no`
+  （否则先卡在 publickey，sshpass 传的密码永远轮不上）。见 docs/04。

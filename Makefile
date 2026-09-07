@@ -66,6 +66,9 @@ STAMPS     := $(OUT)/.stamps
 # 变体相关路径用递归展开（= 而不是 :=）：rootfs-core / rootfs-gui 的 recipe
 # 运行时才会确定 ODIN_VARIANT，:= 会把解析期那个默认值钉死，两个变体就串了。
 ROOTFS_OUT = $(OUT)/rootfs-$(ODIN_VARIANT)
+# rmtfs 的用户态守护进程（modem 读写 EFS 要用）。二进制不入库，这里编出来、
+# 由 build-rootfs.sh 拷进根文件系统。详见 tools/ci/build-rmtfs.sh 的头部注释。
+RMTFS_OUT  := $(OUT)/rmtfs
 
 # ---------------------------------------------------------------- 钉死的外部输入
 # 与 .github/workflows/release-build.yml 的 env 段一致，改一处要改两处
@@ -119,6 +122,7 @@ DTB_NAMES := msm8953-smartisan-odin \
 KDIR_TAG := $(subst /,_,$(abspath $(KDIR)))
 
 .PHONY: all help print-config fetch-kernel dtb kernel lk2nd \
+        rmtfs \
         rootfs rootfs-core rootfs-gui \
         publish publish-core publish-gui \
         clean distclean
@@ -389,6 +393,17 @@ $(STAMPS)/lk2nd: | $(STAMPS)
 	@rm -f "$(LK2ND_OUT)/.odin-strings.txt"
 	@mkdir -p $(STAMPS) && touch $@
 
+# ================================================================ rmtfs（用户态）
+# modem 起来后要靠 rmtfs 读写 EFS（modemst1/modemst2），没有它 modem 会
+# 每约 50 秒被 watchdog 拽崩一次。Debian 没有这个包，得自己编。
+# 编出来的二进制由 build-rootfs.sh 拷进根文件系统（ODIN_RMTFS_BIN）。
+rmtfs: $(STAMPS)/rmtfs
+$(STAMPS)/rmtfs: $(REPO)/tools/ci/build-rmtfs.sh \
+		$(wildcard $(REPO)/tools/ci/rmtfs/*.patch) \
+		| $(STAMPS)
+	CC="$(CROSS)gcc" bash $(REPO)/tools/ci/build-rmtfs.sh "$(RMTFS_OUT)"
+	@mkdir -p $(STAMPS) && touch $@
+
 # ================================================================ 根文件系统
 # 仍是脚本：debootstrap + depmod + initramfs + 用户态配置 + 镜像导出，
 # 一整条流水线，且有 mount 之类的副作用，不适合拆成 make recipe。
@@ -407,6 +422,7 @@ rootfs-gui:  $(STAMPS)/rootfs-gui
 # 这已经是今天第三次撞同一类坑（另两次：CI 缓存键抄包清单、
 # kernel/dtb 漏配置与补丁依赖）—— 依赖关系没表达出来，改动就静默消失。
 $(STAMPS)/rootfs-%: $(STAMPS)/kernel-$(KDIR_TAG) $(STAMPS)/dtb-$(KDIR_TAG) \
+		$(STAMPS)/rmtfs \
 		$(REPO)/tools/ci/build-rootfs.sh \
 		$(REPO)/dist/build/setup-rootfs.sh \
 		$(REPO)/dist/build/apply-staging-fixes.sh \
@@ -418,7 +434,8 @@ $(STAMPS)/rootfs-%: $(STAMPS)/kernel-$(KDIR_TAG) $(STAMPS)/dtb-$(KDIR_TAG) \
 		*) echo "[rootfs] 未知变体: $*（可选 core 或 gui）" >&2; exit 1 ;; \
 	esac
 	@mkdir -p $(OUT)/rootfs-$*
-	SUITE="$(SUITE)" ODIN_VARIANT="$*" $(SUDO) bash $(REPO)/tools/ci/build-rootfs.sh \
+	SUITE="$(SUITE)" ODIN_VARIANT="$*" ODIN_RMTFS_BIN="$(RMTFS_OUT)/rmtfs" \
+		$(SUDO) bash $(REPO)/tools/ci/build-rootfs.sh \
 		"$(OUT)/rootfs-$*" "$(KERNEL_OUT)" "$(DTB_OUT)"
 	@mkdir -p $(STAMPS) && touch $@
 
