@@ -22,7 +22,7 @@
 #   odin-debian-gui-sparse.img      同上 sparse 版
 #   SHA256SUMS                      全部产物的校验和
 #
-# 五个 job：dtb、lk2nd、kernel 并行 → rootfs×2（core / gui，matrix）→ publish。
+# 五个 job：dtb、lk2nd、kernel 并行 → rootfs×3（core / gui / kb，matrix）→ publish。
 # core 是 gui 的子集，所以本地只编 gui（Makefile 的 ODIN_VARIANT 默认 gui）；
 # CI 两个都编，因为要发布的东西必须两个都验过。
 

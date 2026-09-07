@@ -21,9 +21,12 @@ DOUT=${3:-$OUT/../dtb}
 # 变体由 make 的 ODIN_VARIANT 传下来（core 无 GUI / gui 带 Plasma Mobile）。
 # 只影响两件事：装什么包（交给 setup-rootfs.sh）与产出镜像叫什么名字。
 VARIANT=${ODIN_VARIANT:-core}
+# ⚠️ 变体名单在这里**又有一份**，Makefile 的 $(STAMPS)/rootfs-% 里也有一份。
+#    加新变体时两边都要改 —— 2026-09-07 加 kb 时只改了 Makefile，CI 上 kb job
+#    23 秒就挂在 "[rootfs] 未知变体: kb（可选 core / gui）"。
 case "$VARIANT" in
-	core|gui) ;;
-	*) echo "[rootfs] 未知变体: $VARIANT（可选 core / gui）" >&2; exit 1 ;;
+	core|gui|kb) ;;
+	*) echo "[rootfs] 未知变体: $VARIANT（可选 core / gui / kb）" >&2; exit 1 ;;
 esac
 STAGE_CACHE_HIT=${ODIN_STAGE_CACHE_HIT:-false}
 # staging 根目录必须按变体分开。debootstrap 是重活，下面靠

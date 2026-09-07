@@ -412,7 +412,7 @@ $(STAMPS)/rmtfs: $(REPO)/tools/ci/build-rmtfs.sh \
 # ================================================================ 根文件系统
 # 仍是脚本：debootstrap + depmod + initramfs + 用户态配置 + 镜像导出，
 # 一整条流水线，且有 mount 之类的副作用，不适合拆成 make recipe。
-# 变体走模式规则（% = core / gui）：两个变体的步骤完全一样，只有名字不同，
+# 变体走模式规则（% = core / gui / kb）：各变体的步骤完全一样，只有名字不同，
 # 用 $* 把变体名传下去即可，没必要把同一段 recipe 抄两遍。
 # 戳文件也按变体分开 —— 否则编完 core 再编 gui，make 会认为 rootfs 已最新而跳过。
 rootfs: rootfs-$(ODIN_VARIANT)
