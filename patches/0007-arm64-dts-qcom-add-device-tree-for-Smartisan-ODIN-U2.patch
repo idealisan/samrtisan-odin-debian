@@ -48,7 +48,7 @@ new file mode 100644
 index 000000000..3dc8f434d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8953-smartisan-odin.dts
-@@ -0,0 +1,991 @@
+@@ -0,0 +1,1023 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Smartisan U2 Pro (ODIN), based on Qualcomm MSM8953.
@@ -79,10 +79,33 @@ index 000000000..3dc8f434d
 +		pinctrl-names = "default";
 +		pinctrl-0 = <&gpio_key_default>;
 +
++		/*
++		 * 三个实体键的 GPIO 与键码全部照抄原厂 DTB
++		 * （evidence/stock-rom-battery/odin-stock.dts:11643 的 gpio_keys）：
++		 *   GPIO85 -> KEY_VOLUMEUP(115)   GPIO86 -> KEY_VOLUMEDOWN(114)
++		 *   GPIO87 -> KEY_HOME(102)，且带 gpio-key,wakeup
++		 * 三者都是 low-active，debounce-interval 原厂写 15。
++		 */
 +		key-volume-up {
 +			label = "volume_up";
 +			linux,code = <KEY_VOLUMEUP>;
 +			gpios = <&tlmm 85 GPIO_ACTIVE_LOW>;
++			debounce-interval = <15>;
++		};
++
++		key-volume-down {
++			label = "volume_down";
++			linux,code = <KEY_VOLUMEDOWN>;
++			gpios = <&tlmm 86 GPIO_ACTIVE_LOW>;
++			debounce-interval = <15>;
++		};
++
++		key-home {
++			label = "key_home";
++			linux,code = <KEY_HOME>;
++			gpios = <&tlmm 87 GPIO_ACTIVE_LOW>;
++			debounce-interval = <15>;
++			wakeup-source;
 +		};
 +	};
 +
@@ -181,9 +204,18 @@ index 000000000..3dc8f434d
 +	status = "okay";
 +};
 +
++/*
++ * RESIN **不**用作按键输入。
++ * 原厂 DTB（odin-stock.dts:7932）里 qcom,pon_2 就是 status="disable" ——
++ * 音量- 走的是 GPIO86，不是 PMIC RESIN。
++ *
++ * 之前把它 enable 成 KEY_VOLUMEDOWN 是有实际后果的：按一次电源键会同时冒出
++ * KEY_POWER（pwrkey）和 KEY_VOLUMEDOWN（resin）两个事件，于是
++ *   · 热键守护进程 thd 看到"两个键同时按下"就匹配不上单键触发器；
++ *   · 用户看到的是"按了电源键没反应"。
++ */
 +&pm8953_resin {
-+	linux,code = <KEY_VOLUMEDOWN>;
-+	status = "okay";
++	status = "disabled";
 +};
 +
 +&pmi8950_wled {

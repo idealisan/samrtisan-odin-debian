@@ -21,7 +21,14 @@ Type=simple
 #   "Device /dev/input/event0 not suitable."，按键完全没反应；
 #   改成传 /etc/triggerhappy/triggers.d/odin-screen.conf 立刻就执行了。
 #   （Debian 自带的 triggerhappy.service 传的是目录，但它被我们 mask 了。）
+# --ignore KEY_VOLUMEDOWN 是**临时措施**，等 DTS 修好映射就可以去掉。
+#   为什么需要：DTS 里 &pm8953_resin 被错误地 enable 并映射成 KEY_VOLUMEDOWN，
+#   而原厂明确把 RESIN 设成 status="disable"（音量- 其实是 GPIO86）。
+#   后果是**按一次电源键会同时冒出 KEY_POWER 和 KEY_VOLUMEDOWN**，thd 一看到
+#   两个键同时按下就匹配不上单键触发器 KEY_POWER 1 —— 表现就是"按了没反应"。
+#   详见 reports/002 与 WORKLOG 2026-09-07。
 ExecStart=/usr/sbin/thd --triggers /etc/triggerhappy/triggers.d/odin-screen.conf \
+                        --ignore KEY_VOLUMEDOWN \
                         --user root --deviceglob /dev/input/event*
 Restart=on-failure
 RestartSec=2

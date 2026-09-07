@@ -4655,3 +4655,41 @@ gzip 魔数 `037 213`），然后 `git add -A` 把它提交进了 1ab6bba。设�
 
 手动跑脚本：关 → `bl_power=1` 且 buffyboard 停；开 → `bl_power=0` 且 buffyboard 起。
 脚本里加了带时间戳的日志，方便判断"一次物理按键到底触发几次"。
+
+## 2026-09-07 按键映射修正（照原厂 DTB + 报告 002）
+
+### 症状
+
+只按**电源键**一下，`thd --dump` 却抓到两个事件：
+```
+EV_KEY KEY_POWER     1  /dev/input/event2   (pm8941_pwrkey)
+EV_KEY KEY_VOLUMEDOWN 1  /dev/input/event3   (pm8941_resin)
+```
+thd 一看到两个键同时按下就匹配不上单键触发器 `KEY_POWER 1` ⇒ "按了电源键没反应"。
+
+### 原厂铁证（不是猜的）
+
+`evidence/stock-rom-battery/odin-stock.dts`：
+
+- **:11643 gpio_keys** —— 三个实体键都走 TLMM GPIO，全部 low-active、debounce 15：
+  · `vol_up`   GPIO85 → linux,code 0x73(115 KEY_VOLUMEUP)
+  · `vol_down` GPIO86 → linux,code 0x72(114 KEY_VOLUMEDOWN)
+  · `key_home` GPIO87 → linux,code 0x66(102 KEY_HOME)，带 `gpio-key,wakeup`
+- **:7932 qcom,pon_2** —— RESIN 是 `status="disable"`。
+  **原厂根本没把 RESIN 当音量-用**，音量- 是 GPIO86。
+
+我们之前的 DTS 是：gpio-keys 只有 volume-up（GPIO85），
+再 `&pm8953_resin { linux,code = <KEY_VOLUMEDOWN>; status = "okay"; }` —— 两处都错。
+
+### 改法（patches/0007）
+
+- gpio-keys 补齐 volume-down(GPIO86) 与 key_home(GPIO87)，三个键都加 debounce-interval = <15>，
+  key_home 带 `wakeup-source`；
+- `&pm8953_resin` 改成 `status = "disabled"`。
+
+### 验证
+
+- `git apply --check` 通过（hunk 行数用脚本重算，没手数 —— 之前手数错过一次）；
+- 本地容器编译 4 个 DTB 全过；反编译产物核对：
+  volume_up=115/85、volume_down=114/86、key_home=102/87，debounce 全 15，与
+  原厂 DTB 逐项一致。DTB 64071 → 64309 字节。
