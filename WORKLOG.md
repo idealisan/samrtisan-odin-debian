@@ -4693,3 +4693,34 @@ thd 一看到两个键同时按下就匹配不上单键触发器 `KEY_POWER 1` �
 - 本地容器编译 4 个 DTB 全过；反编译产物核对：
   volume_up=115/85、volume_down=114/86、key_home=102/87，debounce 全 15，与
   原厂 DTB 逐项一致。DTB 64071 → 64309 字节。
+
+## 2026-09-08 kb 变体首次刷机：成功，但暴露两个"只在真镜像里才看得见"的问题
+
+`v0.9.7-keymap2` 刷入真机，flash-all.sh **16 项验收全过**（面板/DSI/DRM/背光/
+usb0/wlan0/sshd/扩容…）。按键映射也确认生效：`pm8941_resin` 不再出现在输入设备
+列表里 —— 说明 `&pm8953_resin { status = "disabled" }` 起作用了。
+
+但刷完发现两个问题，都是**仓库里的漏子**，靠"本地手工改过"是盖不住的：
+
+### 1. buffyboard 装错目录（跟之前那次同源）
+
+`build-buffyboard.sh` 把二进制装到 `/usr/bin/buffyboard`，而 meson 生成的
+`buffyboard.service` 里 `ExecStart` 写死 `@bindir@` = `/usr/local/bin/buffyboard`。
+结果：
+```
+Failed to locate executable /usr/local/bin/buffyboard: No such file or directory
+(status=203/EXEC) → Restart 5 次 → Start request repeated too quickly → failed
+```
+之前在旧机上我是靠"手动再拷一份到 /usr/local/bin"绕过去的，**脚本本身没改**，
+于是新镜像一刷就复现。已把脚本改成装 `/usr/local/bin`（本机编译的软件放这里
+本来也更合规），并把相关的 strip、大小报告、文件头说明一并改掉。
+
+### 2. odin-rmtfs 从来没进过启用清单
+
+刷完是 `disabled; inactive (dead)`。它只在 `apply-staging-fixes.sh` 之外被
+`install_rmtfs.sh` 手工 enable 过，镜像里当然没有。已加进 enable_from_tree。
+
+### 教训
+
+"我在真机上手工改好了"不等于"修好了"。刷一次全新镜像才是唯一可靠的验证 ——
+这次两个漏子都是这么暴露的。

@@ -3,7 +3,7 @@
 #
 #   tools/ci/build-buffyboard.sh <arm64 根文件系统目录>
 #
-# 产物直接装进这个根：/usr/bin/buffyboard + /etc/buffyboard.conf +
+# 产物直接装进这个根：/usr/local/bin/buffyboard + /etc/buffyboard.conf +
 # /usr/lib/systemd/system/buffyboard.service + getty@.service.d/buffyboard.conf
 #
 # ---------------------------------------------------------------------------
@@ -108,9 +108,15 @@ chroot "$ROOT" sh -c "
 "
 
 say "装进根文件系统"
-install -d -m 0755 "$ROOT/usr/bin"
-install -m 0755 "$ROOT$BUILD/buffyboard/buffyboard" "$ROOT/usr/bin/buffyboard"
-chroot "$ROOT" strip /usr/bin/buffyboard 2>/dev/null || true
+# 装到 /usr/local/bin —— **不能**装到 /usr/bin：
+#   meson 生成的 buffyboard.service 里 ExecStart 写死的是
+#   `@bindir@` = /usr/local/bin/buffyboard。装到 /usr/bin 的话服务会
+#     Failed to locate executable /usr/local/bin/buffyboard: No such file
+#   然后 Restart 5 次后彻底 failed（2026-09-08 刷机后实测就是这个现象）。
+#   改 unit 也行，但 /usr/local/bin 本来就更合规（本机编译、非发行版包）。
+install -d -m 0755 "$ROOT/usr/local/bin"
+install -m 0755 "$BUILD/buffyboard/buffyboard" "$ROOT/usr/local/bin/buffyboard"
+chroot "$ROOT" strip /usr/local/bin/buffyboard 2>/dev/null || true
 install -m 0644 "$ROOT$SRCDIR/buffyboard/buffyboard.conf" "$ROOT/etc/buffyboard.conf"
 install -d -m 0755 "$ROOT/usr/lib/systemd/system"
 install -m 0644 "$ROOT$BUILD/buffyboard/buffyboard.service" \
@@ -118,7 +124,7 @@ install -m 0644 "$ROOT$BUILD/buffyboard/buffyboard.service" \
 install -d -m 0755 "$ROOT/usr/lib/systemd/system/getty@.service.d"
 install -m 0644 "$ROOT$SRCDIR/buffyboard/getty-buffyboard.conf" \
 	"$ROOT/usr/lib/systemd/system/getty@.service.d/buffyboard.conf"
-say "  /usr/bin/buffyboard $(stat -c%s "$ROOT/usr/bin/buffyboard" 2>/dev/null || stat -f%z "$ROOT/usr/bin/buffyboard") 字节"
+say "  /usr/local/bin/buffyboard $(stat -c%s "$ROOT/usr/local/bin/buffyboard" 2>/dev/null || stat -f%z "$ROOT/usr/local/bin/buffyboard") 字节"
 
 # uinput 是模块（CONFIG_INPUT_UINPUT=m），BuffyBoard 靠它造虚拟键盘设备。
 # 不预加载的话 /dev/uinput 打不开，键盘起不来。

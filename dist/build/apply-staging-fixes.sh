@@ -240,6 +240,10 @@ enable_from_tree odin-backlight.service multi-user.target
 # device unit 上，等显示真就绪了再强制重新 probe 一次。
 # 时间线与"为什么不在 DT 里补 vcc-supply"见脚本头部注释。
 enable_from_tree odin-touchscreen.service multi-user.target
+# modem 的 EFS 读写守护进程。&mpss 在 DTS 里是开的，modem 起来就要用它，
+# 没它每约 50 秒崩一次。之前只在手工装的流程里 enable 过，镜像里从来没启用
+# —— 2026-09-08 刷完 kb 镜像发现它是 disabled/inactive，补上。
+enable_from_tree odin-rmtfs.service multi-user.target
 # 周期全量重绘 BuffyBoard：控制台一整屏刷新（登录 / exit）会把键盘顶成黑块，
 # 靠每秒一次的 SIGUSR1 把它补回来。原理见脚本头部注释。
 # 只在 kb 变体里有意义，但 enable_from_tree 对"覆盖树里没有这个 unit"会自动
