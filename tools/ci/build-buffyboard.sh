@@ -115,7 +115,14 @@ say "装进根文件系统"
 #   然后 Restart 5 次后彻底 failed（2026-09-08 刷机后实测就是这个现象）。
 #   改 unit 也行，但 /usr/local/bin 本来就更合规（本机编译、非发行版包）。
 install -d -m 0755 "$ROOT/usr/local/bin"
-install -m 0755 "$BUILD/buffyboard/buffyboard" "$ROOT/usr/local/bin/buffyboard"
+# ⚠️ 宿主侧路径必须带 $ROOT 前缀。$BUILD / $SRCDIR 是 **chroot 内部**路径
+#   （/usr/src/buffybox/_build），而 install 跑在宿主机上，不加 $ROOT 就会去找
+#   宿主机根下那个不存在的路径 —— 2026-09-08 CI 上就是这个错：
+#     install: cannot stat '/usr/src/buffybox/_build/buffyboard/buffyboard'
+#   编译其实已经成功了（[471/471] Linking 都过了），纯粹是拷贝路径写错。
+BIN="$ROOT$BUILD/buffyboard/buffyboard"
+[ -f "$BIN" ] || { echo "[buffyboard] ❌ 编译产物不存在: $BIN" >&2; exit 1; }
+install -m 0755 "$BIN" "$ROOT/usr/local/bin/buffyboard"
 chroot "$ROOT" strip /usr/local/bin/buffyboard 2>/dev/null || true
 install -m 0644 "$ROOT$SRCDIR/buffyboard/buffyboard.conf" "$ROOT/etc/buffyboard.conf"
 install -d -m 0755 "$ROOT/usr/lib/systemd/system"
