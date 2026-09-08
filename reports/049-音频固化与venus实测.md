@@ -80,6 +80,11 @@ ALSA mixer-based routing or UCM profile`。
    Peak **−36.1 dB**、RMS **−55.8 dB**（不是本底）；用户耳朵确认"有声音"。
 4. 之后故意把 UCM 实验改动全部还原（.odin-bak 都在），`aplay` 依旧 RC=0 —— 证明
    生效的是状态文件，与我中途改过的 UCM 无关。
+5. **关键一条：验证的正是要上线的那条链路。** 把 5 个播放侧控件打回默认值
+   （`Invalid argument`），然后
+   `udevadm trigger --action=add --subsystem-match=sound` —— 这就是开机时声卡出现、
+   `90-alsa-restore.rules` 被触发的同一个事件。3 秒后五个控件全部回到状态文件里的值，
+   `aplay` RC=0。也就是说：刷完镜像、声卡一注册，路由就自己就位，不需要任何手工动作。
 
 ---
 
