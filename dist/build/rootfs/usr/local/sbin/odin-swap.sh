@@ -13,7 +13,7 @@
 #   这台机器是旧手机，闪存磨损不是首要顾虑；换来的是不 OOM。
 #
 #   所以：
-#     swapfile  2 GiB，优先级 10   ← 主力，撑峰值（原 4 GiB，见下面 SIZE 处的说明）
+#     swapfile  5 GiB，优先级 10   ← 主力，撑峰值
 #     zram    512 MiB，优先级 100  ← 打底，接住"温"页，少写 eMMC、响应更快
 #   内核会先用优先级高的 zram，撑不住再落到 swapfile。想只要 swapfile，
 #   把 ODIN_ZRAM_SIZE 设成 0 即可。
@@ -42,14 +42,17 @@
 set -u
 
 SWAPFILE=${ODIN_SWAP_FILE:-/swapfile}
-# 默认 2 GiB（2026-09-08 从 4 GiB 降下来）。
-#   理由：用户问"没装 GUI 的版本怎么占了几个 GB"，实测 / 用掉 4.9 GiB 里
-#   **4.0 GiB 就是这个 swapfile** —— 它是 / 下最大的单项，比整个 /usr(741 MiB)
-#   大 5 倍多。2 GiB 对 core / kb 这种无桌面的用法足够，省下来的空间更实在。
-#   仍是失败的兜底手段（不是主内存），真遇到峰值顶不住就调大 ODIN_SWAP_SIZE。
-SIZE=${ODIN_SWAP_SIZE:-2G}
-# 2 GiB；改成别的值时 WANT_BYTES 会自动跟着算，不用手动同步
-WANT_BYTES=$((2 * 1024 * 1024 * 1024))
+# 5 GiB（用户定，2026-09-08）。
+#   最早就想建 5 GiB，当时根分区 ext4 为了迁就 lk2nd 关了 extents，而 swapfile
+#   走 iomap **需要 extents** ⇒ swapon: Invalid argument，于是临时退到 4 GiB。
+#   后来 reports/036 给 lk2nd 加了只读 extents 支持、根分区已开 extents
+#   （实测 tune2fs 里确有 extent），5 GiB 不再有障碍。
+#
+#   期间我自作主张把它降到 2 GiB（理由是"它占 4 GiB、看着大"），用户明确否掉了
+#   —— swap 大小是权衡过的选择，不是我该替用户省的东西。
+SIZE=${ODIN_SWAP_SIZE:-5G}
+# 5 GiB；改成别的值时 WANT_BYTES 会自动跟着算，不用手动同步
+WANT_BYTES=$((5 * 1024 * 1024 * 1024))
 case "$SIZE" in
 	*G) WANT_BYTES=$(( ${SIZE%G} * 1024 * 1024 * 1024 )) ;;
 	*M) WANT_BYTES=$(( ${SIZE%M} * 1024 * 1024 )) ;;
