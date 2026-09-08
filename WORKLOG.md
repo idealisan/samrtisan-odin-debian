@@ -4784,3 +4784,34 @@ du -ax / | sort -rh | head
 
 用户指定：**下一次还需要发版的话用 `v0.9.11`**（不是 0.9.10）。
 （当前已发到 v0.9.9；v0.9.8 已取消、v0.9.7 已取消。）
+
+## 2026-09-08 音频路由固化进镜像（v0.9.11-audio）
+
+- **现象**：新刷机音频完全不可用，`aplay`/`arecord` 一律 `Invalid argument`（048 报告）。
+- **真因**：路由**从来没被应用过**。
+  - `/var/lib/alsa/` 是空的 ⇒ Debian 自带的 udev 规则 `90-alsa-restore.rules`
+    （`ACTION=="add", KERNEL=="controlC*"` → `alsactl restore`）没有状态可恢复。
+  - UCM 也救不了：卡片实际用的是 `ucm2/smartisanodin/`（Syntax 4）那份**旧**路由
+    （`PRI_MI2S_TX` / `ADC2`，与硬件不符）；换成 `conf.d/smartisan-odin` 指向的正确
+    路由后 `alsaucm set _verb HiFi` 能过，但 `set _dev Speaker/Earpiece` 在
+    alsa-lib 1.2.8 上一律 EINVAL —— 而逐条 `amixer cset` 全都成功，所以既不是控件名
+    也不是取值的问题（`${CardId}` 未定义是另一处坑，改写成 hw:0,x 后仍失败）。
+  - 045 报告里"麦克风/听筒/扬声器 ✅"是在**手工 cset 过**的旧机上验的，镜像里没固化。
+- **修法**：真机调通路由 → `alsactl store` 成 `dist/build/rootfs/var/lib/alsa/asound.state`
+  （1130 个控件 / 178512 字节）随镜像发布，由系统自带 udev 规则在声卡出现时自动恢复。
+  **不新增任何 systemd 服务。**
+- **实测**：故意把 5 个关键控件打回默认值 ⇒ `aplay: audio open error: Invalid argument`
+  （与 048 报告症状一致）；`alsactl restore -f` 之后 aplay RC=0、arecord RC=0；
+  播放 1 kHz 正弦时麦克风回环录到 Peak −36.1 dB / RMS −55.8 dB，用户耳朵确认"有声音"。
+
+## 2026-09-08 venus 用静态 ffmpeg 实测（用户要求"装一个测一下"）
+
+- 设备无外网装不了包 ⇒ 从 johnvansickle.com 下 **arm64 静态** ffmpeg 7.0.2，scp 进设备跑。
+- **解码可用**：`h264_v4l2m2m` 解 720p H.264，20.8× 实时（60 帧源）。
+- **编码可用但有边界**：640×480 / 800×480 / 1024×576 / 1280×704 / 736 / 768 / 800 /
+  **1920×1088** 全部成功；**高度 720（1280×720、640×720）以及 1280×240/360/688/752
+  一律 SIGBUS（ffmpeg 崩，内核无日志）** —— 规律接近"高度需 32 对齐"，最常见的
+  720p 正好踩雷。
+- 解码会掉帧：默认缓冲下 60 帧只出 46/59 帧，日志明示
+  `All capture buffers returned to userspace. Increase num_capture_buffers`；
+  调到 32 反而卡死（4 分钟不返回）。
