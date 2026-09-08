@@ -44,7 +44,9 @@ fi
 
 say "等待显示就绪（/dev/dri/card0）"
 i=0
-while [ ! -e /dev/dri/card0 ] && [ "$i" -lt 30 ]; do
+# 上限 120s：实测本机 DRM 约 36.9s 起来，但把服务排在 modules-load 之后、
+# 不再依赖 device unit，服务会在 ~8s 就启动，得等得住。
+while [ ! -e /dev/dri/card0 ] && [ "$i" -lt 120 ]; do
 	sleep 1
 	i=$((i + 1))
 done

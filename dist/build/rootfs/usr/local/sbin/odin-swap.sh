@@ -13,7 +13,7 @@
 #   这台机器是旧手机，闪存磨损不是首要顾虑；换来的是不 OOM。
 #
 #   所以：
-#     swapfile  4 GiB，优先级 10   ← 主力，撑峰值
+#     swapfile  2 GiB，优先级 10   ← 主力，撑峰值（原 4 GiB，见下面 SIZE 处的说明）
 #     zram    512 MiB，优先级 100  ← 打底，接住"温"页，少写 eMMC、响应更快
 #   内核会先用优先级高的 zram，撑不住再落到 swapfile。想只要 swapfile，
 #   把 ODIN_ZRAM_SIZE 设成 0 即可。
@@ -42,9 +42,14 @@
 set -u
 
 SWAPFILE=${ODIN_SWAP_FILE:-/swapfile}
-SIZE=${ODIN_SWAP_SIZE:-4G}
-# 4 GiB；改成别的值时 WANT_BYTES 会自动跟着算，不用手动同步
-WANT_BYTES=$((4 * 1024 * 1024 * 1024))
+# 默认 2 GiB（2026-09-08 从 4 GiB 降下来）。
+#   理由：用户问"没装 GUI 的版本怎么占了几个 GB"，实测 / 用掉 4.9 GiB 里
+#   **4.0 GiB 就是这个 swapfile** —— 它是 / 下最大的单项，比整个 /usr(741 MiB)
+#   大 5 倍多。2 GiB 对 core / kb 这种无桌面的用法足够，省下来的空间更实在。
+#   仍是失败的兜底手段（不是主内存），真遇到峰值顶不住就调大 ODIN_SWAP_SIZE。
+SIZE=${ODIN_SWAP_SIZE:-2G}
+# 2 GiB；改成别的值时 WANT_BYTES 会自动跟着算，不用手动同步
+WANT_BYTES=$((2 * 1024 * 1024 * 1024))
 case "$SIZE" in
 	*G) WANT_BYTES=$(( ${SIZE%G} * 1024 * 1024 * 1024 )) ;;
 	*M) WANT_BYTES=$(( ${SIZE%M} * 1024 * 1024 )) ;;

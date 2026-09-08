@@ -7,10 +7,15 @@ Description=ODIN: 面板就绪后重新 probe 触摸屏（FT8716 是 TDDI）
 # 完整的时间线与"为什么不在 DT 里补 vcc-supply"见
 # /usr/local/sbin/odin-touchscreen.sh 的头部注释。
 #
-# 绑到 card0 这个 device unit 上：它是"显示真的起来了"的可靠信号，
-# 比写死 sleep 可靠，也比 After=systemd-udev-settle 更精确。
-After=dev-dri-card0.device
-Wants=dev-dri-card0.device
+# ⚠️ 这里**不能**写 After/Wants=dev-dri-card0.device。
+#    2026-09-08 实测：那个 device unit 在这台机器上**从来不激活**
+#    （systemctl show 出来 ActiveState=inactive、ActiveEnterTimestamp 为空），
+#    尽管 /dev/dri/card0 节点本身是存在的（device unit 由 udev 事件创建，这里没成）。
+#    于是 systemd 一直等它，等到 DefaultDeviceTimeout(90s) 才放行 —— 用户态启动
+#    时间直接被顶到 1min35s（内核其实只要 7.6s）。
+#    正确做法：不依赖 device unit，由脚本自己轮询 /dev/dri/card0 是否真的出现
+#    （见 odin-touchscreen.sh），那才是"显示起来了"的可靠信号。
+After=systemd-modules-load.service
 
 [Service]
 Type=oneshot

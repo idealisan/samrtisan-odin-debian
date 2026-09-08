@@ -4724,3 +4724,41 @@ Failed to locate executable /usr/local/bin/buffyboard: No such file or directory
 
 "我在真机上手工改好了"不等于"修好了"。刷一次全新镜像才是唯一可靠的验证 ——
 这次两个漏子都是这么暴露的。
+
+## 2026-09-08 开机慢与占用大的调查（都有结论，都已修）
+
+### 开机 1min43s：内核只要 7.6s，慢全在用户空间
+
+```
+systemd-analyze: 7.636s (kernel) + 1min 35.846s (userspace)
+critical-chain:
+  graphical.target @1min35.7s
+  └─multi-user.target
+    └─odin-touchscreen.service @1min32.3s +3.4s   ← 一直等到 92 秒才开始
+      └─basic.target @29.6s
+        └─systemd-udev-settle.service @7.8s +21.6s
+```
+
+**真凶是我自己写的 `After=dev-dri-card0.device`**：
+`systemctl show dev-dri-card0.device` → `ActiveState=inactive`、
+`ActiveEnterTimestamp` **为空** —— 那个 device unit 在这台机器上**从来没激活过**
+（device unit 由 udev 事件创建，`/dev/dri/card0` 节点存在不代表 unit 激活）。
+于是 systemd 死等它，等到 DefaultDeviceTimeout(90s) 才放行。
+
+改法：不依赖 device unit，改由脚本自己轮询 `/dev/dri/card0` 是否真的出现
+（上限从 30s 放宽到 120s，本机 DRM 约 36.9s 起来）。
+
+顺带：`systemd-udev-settle` 21.6s 也省掉 —— 换成 odin-hotkey 的
+ExecStartPre 精确等 `pm8941_pwrkey`（见 odin-hotkey-wait.sh）。
+
+### 占用 4.9G：4.0G 是 swapfile
+
+```
+du -ax / | sort -rh | head
+  4194308  /swapfile      ← 就是它
+   758276  /usr
+```
+默认 `ODIN_SWAP_SIZE=4G` → 降到 2G（core / kb 不跑桌面够用；要调大仍可覆盖环境变量）。
+
+注：已装好的机器不会因为改默认值而缩小现有 swapfile（脚本见到文件存在会跳过重建），
+刷新镜像才会生效。
