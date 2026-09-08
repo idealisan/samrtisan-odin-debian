@@ -70,7 +70,26 @@ ALSA mixer-based routing or UCM profile`。
 | `DEC1 MUX` / `CIC1 MUX` | ADC1 / AMIC | AMIC1 → ADC1 → DEC1 |
 | `ADC1 Volume` | 8 | 增益（不开的话 RMS 只有本底） |
 
-### 1.4 实测证据（真机 v0.9.9，未重刷）
+### 1.4 镜像层验证（不依赖真机）
+
+v0.9.11-audio 构建完成后，把 `odin-debian-kb.img`（922746880 字节，sha256 与
+SHA256SUMS 一致）用 `debugfs` 直接读：
+
+```
+debugfs -R 'ls -l /var/lib/alsa' kb.img
+  18989  100644 (1)      0      0   178512  asound.state
+```
+
+再把文件 dump 出来与仓库里的源文件比 md5：
+
+```
+e71e585efe222c5a0bde53c98a80b98f  dist/build/rootfs/var/lib/alsa/asound.state
+e71e585efe222c5a0bde53c98a80b98f  （镜像里 dump 出来的）
+```
+
+逐字节一致 ⇒ **路由确实进了镜像**，这一步不依赖设备是否在线。
+
+### 1.5 实测证据（真机 v0.9.9，未重刷）
 
 1. **复现**：把上面 5 个播放侧控件打回默认值 →
    `aplay: main:831: audio open error: Invalid argument`（与 048 报告症状逐字一致）。
@@ -149,6 +168,20 @@ device deadlock or dropped packets/frames`。把 `-num_capture_buffers` 调到 3
 | `WORKLOG.md` | 追加两节（音频固化、venus 实测） |
 
 内核 / DTB / lk2nd / 其他用户态脚本**一律未动**。
+
+---
+
+## 五、刷机与当前状态（2026-09-09 01:10）
+
+- **已刷**：`fastboot flash userdata odin-debian-kb-sparse.img` —— 2 段 sparse
+  全部 OKAY，37 s 完成；刷前 sha256 已与 SHA256SUMS 对齐。
+- lk2nd / DTB / 内核本轮**未变**，所以只刷 userdata，没动 boot 分区。
+- `fastboot reboot` 之后设备**一直没上线**：ping 不通、`fastboot devices` 空、
+  主机侧连 USB 以太网接口都没出现 ⇒ 不是"系统起不来"，而是**主机根本看不到这个
+  USB 设备**（线松了 / 手机没开机 / 没电），需要人去按一下电源键或看一眼屏幕。
+- 设备回来后跑 `tmp/verify-911-audio.sh`（脚本已备好，scp 到 `/home/user/` 即可）：
+  里面**一条 amixer 都不敲**，只看控件值 + `speaker-test` + `arecord` 的 RMS，
+  用来确认"刷完就有声"。
 
 ---
 
