@@ -215,21 +215,38 @@ apply_device() {
 	# 目录被注销"的半死状态（usb0 悬空链接）。换 function 类型是成本最低的对照实验：如果
 	# ECM 没这问题，就说明是 NCM 的锅。实测时通过 /etc/odin/usb-role.env 切，不用改代码、不用重编。
 
-	# 切类型前先摘掉旧链接，并清掉其它类型的 function 目录，避免多个 function 同时挂在 config 上
-	rm -f "$CFG/configs/c.1/f1" 2>/dev/null
-	for other in ncm ecm rndis; do
-		[ "$other" = "$GADGET_FN" ] && continue
-		rmdir "$CFG/functions/$other.usb0" 2>/dev/null
-	done
-
+	# 【关键】只在"链接不存在 / 指向别的 function"时才拆链重建，绝不无条件 rm + ln。
+	#
+	# 为什么：gadget 已绑在 UDC 上时，rm 掉 config 里的 function 链接会让内核**当场把
+	# 整个 gadget 从 UDC 上摘下来** —— 实测 `rm -f configs/c.1/f1` 之后
+	# `cat $CFG/UDC` 立刻变空、PC 侧网卡消失、正在跑的 SSH 会话 Connection reset。
+	# 而本脚本每 30s 被看门狗跑一次，于是旧代码等价于**每 30s 自己把 USB 网卡打掉一次**：
+	# PC 侧看到的就是"网卡一会有一会没有"，且每次重枚举 host MAC 都是新的随机值，
+	# Windows 会不断新建设备实例（UsbNcm Host Device #3、#4…），DHCP 也要重新走一遍。
+	#
+	# 换 function 类型时确实必须拆链，那就**先解绑 UDC 再拆**（顺序反了是 -EBUSY）。
+	cur_fn=$(readlink "$CFG/configs/c.1/f1" 2>/dev/null)
 	mkdir -p "$CFG/functions/$GADGET_FN.usb0" "$CFG/configs/c.1" 2>/dev/null
+	if [ "${cur_fn##*/}" != "$GADGET_FN.usb0" ]; then
+		cur_udc=$(cat "$CFG/UDC" 2>/dev/null)
+		[ -n "$cur_udc" ] && echo "" > "$CFG/UDC" 2>/dev/null
+		# 摘掉旧链接，并清掉其它类型的 function 目录，避免多个 function 同时挂在 config 上
+		rm -f "$CFG/configs/c.1/f1" 2>/dev/null
+		for other in ncm ecm rndis; do
+			[ "$other" = "$GADGET_FN" ] && continue
+			rmdir "$CFG/functions/$other.usb0" 2>/dev/null
+		done
+		# -n 不能少：f1 是指向目录的软链，没有 -n 的话 ln 会把新链接建到旧目录里面去
+		ln -sfn "$CFG/functions/$GADGET_FN.usb0" "$CFG/configs/c.1/f1" 2>/dev/null
+		log "device: rebuilt function link (was='$cur_fn' -> $GADGET_FN.usb0)"
+	fi
+
 	[ -f "$CFG/idVendor" ]  || echo 0x18d1 > "$CFG/idVendor"   2>/dev/null
 	[ -f "$CFG/idProduct" ] || echo 0x4ee1 > "$CFG/idProduct"  2>/dev/null
 	mkdir -p "$CFG/configs/c.1/strings/0x409" 2>/dev/null
 	[ -f "$CFG/configs/c.1/strings/0x409/configuration" ] \
 		|| echo "ODIN Debian" > "$CFG/configs/c.1/strings/0x409/configuration" 2>/dev/null
-	ln -sf "$CFG/functions/$GADGET_FN.usb0" "$CFG/configs/c.1/f1" 2>/dev/null
-	log "device: gadget function=$GADGET_FN"
+	log "device: gadget function=$GADGET_FN link=${cur_fn##*/}"
 
 	# MAC 固定 —— 注意两点（都踩过）：
 	#  1) configfs 的 host_addr/dev_addr 一旦绑定 UDC 就不可写（Permission denied）；
